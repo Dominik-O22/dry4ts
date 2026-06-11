@@ -8,12 +8,16 @@ import {
   clusterCandidates,
   formatCandidate,
   formatCluster,
+  main,
   Options,
+  printText,
   toEdn,
   toJson,
+  USAGE,
   TypeScriptDuplicateFinder,
   type Candidate,
 } from "../src/index.js";
+import { ClusterCollector } from "../src/Clusters.js";
 
 test("reports structural duplicate candidates with file and line ranges", async () => {
   const { files, candidates } = await scanFixture(
@@ -468,3 +472,143 @@ function pair(left: string, right: string, score: number): Candidate {
 function hasDuplicate(candidates: readonly Candidate[], left: string, right: string): boolean {
   return candidates.some((candidate) => candidate.left.file.endsWith(left) && candidate.right.file.endsWith(right));
 }
+
+test("main --help prints USAGE to stdout", () => {
+  const lines: string[] = [];
+  const original = console.log;
+  console.log = (...args: unknown[]) => {
+    lines.push(args.map(String).join(" "));
+  };
+  try {
+    main(["--help"]);
+  } finally {
+    console.log = original;
+  }
+  assert.ok(lines.some((line) => line.includes("Usage: dry4ts")), `Expected USAGE in stdout, got: ${JSON.stringify(lines)}`);
+  assert.ok(lines.some((line) => line.includes(USAGE.split("\n")[0])));
+});
+
+test("main with invalid --threshold value sets exitCode 2 and writes to stderr", () => {
+  const errors: string[] = [];
+  const originalError = console.error;
+  console.error = (...args: unknown[]) => {
+    errors.push(args.map(String).join(" "));
+  };
+  try {
+    process.exitCode = 0;
+    main(["--threshold", "bad"]);
+    assert.equal(process.exitCode, 2);
+    assert.ok(errors.length > 0, "Expected something written to stderr");
+  } finally {
+    console.error = originalError;
+    process.exitCode = 0;
+  }
+});
+
+test("main with --format xml sets exitCode 2", () => {
+  const originalError = console.error;
+  console.error = () => {};
+  const originalLog = console.log;
+  console.log = () => {};
+  try {
+    process.exitCode = 0;
+    main(["--format", "xml", "."]);
+    assert.equal(process.exitCode, 2);
+  } finally {
+    console.error = originalError;
+    console.log = originalLog;
+    process.exitCode = 0;
+  }
+});
+
+test("main --fail-on-duplicates with duplicates sets exitCode 1", async () => {
+  const { dir } = await writeFixture({
+    "alpha.ts": duplicateBody,
+    "beta.ts": duplicateBody,
+  });
+  const result = Bun.spawnSync(
+    ["bun", "run", "src/bin/dry4ts.ts", "--fail-on-duplicates", "--threshold", "0.2", "--min-lines", "3", "--min-nodes", "8", dir],
+    { cwd: "/home/doop/private/dry4ts" },
+  );
+  assert.equal(result.exitCode, 1);
+});
+
+test("main --fail-on-duplicates with no duplicates leaves exitCode 0", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "dry4ts-nodups-"));
+  await writeFile(path.join(dir, "solo.ts"), duplicateBody);
+  const result = Bun.spawnSync(
+    ["bun", "run", "src/bin/dry4ts.ts", "--fail-on-duplicates", "--threshold", "0.99", "--min-lines", "100", "--min-nodes", "9999", dir],
+    { cwd: "/home/doop/private/dry4ts" },
+  );
+  assert.equal(result.exitCode, 0);
+});
+
+test("printText with empty clusters prints no duplicate clusters found", () => {
+  const lines: string[] = [];
+  const original = console.log;
+  console.log = (...args: unknown[]) => {
+    lines.push(args.map(String).join(" "));
+  };
+  try {
+    printText([]);
+  } finally {
+    console.log = original;
+  }
+  assert.deepEqual(lines, ["No duplicate clusters found."]);
+});
+
+test("printText with two clusters separates them with a blank line", () => {
+  const clusters = clusterCandidates([pair("a.ts", "b.ts", 0.9), pair("c.ts", "d.ts", 0.8)]);
+  const lines: string[] = [];
+  const original = console.log;
+  console.log = (...args: unknown[]) => {
+    lines.push(args.map(String).join(" "));
+  };
+  try {
+    printText(clusters);
+  } finally {
+    console.log = original;
+  }
+  assert.ok(lines.includes(""), "Expected a blank line separator between clusters");
+  assert.ok(lines.some((l) => l.startsWith("CLUSTER 1")));
+  assert.ok(lines.some((l) => l.startsWith("CLUSTER 2")));
+});
+
+test("toJson with empty clusters returns object with empty clusters array", () => {
+  assert.deepEqual(JSON.parse(toJson([])), { clusters: [] });
+});
+
+test("toEdn with two clusters includes both entries", () => {
+  const clusters = clusterCandidates([pair("x.ts", "y.ts", 0.9), pair("p.ts", "q.ts", 0.8)]);
+  const edn = toEdn(clusters);
+  assert.ok(edn.includes('"x.ts"'), `Expected x.ts in edn, got: ${edn}`);
+  assert.ok(edn.includes('"y.ts"'), `Expected y.ts in edn, got: ${edn}`);
+  assert.ok(edn.includes('"p.ts"'), `Expected p.ts in edn, got: ${edn}`);
+  assert.ok(edn.includes('"q.ts"'), `Expected q.ts in edn, got: ${edn}`);
+});
+
+test("ClusterCollector updates location to higher node count on same location added twice", () => {
+  const collector = new ClusterCollector();
+  const loc = { file: "a.ts", startLine: 1, endLine: 5, nodes: 10 };
+  const locHigher = { file: "a.ts", startLine: 1, endLine: 5, nodes: 50 };
+  const other = { file: "b.ts", startLine: 1, endLine: 5, nodes: 10 };
+  collector.addMatch(loc, other, 0.9);
+  collector.addMatch(locHigher, other, 0.9);
+  const clusters = collector.clusters();
+  const aLoc = clusters[0].locations.find((l) => l.file === "a.ts");
+  assert.ok(aLoc);
+  assert.equal(aLoc.nodes, 50);
+});
+
+test("Options.from with respectGitignore false sets respectGitignore to false", () => {
+  assert.equal(Options.from({ respectGitignore: false }).respectGitignore, false);
+});
+
+test("toEdn escapes backslash and double quote in file names", () => {
+  const collector = new ClusterCollector();
+  const left = { file: 'path\\to\\"file".ts', startLine: 1, endLine: 5, nodes: 10 };
+  const right = { file: "other.ts", startLine: 1, endLine: 5, nodes: 10 };
+  collector.addMatch(left, right, 0.9);
+  const edn = toEdn(collector.clusters());
+  assert.ok(edn.includes('path\\\\to\\\\\\"file\\"'), `Expected escaped path in edn, got: ${edn}`);
+});
