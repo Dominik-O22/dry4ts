@@ -155,3 +155,35 @@ bun run check
 bun run ci
 bun run bench -- /path/to/project/src /path/to/project/tests
 ```
+
+### Benchmarking
+
+Three corpus tiers, all scanned with `bun run bench -- <paths>`:
+
+1. **Real mid-size project** — any ~30k LOC repository you have locally.
+   Use it as a regression check: cluster output should stay identical across
+   performance changes, and timing should not regress.
+2. **Pinned large repository** — `bun run bench:setup` shallow-clones
+   `microsoft/TypeScript` at the tag matching the installed `typescript`
+   dependency into `.bench/TypeScript` (gitignored). Scan
+   `.bench/TypeScript/src/compiler` for a worst-case stress: very large
+   files, deeply nested ASTs, and high structural self-similarity.
+3. **Synthetic regimes** — `bun run bench:corpus <regime>` generates a
+   deterministic corpus into `.bench/corpus/<regime>`:
+   - `identical` (default 800 functions): dense identical structures,
+     stresses the pairwise comparison phase
+   - `oneliners` (default 10000): trivial declarations below `--min-lines`,
+     stresses entry filtering
+   - `nested` (default depth 300): deeply nested expressions, stresses
+     fingerprint construction
+
+Example:
+
+```bash
+bun run bench:corpus identical -- --count 1200
+bun run bench -- --runs 5 .bench/corpus/identical
+```
+
+Baseline (2026-06-11, pre-optimization, TypeScript v5.9.3 corpus):
+`src/compiler` scans in ~16.2s and reports 246 clusters. Performance work
+should reduce the time without changing the cluster count.

@@ -27,6 +27,8 @@
     "check": "bun run build && bun test && bun ./dist/bin/dry4ts.js --fail-on-duplicates src test",
     "ci": "bun run check",
     "bench": "bun run build && bun scripts/benchmark.mjs",
+    "bench:corpus": "bun scripts/bench-corpus.mjs",
+    "bench:setup": "bun scripts/bench-setup.mjs",
     "pack:dry-run": "bun run build && bun pm pack --dry-run",
     "prepublishOnly": "bun run ci"
   },
