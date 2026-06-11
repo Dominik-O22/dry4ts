@@ -30,7 +30,7 @@ skills:
     type: "core"
     domain: "automating-duplicate-checks"
     path: "skills/wire-duplicate-checks-into-ci/SKILL.md"
-    description: "Use dry4ts as a CI or automated review gate with --format json and --fail-on-duplicates. Load when writing GitHub Actions, parsing Candidate JSON, or handling exit codes 0, 1, and 2."
+    description: "Use dry4ts as a CI or automated review gate with --format json and --fail-on-duplicates. Load when writing GitHub Actions, parsing cluster JSON, or handling exit codes 0, 1, and 2."
     sources:
       - "dry4ts:README.md"
       - "dry4ts:AGENTS.md"

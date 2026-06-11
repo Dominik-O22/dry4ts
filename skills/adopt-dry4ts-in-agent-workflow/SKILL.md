@@ -1,7 +1,7 @@
 ---
 name: adopt-dry4ts-in-agent-workflow
 description: >
-  Run dry4ts after AI-generated edits to catch structural duplication before it accumulates. Load when building autonomous review loops, triaging duplicate candidates, using JSON output after generated changes, or deciding when local duplicate checks should become CI gates.
+  Run dry4ts after AI-generated edits to catch structural duplication before it accumulates. Load when building autonomous review loops, triaging duplicate clusters, using JSON output after generated changes, or deciding when local duplicate checks should become CI gates.
 type: core
 library: dry4ts
 library_version: "0.1.0"
@@ -21,7 +21,7 @@ sources:
 bunx dry4ts --format json src test
 ```
 
-Run this after generated edits to produce machine-readable duplicate candidates for review.
+Run this after generated edits to produce machine-readable duplicate clusters for review.
 
 ## Core Patterns
 
@@ -31,7 +31,7 @@ Run this after generated edits to produce machine-readable duplicate candidates 
 bunx dry4ts --format json src test
 ```
 
-Use JSON when another agent, script, or review tool will consume the result.
+Use JSON when another agent, script, or review tool will consume the clustered result.
 
 ### Keep candidate triage separate from refactoring
 
@@ -59,7 +59,7 @@ const reviewItems = candidates.map((candidate) => ({
 console.log(JSON.stringify({ reviewItems }, null, 2));
 ```
 
-Candidate output should drive a review decision before any abstraction is extracted.
+Candidate or cluster output should drive a review decision before any abstraction is extracted.
 
 ### Escalate repeated local checks into CI
 
@@ -67,7 +67,7 @@ Candidate output should drive a review decision before any abstraction is extrac
 bunx dry4ts --format json --fail-on-duplicates src test
 ```
 
-Use the failing form only when the team wants duplicate candidates to block a pipeline.
+Use the failing form only when the team wants duplicate clusters to block a pipeline.
 
 ## Common Mistakes
 

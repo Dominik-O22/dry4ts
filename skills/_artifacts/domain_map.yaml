@@ -84,7 +84,7 @@ skills:
       - "--json"
       - "--fail-on-duplicates"
       - "exit codes"
-      - "Candidate JSON shape"
+      - "Cluster JSON shape"
       - "GitHub Actions usage"
     tasks:
       - "Add a duplicate-code CI job"
@@ -93,7 +93,7 @@ skills:
       - "Distinguish duplicate findings from CLI usage errors"
     failure_modes:
       - mistake: "Forget fail-on-duplicates in CI"
-        mechanism: "Without --fail-on-duplicates, dry4ts exits 0 even when candidates are found, so CI records a successful job."
+        mechanism: "Without --fail-on-duplicates, dry4ts exits 0 even when duplicate clusters are found, so CI records a successful job."
         wrong_pattern: |
           bunx dry4ts --format json src test
         correct_pattern: |
@@ -102,13 +102,13 @@ skills:
         priority: "CRITICAL"
         status: "active"
       - mistake: "Parse text output in agents"
-        mechanism: "Text output is intended for humans; JSON has the stable candidate array shape for tools and agents."
+        mechanism: "Text output is intended for humans; JSON has the stable cluster array shape for tools and agents."
         wrong_pattern: |
           const output = await run("bunx dry4ts src test");
-          const lines = output.split("\n").filter((line) => line.startsWith("DUPLICATE"));
+          const lines = output.split("\n").filter((line) => line.startsWith("CLUSTER"));
         correct_pattern: |
           const output = await run("bunx dry4ts --format json src test");
-          const { candidates } = JSON.parse(output);
+          const { clusters } = JSON.parse(output);
         source: "README.md:121"
         priority: "HIGH"
         status: "active"
@@ -120,7 +120,7 @@ skills:
           }
         correct_pattern: |
           if (result.exitCode === 1) {
-            reportDuplicateCandidates(result.stdout);
+            reportDuplicateClusters(result.stdout);
           } else if (result.exitCode === 2) {
             throw new Error(result.stderr);
           }

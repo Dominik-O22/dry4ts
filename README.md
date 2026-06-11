@@ -1,6 +1,6 @@
 # dry4ts
 
-dry4ts finds candidate duplicate TypeScript code across files and directories. It reports fuzzy structural matches by filename and line range so another mechanism can evaluate and reduce duplication.
+dry4ts finds candidate duplicate TypeScript code across files and directories. It reports fuzzy structural matches as clusters of related filename and line ranges so another mechanism can evaluate and reduce duplication.
 
 ## Overview
 
@@ -48,33 +48,34 @@ When no paths are provided, dry4ts scans `src`. Directory arguments recursively 
 Default text output:
 
 ```text
-DUPLICATE score=0.89
-  src/invoice.ts:12-25
-  src/receipt.ts:30-44
+CLUSTER 1 score=0.89 locations=2
+  src/invoice.ts:12-25 nodes=88
+  src/receipt.ts:30-44 nodes=91
 ```
 
 EDN output:
 
 ```clojure
-{:candidates
- [{:score 0.8909090909090909
-   :left {:file "src/invoice.ts", :start-line 12, :end-line 25}
-   :right {:file "src/receipt.ts", :start-line 30, :end-line 44}
-   :left-nodes 88
-   :right-nodes 91}]}
+{:clusters
+ [{:score-min 0.8909090909090909
+   :score-max 0.8909090909090909
+   :location-count 2
+   :locations [{:file "src/invoice.ts", :start-line 12, :end-line 25, :nodes 88}
+               {:file "src/receipt.ts", :start-line 30, :end-line 44, :nodes 91}]}]}
 ```
 
 JSON output:
 
 ```json
 {
-  "candidates": [
+  "clusters": [
     {
-      "score": 0.8909090909090909,
-      "left": { "file": "src/invoice.ts", "startLine": 12, "endLine": 25 },
-      "right": { "file": "src/receipt.ts", "startLine": 30, "endLine": 44 },
-      "leftNodes": 88,
-      "rightNodes": 91
+      "score": { "min": 0.8909090909090909, "max": 0.8909090909090909 },
+      "locationCount": 2,
+      "locations": [
+        { "file": "src/invoice.ts", "startLine": 12, "endLine": 25, "nodes": 88 },
+        { "file": "src/receipt.ts", "startLine": 30, "endLine": 44, "nodes": 91 }
+      ]
     }
   ]
 }
@@ -85,7 +86,7 @@ JSON output:
 ```ts
 import { TypeScriptDuplicateFinder } from "dry4ts";
 
-const candidates = new TypeScriptDuplicateFinder().findDuplicates({
+const clusters = new TypeScriptDuplicateFinder().findClusters({
   paths: ["src"],
   threshold: 0.82,
   minLines: 4,
@@ -133,7 +134,7 @@ Exit codes are stable for automation:
 2  CLI usage/configuration error
 ```
 
-The JSON shape is intentionally small and stable: `{ "candidates": Candidate[] }`, where each candidate includes score, left/right locations, and normalized node counts.
+The JSON shape is intentionally small and stable: `{ "clusters": ClusterReport[] }`. Each cluster includes a `score` range, `locationCount`, and grouped `locations`. Each location includes `nodes`, the normalized syntax node count for that duplicated block.
 
 ## Publishing
 
