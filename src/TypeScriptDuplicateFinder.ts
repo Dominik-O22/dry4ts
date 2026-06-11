@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import ignore, { type Ignore } from "ignore";
 import ts from "typescript";
 
 import { ClusterCollector } from "./Clusters.js";
@@ -70,25 +71,71 @@ export class TypeScriptDuplicateFinder {
   }
 
   private entriesFor(options: Options): Entry[] {
-    return this.scan(options.paths)
+    return this.scan(options)
       .filter((entry) => lines(entry) >= options.minLines)
       .filter((entry) => entry.nodes >= options.minNodes);
   }
 
-  private scan(paths: readonly string[]): Entry[] {
-    return paths
-      .flatMap((sourcePath) => this.typeScriptFiles(sourcePath))
+  private scan(options: Options): Entry[] {
+    const ig = options.respectGitignore ? this.gitignoreForCwd() : null;
+    return this.dedupeFiles(
+      options.paths.flatMap((sourcePath) => this.typeScriptFiles(sourcePath, ig, false)),
+    )
       .sort()
       .flatMap((file) => this.scanFile(file));
   }
 
-  private typeScriptFiles(sourcePath: string): string[] {
+  private gitignoreForCwd(): Ignore {
+    const ig = ignore();
+    const gitignorePath = path.join(process.cwd(), ".gitignore");
+    if (fs.existsSync(gitignorePath)) {
+      const content = fs.readFileSync(gitignorePath, "utf8");
+      ig.add(content);
+    }
+    return ig;
+  }
+
+  private relativeForIgnore(filePath: string): string | null {
+    const cwd = process.cwd();
+    const rel = path.relative(cwd, filePath);
+    // Guard: if path escapes cwd, skip ignore matching
+    if (rel.startsWith("..") || path.isAbsolute(rel)) {
+      return null;
+    }
+    // normalize to forward slashes for the ignore matcher
+    return rel.split(path.sep).join("/");
+  }
+
+  private dedupeFiles(files: string[]): string[] {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const file of files) {
+      const resolved = path.resolve(file);
+      if (!seen.has(resolved)) {
+        seen.add(resolved);
+        result.push(file);
+      }
+    }
+    return result;
+  }
+
+  private typeScriptFiles(sourcePath: string, ig: Ignore | null, fromDirectory: boolean): string[] {
     if (!fs.existsSync(sourcePath)) {
       return [];
     }
     const stats = fs.statSync(sourcePath);
     if (stats.isFile()) {
-      return isTypeScriptSource(sourcePath) ? [sourcePath] : [];
+      // Explicit file arguments bypass ignore filtering; directory-discovered files are filtered
+      if (!isTypeScriptSource(sourcePath)) {
+        return [];
+      }
+      if (fromDirectory && ig !== null) {
+        const rel = this.relativeForIgnore(sourcePath);
+        if (rel !== null && ig.ignores(rel)) {
+          return [];
+        }
+      }
+      return [sourcePath];
     }
     if (!stats.isDirectory()) {
       return [];
@@ -99,8 +146,20 @@ export class TypeScriptDuplicateFinder {
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         const fullPath = path.join(dir, entry.name);
         if (entry.isDirectory()) {
+          if (ig !== null) {
+            const rel = this.relativeForIgnore(fullPath);
+            if (rel !== null && ig.ignores(rel)) {
+              continue;
+            }
+          }
           visit(fullPath);
         } else if (entry.isFile() && isTypeScriptSource(fullPath)) {
+          if (ig !== null) {
+            const rel = this.relativeForIgnore(fullPath);
+            if (rel !== null && ig.ignores(rel)) {
+              continue;
+            }
+          }
           files.push(fullPath);
         }
       }

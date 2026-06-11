@@ -8,6 +8,7 @@ export interface OptionsInput {
   readonly format?: OutputFormat;
   readonly help?: boolean;
   readonly failOnDuplicates?: boolean;
+  readonly respectGitignore?: boolean;
 }
 
 export class Options {
@@ -19,10 +20,11 @@ export class Options {
     public readonly format: OutputFormat,
     public readonly help: boolean,
     public readonly failOnDuplicates: boolean,
+    public readonly respectGitignore: boolean,
   ) {}
 
   static defaults(): Options {
-    return new Options(["src"], 0.82, 4, 20, "text", false, false);
+    return new Options(["src"], 0.82, 4, 20, "text", false, false, true);
   }
 
   static from(input: OptionsInput = {}): Options {
@@ -36,6 +38,7 @@ export class Options {
       input.format ?? defaults.format,
       input.help ?? defaults.help,
       input.failOnDuplicates ?? defaults.failOnDuplicates,
+      input.respectGitignore ?? defaults.respectGitignore,
     );
   }
 
@@ -47,6 +50,7 @@ export class Options {
     let format: OutputFormat = "text";
     let help = false;
     let failOnDuplicates = false;
+    let respectGitignore = true;
 
     for (let i = 0; i < args.length; i += 1) {
       const arg = args[i];
@@ -75,6 +79,9 @@ export class Options {
         case "--fail-on-duplicates":
           failOnDuplicates = true;
           break;
+        case "--no-gitignore":
+          respectGitignore = false;
+          break;
         case "--help":
         case "-h":
           help = true;
@@ -87,7 +94,7 @@ export class Options {
     if (paths.length === 0) {
       paths.push("src");
     }
-    return new Options(paths, threshold, minLines, minNodes, format, help, failOnDuplicates);
+    return new Options(paths, threshold, minLines, minNodes, format, help, failOnDuplicates, respectGitignore);
   }
 }
 

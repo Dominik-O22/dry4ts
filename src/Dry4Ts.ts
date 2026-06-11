@@ -16,6 +16,7 @@ export const USAGE = [
   "  --text          Same as --format text",
   "  --fail-on-duplicates",
   "                  Exit with status 1 when duplicate candidates are found",
+  "  --no-gitignore  Include files and directories ignored by .gitignore",
 ].join("\n");
 
 export function main(args: readonly string[] = process.argv.slice(2)): void {

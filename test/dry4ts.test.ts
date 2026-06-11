@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -169,6 +169,14 @@ test("defaults to src when no paths are provided", () => {
   assert.deepEqual(Options.parse().paths, ["src"]);
 });
 
+test("respects gitignore by default", () => {
+  assert.equal(Options.parse(".").respectGitignore, true);
+});
+
+test("disables gitignore with --no-gitignore", () => {
+  assert.equal(Options.parse("--no-gitignore", ".").respectGitignore, false);
+});
+
 test("creates options from partial objects", () => {
   const options = Options.from({ paths: ["lib"], format: "json", failOnDuplicates: true });
 
@@ -289,6 +297,139 @@ test("prints json clusters for agents and ci integrations", () => {
       ],
     }],
   });
+});
+
+const duplicateBody = `
+export function process(items: number[]): number {
+  const kept = items.filter((item) => item % 2 === 0);
+  return kept.map((item) => item * 2).reduce((sum, next) => sum + next, 0);
+}
+`;
+
+test("directory scan skips files and directories listed in .gitignore", async () => {
+  const projectDir = await mkdtemp(path.join(tmpdir(), "dry4ts-gitignore-"));
+  const keptDir = path.join(projectDir, "kept");
+  const ignoredDir = path.join(projectDir, "ignored");
+  await mkdir(keptDir);
+  await mkdir(ignoredDir);
+  await writeFile(path.join(projectDir, ".gitignore"), "ignored/\n");
+  await writeFile(path.join(keptDir, "one.ts"), duplicateBody);
+  await writeFile(path.join(keptDir, "two.ts"), duplicateBody);
+  await writeFile(path.join(ignoredDir, "three.ts"), duplicateBody);
+
+  const originalCwd = process.cwd();
+  try {
+    process.chdir(projectDir);
+    const clusters = new TypeScriptDuplicateFinder().findClusters({
+      paths: ["."],
+      threshold: 0.2,
+      minLines: 3,
+      minNodes: 8,
+    });
+    const allFiles = clusters.flatMap((cluster) => cluster.locations.map((loc) => loc.file));
+    assert.ok(
+      allFiles.every((f) => !f.includes("ignored")),
+      `Expected no ignored/ files in results, got: ${JSON.stringify(allFiles)}`,
+    );
+  } finally {
+    process.chdir(originalCwd);
+  }
+});
+
+test("directory scan includes ignored files when --no-gitignore is set", async () => {
+  const projectDir = await mkdtemp(path.join(tmpdir(), "dry4ts-no-gitignore-"));
+  const keptDir = path.join(projectDir, "kept");
+  const ignoredDir = path.join(projectDir, "ignored");
+  await mkdir(keptDir);
+  await mkdir(ignoredDir);
+  await writeFile(path.join(projectDir, ".gitignore"), "ignored/\n");
+  await writeFile(path.join(keptDir, "one.ts"), duplicateBody);
+  await writeFile(path.join(ignoredDir, "three.ts"), duplicateBody);
+
+  const originalCwd = process.cwd();
+  try {
+    process.chdir(projectDir);
+    const clusters = new TypeScriptDuplicateFinder().findClusters({
+      paths: ["."],
+      threshold: 0.2,
+      minLines: 3,
+      minNodes: 8,
+      respectGitignore: false,
+    });
+    const allFiles = clusters.flatMap((cluster) => cluster.locations.map((loc) => loc.file));
+    assert.ok(
+      allFiles.some((f) => f.includes("ignored")),
+      `Expected ignored/ files in results with --no-gitignore, got: ${JSON.stringify(allFiles)}`,
+    );
+  } finally {
+    process.chdir(originalCwd);
+  }
+});
+
+test("explicit file argument scans ignored file even with gitignore enabled", async () => {
+  const projectDir = await mkdtemp(path.join(tmpdir(), "dry4ts-explicit-"));
+  const keptDir = path.join(projectDir, "kept");
+  const ignoredDir = path.join(projectDir, "ignored");
+  await mkdir(keptDir);
+  await mkdir(ignoredDir);
+  await writeFile(path.join(projectDir, ".gitignore"), "ignored/\n");
+  await writeFile(path.join(keptDir, "one.ts"), duplicateBody);
+  await writeFile(path.join(ignoredDir, "three.ts"), duplicateBody);
+
+  const originalCwd = process.cwd();
+  try {
+    process.chdir(projectDir);
+    const clusters = new TypeScriptDuplicateFinder().findClusters({
+      paths: [path.join(ignoredDir, "three.ts"), path.join(keptDir, "one.ts")],
+      threshold: 0.2,
+      minLines: 3,
+      minNodes: 8,
+      respectGitignore: true,
+    });
+    const allFiles = clusters.flatMap((cluster) => cluster.locations.map((loc) => loc.file));
+    assert.ok(
+      allFiles.some((f) => f.includes("ignored")),
+      `Expected ignored file to be scanned when passed explicitly, got: ${JSON.stringify(allFiles)}`,
+    );
+  } finally {
+    process.chdir(originalCwd);
+  }
+});
+
+test("scans directory outside cwd without crashing", async () => {
+  const externalDir = await mkdtemp(path.join(tmpdir(), "dry4ts-external-"));
+  await writeFile(path.join(externalDir, "a.ts"), duplicateBody);
+  await writeFile(path.join(externalDir, "b.ts"), duplicateBody);
+
+  const clusters = new TypeScriptDuplicateFinder().findClusters({
+    paths: [externalDir],
+    threshold: 0.2,
+    minLines: 3,
+    minNodes: 8,
+    respectGitignore: true,
+  });
+  assert.ok(Array.isArray(clusters), "Expected an array of clusters");
+});
+
+test("dedupes overlapping input paths", async () => {
+  const projectDir = await mkdtemp(path.join(tmpdir(), "dry4ts-dedup-"));
+  const subDir = path.join(projectDir, "sub");
+  await mkdir(subDir);
+  await writeFile(path.join(subDir, "a.ts"), duplicateBody);
+  await writeFile(path.join(subDir, "b.ts"), duplicateBody);
+
+  const clusters = new TypeScriptDuplicateFinder().findClusters({
+    paths: [projectDir, subDir],
+    threshold: 0.2,
+    minLines: 3,
+    minNodes: 8,
+  });
+  // a.ts and b.ts should appear in exactly one cluster, not duplicated
+  const clusterFiles = clusters.flatMap((cluster) => cluster.locations.map((loc) => loc.file));
+  const aFiles = clusterFiles.filter((f) => f.endsWith("a.ts"));
+  const bFiles = clusterFiles.filter((f) => f.endsWith("b.ts"));
+  assert.equal(aFiles.length, 1, `Expected a.ts exactly once, got ${aFiles.length}`);
+  assert.equal(bFiles.length, 1, `Expected b.ts exactly once, got ${bFiles.length}`);
 });
 
 async function writeSource(dir: string, name: string, text: string): Promise<string> {

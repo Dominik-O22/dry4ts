@@ -41,9 +41,10 @@ Options:
 --text          Same as --format text
 --fail-on-duplicates
                 Exit with status 1 when duplicate candidates are found
+--no-gitignore  Include files and directories ignored by .gitignore
 ```
 
-When no paths are provided, dry4ts scans `src`. Directory arguments recursively include `.js`, `.jsx`, `.ts`, `.tsx`, `.mts`, and `.cts` files, excluding TypeScript declaration files.
+When no paths are provided, dry4ts scans `src`. Directory arguments recursively include `.js`, `.jsx`, `.ts`, `.tsx`, `.mts`, and `.cts` files, excluding TypeScript declaration files. Directory scans respect `.gitignore` from the working directory by default; pass `--no-gitignore` to include ignored paths. Explicit file arguments are always scanned even when they match a `.gitignore` pattern.
 
 Default text output:
 
