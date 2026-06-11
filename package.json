@@ -24,8 +24,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && bun scripts/prepare-bin.mjs",
     "test": "bun test",
-    "check": "bun run build && bun test",
-    "ci": "bun run check && bun ./dist/bin/dry4ts.js --fail-on-duplicates src test",
+    "check": "bun run build && bun test && bun ./dist/bin/dry4ts.js --fail-on-duplicates src test",
+    "ci": "bun run check",
+    "bench": "bun run build && bun scripts/benchmark.mjs",
     "pack:dry-run": "bun run build && bun pm pack --dry-run",
     "prepublishOnly": "bun run ci"
   },

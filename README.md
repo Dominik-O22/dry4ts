@@ -153,4 +153,5 @@ npm publish
 bun run test
 bun run check
 bun run ci
+bun run bench -- /path/to/project/src /path/to/project/tests
 ```
