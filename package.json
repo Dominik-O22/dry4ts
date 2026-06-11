@@ -1,0 +1,49 @@
+{
+  "name": "dry4ts",
+  "version": "0.1.0",
+  "description": "Find candidate duplicate TypeScript code by comparing normalized AST structure.",
+  "type": "module",
+  "packageManager": "bun@1.3.6",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "dry4ts": "./dist/bin/dry4ts.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && bun scripts/prepare-bin.mjs",
+    "test": "bun test",
+    "check": "bun run build && bun test",
+    "ci": "bun run check && bun ./dist/bin/dry4ts.js --fail-on-duplicates src test",
+    "pack:dry-run": "bun run build && bun pm pack --dry-run",
+    "prepublishOnly": "bun run ci"
+  },
+  "keywords": [
+    "duplicate-code",
+    "dry",
+    "static-analysis",
+    "typescript",
+    "javascript",
+    "cli"
+  ],
+  "sideEffects": false,
+  "dependencies": {
+    "typescript": "^5.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}
