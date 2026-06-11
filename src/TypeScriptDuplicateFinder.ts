@@ -3,9 +3,10 @@ import path from "node:path";
 
 import ts from "typescript";
 
+import { ClusterCollector } from "./Clusters.js";
 import { Options, type OptionsInput } from "./Options.js";
 import { TypeScriptNormalizer } from "./TypeScriptNormalizer.js";
-import type { Candidate, Location } from "./types.js";
+import type { Candidate, Cluster, Location } from "./types.js";
 
 interface Entry {
   readonly file: string;
@@ -20,17 +21,18 @@ export class TypeScriptDuplicateFinder {
 
   findDuplicates(options: Options | OptionsInput = Options.defaults()): Candidate[] {
     const resolvedOptions = options instanceof Options ? options : Options.from(options);
-    const entries = this.scan(resolvedOptions.paths)
-      .filter((entry) => lines(entry) >= resolvedOptions.minLines)
-      .filter((entry) => entry.nodes >= resolvedOptions.minNodes);
+    const entries = this.entriesFor(resolvedOptions);
     const candidates: Candidate[] = [];
 
     for (let i = 0; i < entries.length; i += 1) {
       for (let j = i + 1; j < entries.length; j += 1) {
         const left = entries[i];
         const right = entries[j];
+        if (overlaps(left, right) || maxPossibleSimilarity(left, right) < resolvedOptions.threshold) {
+          continue;
+        }
         const score = similarity(left, right);
-        if (!overlaps(left, right) && score >= resolvedOptions.threshold) {
+        if (score >= resolvedOptions.threshold) {
           candidates.push({
             score,
             left: location(left),
@@ -43,6 +45,34 @@ export class TypeScriptDuplicateFinder {
     }
 
     return candidates.sort(compareCandidates);
+  }
+
+  findClusters(options: Options | OptionsInput = Options.defaults()): Cluster[] {
+    const resolvedOptions = options instanceof Options ? options : Options.from(options);
+    const entries = this.entriesFor(resolvedOptions);
+    const collector = new ClusterCollector();
+
+    for (let i = 0; i < entries.length; i += 1) {
+      for (let j = i + 1; j < entries.length; j += 1) {
+        const left = entries[i];
+        const right = entries[j];
+        if (overlaps(left, right) || maxPossibleSimilarity(left, right) < resolvedOptions.threshold) {
+          continue;
+        }
+        const score = similarity(left, right);
+        if (score >= resolvedOptions.threshold) {
+          collector.addMatch({ ...location(left), nodes: left.nodes }, { ...location(right), nodes: right.nodes }, score);
+        }
+      }
+    }
+
+    return collector.clusters();
+  }
+
+  private entriesFor(options: Options): Entry[] {
+    return this.scan(options.paths)
+      .filter((entry) => lines(entry) >= options.minLines)
+      .filter((entry) => entry.nodes >= options.minNodes);
   }
 
   private scan(paths: readonly string[]): Entry[] {
@@ -174,17 +204,24 @@ function overlaps(left: Entry, right: Entry): boolean {
 }
 
 function similarity(left: Entry, right: Entry): number {
-  const union = new Set([...left.fingerprints, ...right.fingerprints]);
-  if (union.size === 0) {
+  if (left.fingerprints.size === 0 && right.fingerprints.size === 0) {
     return 0;
   }
+  const smaller = left.fingerprints.size <= right.fingerprints.size ? left.fingerprints : right.fingerprints;
+  const larger = smaller === left.fingerprints ? right.fingerprints : left.fingerprints;
   let shared = 0;
-  for (const fingerprint of left.fingerprints) {
-    if (right.fingerprints.has(fingerprint)) {
+  for (const fingerprint of smaller) {
+    if (larger.has(fingerprint)) {
       shared += 1;
     }
   }
-  return shared / union.size;
+  return shared / (left.fingerprints.size + right.fingerprints.size - shared);
+}
+
+function maxPossibleSimilarity(left: Entry, right: Entry): number {
+  const smaller = Math.min(left.fingerprints.size, right.fingerprints.size);
+  const larger = Math.max(left.fingerprints.size, right.fingerprints.size);
+  return larger === 0 ? 0 : smaller / larger;
 }
 
 function compareCandidates(left: Candidate, right: Candidate): number {

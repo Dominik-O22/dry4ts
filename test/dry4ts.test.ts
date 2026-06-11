@@ -4,7 +4,16 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { formatCandidate, Options, toEdn, toJson, TypeScriptDuplicateFinder, type Candidate } from "../src/index.js";
+import {
+  clusterCandidates,
+  formatCandidate,
+  formatCluster,
+  Options,
+  toEdn,
+  toJson,
+  TypeScriptDuplicateFinder,
+  type Candidate,
+} from "../src/index.js";
 
 test("reports structural duplicate candidates with file and line ranges", async () => {
   const { files, candidates } = await scanFixture(
@@ -187,20 +196,99 @@ test("formats text output with line ranges", () => {
   );
 });
 
-test("prints edn", () => {
-  assert.equal(toEdn([]), "{:candidates []}");
+test("groups transitively connected candidates into clusters", () => {
+  const ab = pair("a.ts", "b.ts", 0.9);
+  const bc = pair("b.ts", "c.ts", 0.85);
+  const de = pair("d.ts", "e.ts", 0.95);
+
+  const clusters = clusterCandidates([de, ab, bc]);
+
+  assert.equal(clusters.length, 2);
+  assert.deepEqual(
+    clusters.map((cluster) => cluster.locations.map((location) => location.file)),
+    [["d.ts", "e.ts"], ["a.ts", "b.ts", "c.ts"]],
+  );
+  assert.deepEqual(clusters[1].score, { min: 0.85, max: 0.9 });
 });
 
-test("prints json for agents and ci integrations", () => {
-  const candidate = {
-    score: 0.875,
-    left: { file: "a.ts", startLine: 10, endLine: 14 },
-    right: { file: "b.ts", startLine: 20, endLine: 24 },
-    leftNodes: 88,
-    rightNodes: 91,
-  };
+test("formats clusters with score range, location count, and node size", () => {
+  const clusters = clusterCandidates([pair("a.ts", "b.ts", 0.9), pair("b.ts", "c.ts", 0.85)]);
 
-  assert.deepEqual(JSON.parse(toJson([candidate])), { candidates: [candidate] });
+  assert.equal(
+    formatCluster(clusters[0], 1),
+    "CLUSTER 1 score=0.85-0.90 locations=3\n  a.ts:10-14 nodes=50\n  b.ts:10-14 nodes=50\n  c.ts:10-14 nodes=50",
+  );
+});
+
+test("does not expose complete pairwise match counts in cluster output", () => {
+  const files = ["a.ts", "b.ts", "c.ts", "d.ts", "e.ts"];
+  const candidates = files.flatMap((left, leftIndex) =>
+    files.slice(leftIndex + 1).map((right) => pair(left, right, 1)),
+  );
+
+  const [cluster] = clusterCandidates(candidates);
+
+  assert.equal(cluster.locations.length, 5);
+  assert.equal(formatCluster(cluster, 1).split("\n")[0], "CLUSTER 1 score=1.00 locations=5");
+});
+
+test("finds duplicate clusters directly", async () => {
+  const { files, dir } = await writeFixture({
+    "one.ts": `
+export function one(items: number[]): number {
+  const selected = items.filter((item) => item > 0);
+  return selected.map((item) => item + 1).reduce((sum, next) => sum + next, 0);
+}
+`,
+    "two.ts": `
+export function two(values: number[]): number {
+  const chosen = values.filter((value) => value < 10);
+  return chosen.map((value) => value - 1).reduce((total, next) => total + next, 0);
+}
+`,
+  });
+
+  const clusters = new TypeScriptDuplicateFinder().findClusters({
+    paths: [dir],
+    threshold: 0.2,
+    minLines: 3,
+    minNodes: 8,
+  });
+
+  assert.equal(clusters.length, 1);
+  assert.deepEqual(clusters[0].locations.map((location) => location.file), [files["one.ts"], files["two.ts"]]);
+});
+
+test("prints edn", () => {
+  assert.equal(toEdn([]), "{:clusters []}");
+});
+
+test("prints edn clusters instead of every candidate pair", () => {
+  const candidate = pair("a.ts", "b.ts", 0.875);
+  const clusters = clusterCandidates([candidate]);
+
+  assert.equal(
+    toEdn(clusters),
+    '{:clusters\n [{:score-min 0.875\n   :score-max 0.875\n   :location-count 2\n   :locations [{:file "a.ts", :start-line 10, :end-line 14, :nodes 50}\n               {:file "b.ts", :start-line 10, :end-line 14, :nodes 50}]}]}',
+  );
+});
+
+test("prints json clusters for agents and ci integrations", () => {
+  const ab = pair("a.ts", "b.ts", 0.875);
+  const bc = pair("b.ts", "c.ts", 0.925);
+  const clusters = clusterCandidates([ab, bc]);
+
+  assert.deepEqual(JSON.parse(toJson(clusters)), {
+    clusters: [{
+      score: { min: 0.875, max: 0.925 },
+      locationCount: 3,
+      locations: [
+        { ...ab.left, nodes: ab.leftNodes },
+        { ...ab.right, nodes: ab.rightNodes },
+        { ...bc.right, nodes: bc.rightNodes },
+      ],
+    }],
+  });
 });
 
 async function writeSource(dir: string, name: string, text: string): Promise<string> {
@@ -213,13 +301,23 @@ async function scanFixture(
   sources: Record<string, string>,
   options: { threshold: number; minLines: number; minNodes: number },
 ): Promise<{ files: Record<string, string>; candidates: Candidate[] }> {
+  const { files, dir } = await writeFixture(sources);
+  const candidates = new TypeScriptDuplicateFinder().findDuplicates({ paths: [dir], ...options });
+  return { files, candidates };
+}
+
+async function writeFixture(sources: Record<string, string>): Promise<{ files: Record<string, string>; dir: string }> {
   const dir = await mkdtemp(path.join(tmpdir(), "dry4ts-"));
   const files: Record<string, string> = {};
   for (const [name, text] of Object.entries(sources)) {
     files[name] = await writeSource(dir, name, text);
   }
-  const candidates = new TypeScriptDuplicateFinder().findDuplicates({ paths: [dir], ...options });
-  return { files, candidates };
+  return { files, dir };
+}
+
+function pair(left: string, right: string, score: number): Candidate {
+  const location = (file: string) => ({ file, startLine: 10, endLine: 14 });
+  return { score, left: location(left), right: location(right), leftNodes: 50, rightNodes: 50 };
 }
 
 function hasDuplicate(candidates: readonly Candidate[], left: string, right: string): boolean {
