@@ -7,7 +7,7 @@
 > `plans/README.md` unless a reviewer told you they maintain the index.
 >
 > **Drift check (run first)**:
-> `git diff --stat 6bd3210..HEAD -- package.json bun.lock README.md src/Options.ts src/Dry4Ts.ts src/TypeScriptDuplicateFinder.ts test/dry4ts.test.ts`
+> `git diff --stat 87665c4..HEAD -- package.json bun.lock README.md src/Options.ts src/Dry4Ts.ts src/TypeScriptDuplicateFinder.ts test/dry4ts.test.ts`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding. On a
 > mismatch, treat it as a STOP condition.
@@ -19,7 +19,8 @@
 - **Risk**: MED
 - **Depends on**: none
 - **Category**: perf
-- **Planned at**: commit `6bd3210`, 2026-06-11
+- **Planned at**: commit `87665c4`, 2026-06-11 (re-verified against live code; the
+  original `6bd3210` stamp predated unrelated benchmark/docs commits)
 
 ## Why this matters
 
