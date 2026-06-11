@@ -98,11 +98,9 @@ export class TypeScriptDuplicateFinder {
   private relativeForIgnore(filePath: string): string | null {
     const cwd = process.cwd();
     const rel = path.relative(cwd, filePath);
-    // Guard: if path escapes cwd, skip ignore matching
     if (rel.startsWith("..") || path.isAbsolute(rel)) {
       return null;
     }
-    // normalize to forward slashes for the ignore matcher
     return rel.split(path.sep).join("/");
   }
 
@@ -125,7 +123,6 @@ export class TypeScriptDuplicateFinder {
     }
     const stats = fs.statSync(sourcePath);
     if (stats.isFile()) {
-      // Explicit file arguments bypass ignore filtering; directory-discovered files are filtered
       if (!isTypeScriptSource(sourcePath)) {
         return [];
       }

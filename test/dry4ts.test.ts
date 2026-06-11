@@ -396,7 +396,7 @@ test("explicit file argument scans ignored file even with gitignore enabled", as
   }
 });
 
-test("scans directory outside cwd without crashing", async () => {
+test("scans directory outside cwd and still finds duplicates", async () => {
   const externalDir = await mkdtemp(path.join(tmpdir(), "dry4ts-external-"));
   await writeFile(path.join(externalDir, "a.ts"), duplicateBody);
   await writeFile(path.join(externalDir, "b.ts"), duplicateBody);
@@ -408,7 +408,12 @@ test("scans directory outside cwd without crashing", async () => {
     minNodes: 8,
     respectGitignore: true,
   });
-  assert.ok(Array.isArray(clusters), "Expected an array of clusters");
+  const hasPair = clusters.some(
+    (cluster) =>
+      cluster.locations.some((loc) => loc.file.endsWith("a.ts")) &&
+      cluster.locations.some((loc) => loc.file.endsWith("b.ts")),
+  );
+  assert.ok(hasPair, `Expected a cluster containing a.ts and b.ts, got: ${JSON.stringify(clusters)}`);
 });
 
 test("dedupes overlapping input paths", async () => {
@@ -424,7 +429,6 @@ test("dedupes overlapping input paths", async () => {
     minLines: 3,
     minNodes: 8,
   });
-  // a.ts and b.ts should appear in exactly one cluster, not duplicated
   const clusterFiles = clusters.flatMap((cluster) => cluster.locations.map((loc) => loc.file));
   const aFiles = clusterFiles.filter((f) => f.endsWith("a.ts"));
   const bFiles = clusterFiles.filter((f) => f.endsWith("b.ts"));
