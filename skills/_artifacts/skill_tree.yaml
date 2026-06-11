@@ -1,0 +1,53 @@
+# skills/_artifacts/skill_tree.yaml
+library:
+  name: "dry4ts"
+  version: "0.1.0"
+  repository: "unknown"
+  description: "Find candidate duplicate TypeScript code by comparing normalized AST structure."
+generated_from:
+  domain_map: "skills/_artifacts/domain_map.yaml"
+  skill_spec: "skills/_artifacts/skill_spec.md"
+generated_at: "2026-06-11"
+
+skills:
+  - name: "Scan Code for Duplicate Candidates"
+    slug: "scan-code-for-duplicate-candidates"
+    type: "core"
+    domain: "finding-duplicate-code"
+    path: "skills/scan-code-for-duplicate-candidates/SKILL.md"
+    description: "Run dry4ts locally or from code to find fuzzy structural duplicate candidates. Load when choosing paths, interpreting score/line output, tuning threshold/min-lines/min-nodes, or using TypeScriptDuplicateFinder.findDuplicates."
+    sources:
+      - "dry4ts:README.md"
+      - "dry4ts:src/TypeScriptDuplicateFinder.ts"
+      - "dry4ts:src/TypeScriptNormalizer.ts"
+      - "dry4ts:src/Options.ts"
+      - "dry4ts:src/types.ts"
+    references:
+      - "references/candidate-selection-and-normalization.md"
+
+  - name: "Wire Duplicate Checks Into CI"
+    slug: "wire-duplicate-checks-into-ci"
+    type: "core"
+    domain: "automating-duplicate-checks"
+    path: "skills/wire-duplicate-checks-into-ci/SKILL.md"
+    description: "Use dry4ts as a CI or automated review gate with --format json and --fail-on-duplicates. Load when writing GitHub Actions, parsing Candidate JSON, or handling exit codes 0, 1, and 2."
+    sources:
+      - "dry4ts:README.md"
+      - "dry4ts:AGENTS.md"
+      - "dry4ts:src/Dry4Ts.ts"
+      - "dry4ts:.github/workflows/ci.yml"
+    references:
+      - "references/output-contract.md"
+
+  - name: "Adopt dry4ts in an Agent Workflow"
+    slug: "adopt-dry4ts-in-agent-workflow"
+    type: "core"
+    domain: "automating-duplicate-checks"
+    path: "skills/adopt-dry4ts-in-agent-workflow/SKILL.md"
+    description: "Run dry4ts after AI-generated edits to catch structural duplication before it accumulates. Load when building autonomous review loops, triaging duplicate candidates, or deciding when local checks should become CI gates."
+    sources:
+      - "dry4ts:README.md"
+      - "dry4ts:AGENTS.md"
+      - "dry4ts:src/TypeScriptDuplicateFinder.ts"
+      - "dry4ts:src/Dry4Ts.ts"
+      - "dry4ts:test/dry4ts.test.ts"

@@ -117,6 +117,8 @@ For this repository, `bun run ci` builds, tests, and runs dry4ts against `src te
 
 ## AI Agents
 
+If you use an AI agent, run `npx @tanstack/intent@latest install`.
+
 Prefer JSON output for autonomous tools:
 
 ```bash

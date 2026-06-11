@@ -17,7 +17,9 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "skills",
+    "!skills/_artifacts"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json && bun scripts/prepare-bin.mjs",
@@ -33,13 +35,15 @@
     "static-analysis",
     "typescript",
     "javascript",
-    "cli"
+    "cli",
+    "tanstack-intent"
   ],
   "sideEffects": false,
   "dependencies": {
     "typescript": "^5.4.0"
   },
   "devDependencies": {
+    "@tanstack/intent": "^0.0.42",
     "@types/node": "^22.0.0"
   },
   "engines": {
