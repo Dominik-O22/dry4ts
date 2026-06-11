@@ -8,7 +8,7 @@ starting, honor its STOP conditions, and update the plan row when done.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| [001](001-respect-gitignore.md) | Respect .gitignore during directory scans | P1 | M | - | TODO |
+| [001](001-respect-gitignore.md) | Respect .gitignore during directory scans | P1 | M | - | DONE (commit `0fb5f4c` on worktree branch `worktree-agent-aa2c9392ba03b7fa7`, awaiting merge) |
 | [002](002-remove-raw-pair-api.md) | Remove the raw duplicate-pair API | P1 | M | 001 | TODO |
 | [003](003-skip-short-candidates-before-normalization.md) | Skip short candidates before normalization | P2 | S | 001 | TODO |
 | [004](004-intern-structural-fingerprints.md) | Intern structural fingerprints | P2 | M | 003 | TODO |
