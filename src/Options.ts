@@ -21,7 +21,17 @@ export class Options {
     public readonly help: boolean,
     public readonly failOnDuplicates: boolean,
     public readonly respectGitignore: boolean,
-  ) {}
+  ) {
+    if (!(threshold > 0 && threshold <= 1)) {
+      throw new Error(`threshold must be greater than 0 and at most 1, got ${threshold}`);
+    }
+    if (minLines < 1) {
+      throw new Error(`minLines must be at least 1, got ${minLines}`);
+    }
+    if (minNodes < 1) {
+      throw new Error(`minNodes must be at least 1, got ${minNodes}`);
+    }
+  }
 
   static defaults(): Options {
     return new Options(["src"], 0.82, 4, 20, "text", false, false, true);

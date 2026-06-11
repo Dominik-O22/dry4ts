@@ -23,6 +23,7 @@ const REGIMES = {
 };
 
 const FUNCTIONS_PER_FILE = 50;
+const ONELINERS_PER_FILE = 500;
 
 const args = process.argv.slice(2);
 const regime = args[0];
@@ -73,12 +74,11 @@ function identicalFunction(id) {
 
 function generateOneliners(total) {
   const files = [];
-  const perFile = 500;
-  for (let fileIndex = 0; fileIndex * perFile < total; fileIndex += 1) {
-    const inFile = Math.min(perFile, total - fileIndex * perFile);
+  for (let fileIndex = 0; fileIndex * ONELINERS_PER_FILE < total; fileIndex += 1) {
+    const inFile = Math.min(ONELINERS_PER_FILE, total - fileIndex * ONELINERS_PER_FILE);
     const lines = [];
     for (let i = 0; i < inFile; i += 1) {
-      const id = fileIndex * perFile + i;
+      const id = fileIndex * ONELINERS_PER_FILE + i;
       lines.push(`export const one${id} = (value: number): number => value + ${id};`);
     }
     files.push([`oneliners-${fileIndex}.ts`, lines.join("\n") + "\n"]);

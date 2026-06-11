@@ -195,6 +195,13 @@ test("rejects invalid numeric option values", () => {
   assert.throws(() => Options.parse("--min-lines", "many"), /Invalid integer/);
 });
 
+test("rejects out-of-range option values", () => {
+  assert.throws(() => Options.parse("--threshold", "0"), /threshold must be/);
+  assert.throws(() => Options.parse("--threshold", "1.5"), /threshold must be/);
+  assert.throws(() => Options.from({ minLines: 0 }), /minLines must be/);
+  assert.throws(() => Options.from({ minNodes: -1 }), /minNodes must be/);
+});
+
 test("formats text output with line ranges", () => {
   assert.equal(
     formatCandidate({
@@ -310,6 +317,8 @@ export function process(items: number[]): number {
 }
 `;
 
+const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+
 test("directory scan skips files and directories listed in .gitignore", async () => {
   const projectDir = await mkdtemp(path.join(tmpdir(), "dry4ts-gitignore-"));
   const keptDir = path.join(projectDir, "kept");
@@ -398,6 +407,41 @@ test("explicit file argument scans ignored file even with gitignore enabled", as
   } finally {
     process.chdir(originalCwd);
   }
+});
+
+function scanFromCwd(projectDir: string) {
+  const originalCwd = process.cwd();
+  try {
+    process.chdir(projectDir);
+    return new TypeScriptDuplicateFinder().findClusters({
+      paths: ["."],
+      threshold: 0.2,
+      minLines: 3,
+      minNodes: 8,
+    });
+  } finally {
+    process.chdir(originalCwd);
+  }
+}
+
+test("scans without error when cwd has no .gitignore", async () => {
+  const projectDir = await mkdtemp(path.join(tmpdir(), "dry4ts-no-ignore-file-"));
+  await writeFile(path.join(projectDir, "a.ts"), duplicateBody);
+  await writeFile(path.join(projectDir, "b.ts"), duplicateBody);
+
+  assert.equal(scanFromCwd(projectDir).length, 1);
+});
+
+test("does not parse files inside gitignored directories", async () => {
+  const projectDir = await mkdtemp(path.join(tmpdir(), "dry4ts-prune-"));
+  const ignoredDir = path.join(projectDir, "ignored");
+  await mkdir(ignoredDir);
+  await writeFile(path.join(projectDir, ".gitignore"), "ignored/\n");
+  await writeFile(path.join(projectDir, "one.ts"), duplicateBody);
+  await writeFile(path.join(projectDir, "two.ts"), duplicateBody);
+  await writeFile(path.join(ignoredDir, "broken.ts"), "const = (((((\n");
+
+  assert.equal(scanFromCwd(projectDir).length, 1);
 });
 
 test("scans directory outside cwd and still finds duplicates", async () => {
@@ -505,14 +549,15 @@ test("main with invalid --threshold value sets exitCode 2 and writes to stderr",
   }
 });
 
-test("main with --format xml sets exitCode 2", () => {
+test("main with --format xml sets exitCode 2", async () => {
+  const { dir } = await writeFixture({ "solo.ts": duplicateBody });
   const originalError = console.error;
   console.error = () => {};
   const originalLog = console.log;
   console.log = () => {};
   try {
     process.exitCode = 0;
-    main(["--format", "xml", "."]);
+    main(["--format", "xml", dir]);
     assert.equal(process.exitCode, 2);
   } finally {
     console.error = originalError;
@@ -528,7 +573,7 @@ test("main --fail-on-duplicates with duplicates sets exitCode 1", async () => {
   });
   const result = Bun.spawnSync(
     ["bun", "run", "src/bin/dry4ts.ts", "--fail-on-duplicates", "--threshold", "0.2", "--min-lines", "3", "--min-nodes", "8", dir],
-    { cwd: "/home/doop/private/dry4ts" },
+    { cwd: repoRoot },
   );
   assert.equal(result.exitCode, 1);
 });
@@ -538,7 +583,7 @@ test("main --fail-on-duplicates with no duplicates leaves exitCode 0", async () 
   await writeFile(path.join(dir, "solo.ts"), duplicateBody);
   const result = Bun.spawnSync(
     ["bun", "run", "src/bin/dry4ts.ts", "--fail-on-duplicates", "--threshold", "0.99", "--min-lines", "100", "--min-nodes", "9999", dir],
-    { cwd: "/home/doop/private/dry4ts" },
+    { cwd: repoRoot },
   );
   assert.equal(result.exitCode, 0);
 });
