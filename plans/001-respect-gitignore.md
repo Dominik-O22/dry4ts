@@ -109,7 +109,7 @@ src/TypeScriptDuplicateFinder.ts:104           files.push(fullPath);
 | Test | `bun run test` | exits 0; all tests pass |
 | Full gate | `bun run check` | exits 0; build, tests, and dry4ts scan pass |
 | Manual CLI check | `bun ./dist/bin/dry4ts.js --format json .` | exits 0 and does not scan ignored `node_modules/` or `dist/` |
-| Opt-out check | `bun ./dist/bin/dry4ts.js --no-gitignore --format json .` | exits 0 or reports parse errors from ignored/generated files; it must attempt ignored paths |
+| Opt-out check | `bun ./dist/bin/dry4ts.js --no-gitignore --format json .` | attempts ignored paths; expect a nonzero exit, because `scanFile` throws on the first parse error and `node_modules/` will contain unparseable files |
 
 ## Scope
 
@@ -142,11 +142,8 @@ src/TypeScriptDuplicateFinder.ts:104           files.push(fullPath);
 ### Step 1: Add the ignore parser dependency
 
 Run `bun add ignore`. Keep `ignore` in `dependencies`, not `devDependencies`,
-because the published CLI needs it at runtime.
-
-If TypeScript cannot find types for `ignore` during `bun run check`, inspect the
-package first. Only add `@types/ignore` if the installed package truly lacks
-bundled type definitions.
+because the published CLI needs it at runtime. The `ignore` package ships its
+own type definitions; do not add `@types/ignore` (it does not exist).
 
 **Verify**: `bun run test` -> exits 0.
 
@@ -195,6 +192,12 @@ Implement behavior with the `ignore` package:
 - If `.gitignore` is absent, use an empty ignore set.
 - Match paths relative to `process.cwd()`, using forward slashes for the ignore
   matcher.
+- **Guard against out-of-cwd inputs.** The `ignore` matcher throws a
+  `RangeError` for paths that are not relative beneath its base directory.
+  When `path.relative(process.cwd(), candidate)` starts with `..` (or is
+  absolute, on Windows cross-drive), skip ignore matching entirely and include
+  the path. Without this guard, `dry4ts /some/other/repo` crashes. Add a test
+  covering a scanned directory outside cwd.
 - For directory traversal, skip ignored directories before recursing.
 - For files discovered through directory traversal, skip ignored files.
 - For explicit file path arguments, include the file if it is a supported source
@@ -268,8 +271,10 @@ bun ./dist/bin/dry4ts.js --no-gitignore --format json .
 Expected result:
 
 - `--no-gitignore` is accepted, not treated as a path
-- the command attempts to include ignored files; it may be slower or encounter
-  parse errors from ignored/generated files
+- the command attempts to include ignored files; expect a nonzero exit with a
+  parse error, because `scanFile` throws on the first parse failure and
+  `node_modules/` contains files the parser rejects. A nonzero exit here is
+  success for this check; the point is that ignored paths were attempted.
 
 ## Test plan
 
@@ -310,6 +315,10 @@ Stop and report back if:
 - This first pass intentionally uses `.gitignore` from `process.cwd()`. If
   users later need per-subdirectory `.gitignore` behavior, add it as a separate
   feature with dedicated tests.
+- Paths outside cwd bypass ignore filtering by design in this pass. A later
+  improvement could load `.gitignore` from each input root (or nearest
+  ancestor) and match relative to that root, which would also make
+  `dry4ts /other/repo` respect that repo's ignore rules.
 - Reviewers should scrutinize path normalization: ignore matching should be
   stable on Unix and Windows path separators.
 - This plan does not address the all-pairs comparison algorithm; it prevents the

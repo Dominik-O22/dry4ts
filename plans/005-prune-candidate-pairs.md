@@ -141,6 +141,12 @@ For each group of size > 1:
 - add enough score-1 matches to connect the group into one cluster, such as
   matching the first entry to every other entry
 - do not compare every pair inside the group
+- **keep the `overlaps()` guard on every emitted match, including these group
+  connections.** The exhaustive loop skips same-file overlapping entries; a
+  star-connect that ignores `overlaps` changes behavior. If the chosen hub
+  entry overlaps a group member, pick a different connecting entry for that
+  member (or fall back to pairwise checks within the group); never emit a
+  match between overlapping entries.
 
 Use a stable key built from sorted fingerprint IDs. This is exact: identical
 sets have Jaccard score 1.
@@ -222,6 +228,8 @@ benchmark artifact convention.
 
 - [ ] Dense identical fingerprint sets are clustered without all-pairs
   comparison inside the group.
+- [ ] No emitted match (including group connections) pairs overlapping
+  same-file entries; a test covers this.
 - [ ] Size-window pruning happens before exact similarity for non-identical
   sets.
 - [ ] Any inverted-index/prefix-filter pruning is proven against exhaustive

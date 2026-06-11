@@ -29,6 +29,11 @@ REJECTED (with one-line rationale).
   rejection is already in place.
 - 005 should land after 004 because compact shared fingerprint IDs make pair
   pruning easier to implement and benchmark.
+- 005 is optional pending evidence: after 001-004 land, re-run
+  `bun run bench -- --runs 5 src test` plus a realistic large-repo scan. If
+  real scans are already fast (the 29s case was driven by scanning ignored
+  directories, which 001 fixes), mark 005 REJECTED with the benchmark numbers
+  instead of taking on its HIGH risk.
 
 ## Findings Considered And Rejected
 

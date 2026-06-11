@@ -79,7 +79,8 @@ src/TypeScriptDuplicateFinder.ts:169       fingerprints: normalized.fingerprints
 
 - `src/NormalizedNode.ts`
 - `src/TypeScriptDuplicateFinder.ts`
-- `src/TypeScriptNormalizer.ts` only if constructor signatures need adjusting
+- `src/TypeScriptNormalizer.ts` for the memoization in Step 4 and any signature
+  adjustments
 - `test/dry4ts.test.ts`
 
 **Out of scope**:
@@ -111,7 +112,7 @@ export class FingerprintInterner {
   private nextId = 0;
 
   idFor(tag: string, childIds: readonly string[]): string {
-    const key = childIds.length === 0 ? tag : `${tag}\0${childIds.join("\0")}`;
+    const key = `${tag}\0${childIds.length}\0${childIds.join("\0")}`;
     const existing = this.idsByKey.get(key);
     if (existing) {
       return existing;
@@ -122,6 +123,11 @@ export class FingerprintInterner {
   }
 }
 ```
+
+The key always embeds the child arity (`tag\0count\0ids...`), including for
+leaves (`tag\00\0`). This prevents ambiguity between a tag that happens to
+contain separator bytes and a composite key; do not use the bare tag as a leaf
+key.
 
 Use IDs only within one scan. Do not create a new interner for every candidate,
 because independent interners can assign the same ID to different structures and
@@ -170,7 +176,33 @@ Suggested behavior:
 
 **Verify**: `bun run test` -> exits 0.
 
-### Step 4: Add regression tests for matching and non-matching structures
+### Step 4: Memoize normalization for nested candidates within a file
+
+Interning fixes the per-node fingerprint cost, but a second quadratic source
+remains: `collectEntries` creates an entry for every candidate root, including
+nested ones, and each `entry` call normalizes its subtree from the raw
+TypeScript AST. A function containing nested functions re-normalizes the
+shared inner subtrees once per enclosing candidate.
+
+Fix it with a per-file memo:
+
+- In `scanFile`, create a `Map<ts.Node, NormalizedNode>` for the file being
+  scanned.
+- Change `TypeScriptNormalizer.normalize` (or wrap it in the finder) so that
+  before normalizing a node it checks the memo, and after normalizing it
+  stores the result. Because `normalize` recurses through `forEachChild`, a
+  memo hit on any subtree short-circuits the whole branch.
+- Scope the memo to one file scan; do not let it outlive `scanFile`, or memory
+  grows with corpus size and stale `ts.Node` references pin entire ASTs.
+
+If threading the memo through `TypeScriptNormalizer` requires changing its
+public constructor or method signatures beyond adding an optional parameter,
+keep the memo in the finder and walk candidates outer-to-inner instead. Do not
+expand scope beyond the in-scope files.
+
+**Verify**: `bun run test` -> exits 0.
+
+### Step 5: Add regression tests for matching and non-matching structures
 
 Add tests that protect against interner mistakes:
 
@@ -184,7 +216,7 @@ Use the existing fixture helpers in `test/dry4ts.test.ts` as the pattern.
 
 **Verify**: `bun run test` -> exits 0.
 
-### Step 5: Run a bounded nested-candidate benchmark
+### Step 6: Run a bounded nested-candidate benchmark
 
 Run a bounded `bun --eval` benchmark similar to this:
 
@@ -213,6 +245,8 @@ Do not commit benchmark artifacts.
 - [ ] `NormalizedNode` no longer recursively serializes full subtree strings for
   every node.
 - [ ] One shared exact interner is used for all candidates in a scan.
+- [ ] Nested candidate roots within one file reuse memoized subtree
+  normalization instead of re-normalizing from the raw TypeScript AST.
 - [ ] Similarity behavior remains set-based and exact within the scan.
 - [ ] New tests guard against false matches from independent interner IDs.
 - [ ] `bun run test` exits 0.
@@ -234,6 +268,11 @@ Stop and report back if:
 
 - The interner is an internal performance detail. Do not expose fingerprint IDs
   in CLI output.
+- Interning alone does not remove the nested-candidate re-normalization cost;
+  Step 4's memo does. If Step 4 is skipped or deferred, record that in the
+  status row so the deep-nesting benchmark expectation is adjusted.
+- Fingerprint IDs could be numbers instead of strings (`Set<number>`) for less
+  memory; optional, only if it does not complicate the `Entry` type.
 - Reviewers should look for the specific bug where each candidate gets a fresh
   interner; that can create false positives because different structures may
   receive the same compact ID.

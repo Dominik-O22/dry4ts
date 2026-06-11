@@ -18,18 +18,19 @@
 - **Effort**: M
 - **Risk**: MED
 - **Depends on**: plans/001-respect-gitignore.md
-- **Category**: perf
+- **Category**: cleanup (API surface)
 - **Planned at**: commit `6bd3210`, 2026-06-11
 
 ## Why this matters
 
-The package is intended to be used as a CLI, not as a library. The raw
-`findDuplicates` method returns every matching pair, which is the least scalable
-shape for dense duplicate sets: a synthetic 1,200-candidate corpus produced
-719,400 candidate objects and used about 151 MB heap after `findDuplicates`.
-The CLI already reports clusters, so keeping raw pair APIs increases surface
-area and encourages the slowest output shape without serving the intended
-product.
+The package is intended to be used as a CLI, not as a library. The CLI never
+calls `findDuplicates`, so removing it yields no runtime performance gain for
+the product; this plan is API-surface cleanup, not a perf fix. The motivation
+is that the raw pair shape is the least scalable output for dense duplicate
+sets (a synthetic 1,200-candidate corpus produced 719,400 candidate objects
+and used about 151 MB heap after `findDuplicates`), and keeping it invites
+library consumers onto the worst code path while doubling the comparison-loop
+maintenance burden.
 
 ## Current state
 
@@ -165,6 +166,10 @@ In `src/Clusters.ts`:
 In `src/index.ts`:
 
 - Stop exporting `clusterCandidates`, `formatCandidate`, and `Candidate`.
+- Before removing package-root exports, grep the shipped `skills/` directory
+  (it is in the `files` array of `package.json`) for imports of `dry4ts` as a
+  package: `rg -n "from .dry4ts.|require\(.dry4ts.\)" skills`. If any skill
+  imports the library entry point, treat that as a STOP condition.
 - Because this package is CLI-only, also remove package-root library exports
   from `package.json` if no tooling requires them:
   - remove `"main"`
