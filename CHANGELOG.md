@@ -25,9 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     parent-node wiring in the TypeScript parser.
   - `--min-nodes` now prunes candidates before fingerprinting, so raising it
     speeds up scans.
-- Library API: `NormalizedNode.fingerprints()` returns a sorted
-  `Float64Array` (was `Set<string>`), and `FingerprintInterner.idFor()`
-  returns a number (was string). CLI behavior is unchanged.
+- Internals: `NormalizedNode.fingerprints()` returns a sorted `Float64Array`
+  (was `Set<string>`), and `FingerprintInterner.idFor()` returns a number
+  (was string). dry-ts is a CLI; these types only matter if you import its
+  modules directly. CLI behavior is unchanged.
 
 ### Fixed
 
