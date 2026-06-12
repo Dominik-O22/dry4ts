@@ -20,7 +20,7 @@ jobs:
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
-      - run: npm install -g npm@latest # OIDC trusted publishing needs npm >= 11.5.1
+      - run: npm install -g npm@11 # keep OIDC compatibility while avoiding latest-version drift
       - run: bun install --frozen-lockfile
       - run: bun run ci
       - name: Verify tag matches package.json version
