@@ -5,6 +5,35 @@ All notable changes to dry4ts are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-06-13
+
+### Changed
+
+- Large performance rework of the scan and matching pipeline. Scanning the
+  TypeScript compiler sources dropped from ~5.4s to ~1.5s; the Sentry frontend
+  (8.5k files), which previously did not finish within five minutes, now scans
+  in ~6.6s. Reported clusters are unchanged (verified byte-identical on both
+  corpora).
+  - Candidate pairs are found through prefix filtering over a rarest-first
+    fingerprint index instead of comparing all size-window pairs.
+  - Structural fingerprints are 53-bit content hashes stored in sorted
+    `Float64Array`s instead of interned strings in `Set`s. Hashing is
+    deterministic and stateless; the chance of a hash collision affecting a
+    result is negligible for candidate finding.
+  - Files are parsed and fingerprinted in a single AST walk (new
+    `FileScanner`) without materializing a normalized tree, and without
+    parent-node wiring in the TypeScript parser.
+  - `--min-nodes` now prunes candidates before fingerprinting, so raising it
+    speeds up scans.
+- Library API: `NormalizedNode.fingerprints()` returns a sorted
+  `Float64Array` (was `Set<string>`), and `FingerprintInterner.idFor()`
+  returns a number (was string). CLI behavior is unchanged.
+
+### Fixed
+
+- A pair whose similarity equals the threshold exactly could be skipped when
+  floating-point division floored the size window (e.g. `405 / 0.81`).
+
 ## [0.2.1] - 2026-06-12
 
 ### Changed
