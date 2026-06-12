@@ -6,7 +6,7 @@ on:
 
 permissions:
   contents: read
-  id-token: write # npm provenance
+  id-token: write # OIDC trusted publishing + provenance
 
 jobs:
   publish:
@@ -20,6 +20,7 @@ jobs:
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
+      - run: npm install -g npm@latest # OIDC trusted publishing needs npm >= 11.5.1
       - run: bun install --frozen-lockfile
       - run: bun run ci
       - name: Verify tag matches package.json version
@@ -30,6 +31,5 @@ jobs:
             echo "Release tag ($tag) != package.json version ($pkg)" >&2
             exit 1
           fi
-      - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # OIDC trusted publishing: no token, provenance is automatic under OIDC
+      - run: npm publish --access public
