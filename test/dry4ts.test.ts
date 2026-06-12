@@ -176,6 +176,8 @@ test("parses command line options and paths", () => {
     "5",
     "--min-nodes",
     "30",
+    "--min-locations",
+    "4",
     "--json",
     "--fail-on-duplicates",
     "spec",
@@ -185,12 +187,14 @@ test("parses command line options and paths", () => {
   assert.equal(options.threshold, 0.9);
   assert.equal(options.minLines, 5);
   assert.equal(options.minNodes, 30);
+  assert.equal(options.minLocations, 4);
   assert.equal(options.format, "json");
   assert.equal(options.failOnDuplicates, true);
 });
 
 test("defaults to src when no paths are provided", () => {
   assert.deepEqual(Options.parse().paths, ["src"]);
+  assert.equal(Options.parse().minLocations, 2);
 });
 
 test("respects gitignore by default", () => {
@@ -206,6 +210,7 @@ test("creates options from partial objects", () => {
 
   assert.deepEqual(options.paths, ["lib"]);
   assert.equal(options.threshold, 0.82);
+  assert.equal(options.minLocations, 2);
   assert.equal(options.format, "json");
   assert.equal(options.failOnDuplicates, true);
 });
@@ -213,6 +218,7 @@ test("creates options from partial objects", () => {
 test("rejects invalid numeric option values", () => {
   assert.throws(() => Options.parse("--threshold", "high"), /Invalid number/);
   assert.throws(() => Options.parse("--min-lines", "many"), /Invalid integer/);
+  assert.throws(() => Options.parse("--min-locations", "many"), /Invalid integer/);
 });
 
 test("rejects out-of-range option values", () => {
@@ -220,6 +226,7 @@ test("rejects out-of-range option values", () => {
   assert.throws(() => Options.parse("--threshold", "1.5"), /threshold must be/);
   assert.throws(() => Options.from({ minLines: 0 }), /minLines must be/);
   assert.throws(() => Options.from({ minNodes: -1 }), /minNodes must be/);
+  assert.throws(() => Options.from({ minLocations: 1 }), /minLocations must be/);
 });
 
 test("groups transitively connected candidates into clusters", () => {
@@ -462,6 +469,30 @@ test("keeps only size-window boundary candidates for exact similarity", () => {
   );
 
   assert.deepEqual(pairKeys, ["base.ts|lower-inside.ts", "base.ts|upper-inside.ts"]);
+});
+
+test("filters reported clusters by minimum location count", async () => {
+  const { files, dir } = await writeFixture({
+    "tuple-one.ts": "export type TupleOne = [string, number, boolean, Date];\n",
+    "tuple-two.ts": "export type TupleTwo = [string, number, boolean, Date];\n",
+    "tuple-three.ts": "export type TupleThree = [string, number, boolean, Date];\n",
+    "union-one.ts": "export type UnionOne = string | number | boolean;\n",
+    "union-two.ts": "export type UnionTwo = string | number | boolean;\n",
+  });
+
+  const clusters = new TypeScriptDuplicateFinder().findClusters({
+    paths: [dir],
+    threshold: 1,
+    minLines: 1,
+    minNodes: 1,
+    minLocations: 3,
+  });
+
+  assert.equal(clusters.length, 1);
+  assert.deepEqual(
+    clusters[0].locations.map((location) => location.file),
+    [files["tuple-one.ts"], files["tuple-three.ts"], files["tuple-two.ts"]],
+  );
 });
 
 test("prints edn", () => {

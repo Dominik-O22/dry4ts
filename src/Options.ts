@@ -5,6 +5,7 @@ export interface OptionsInput {
   readonly threshold?: number;
   readonly minLines?: number;
   readonly minNodes?: number;
+  readonly minLocations?: number;
   readonly format?: OutputFormat;
   readonly help?: boolean;
   readonly failOnDuplicates?: boolean;
@@ -21,6 +22,7 @@ export class Options {
     public readonly help: boolean,
     public readonly failOnDuplicates: boolean,
     public readonly respectGitignore: boolean,
+    public readonly minLocations: number = 2,
   ) {
     if (!(threshold > 0 && threshold <= 1)) {
       throw new Error(`threshold must be greater than 0 and at most 1, got ${threshold}`);
@@ -31,10 +33,13 @@ export class Options {
     if (minNodes < 1) {
       throw new Error(`minNodes must be at least 1, got ${minNodes}`);
     }
+    if (minLocations < 2) {
+      throw new Error(`minLocations must be at least 2, got ${minLocations}`);
+    }
   }
 
   static defaults(): Options {
-    return new Options(["src"], 0.82, 4, 20, "text", false, false, true);
+    return new Options(["src"], 0.82, 4, 20, "text", false, false, true, 2);
   }
 
   static from(input: OptionsInput = {}): Options {
@@ -49,6 +54,7 @@ export class Options {
       input.help ?? defaults.help,
       input.failOnDuplicates ?? defaults.failOnDuplicates,
       input.respectGitignore ?? defaults.respectGitignore,
+      input.minLocations ?? defaults.minLocations,
     );
   }
 
@@ -57,6 +63,7 @@ export class Options {
     let threshold = 0.82;
     let minLines = 4;
     let minNodes = 20;
+    let minLocations = 2;
     let format: OutputFormat = "text";
     let help = false;
     let failOnDuplicates = false;
@@ -73,6 +80,9 @@ export class Options {
           break;
         case "--min-nodes":
           minNodes = integerValue(args, ++i, arg);
+          break;
+        case "--min-locations":
+          minLocations = integerValue(args, ++i, arg);
           break;
         case "--format":
           format = valueFor(args, ++i, arg);
@@ -104,7 +114,7 @@ export class Options {
     if (paths.length === 0) {
       paths.push("src");
     }
-    return new Options(paths, threshold, minLines, minNodes, format, help, failOnDuplicates, respectGitignore);
+    return new Options(paths, threshold, minLines, minNodes, format, help, failOnDuplicates, respectGitignore, minLocations);
   }
 }
 

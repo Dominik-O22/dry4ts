@@ -39,7 +39,7 @@ export class TypeScriptDuplicateFinder {
       collector.addMatch({ ...location(left), nodes: left.nodes }, { ...location(right), nodes: right.nodes }, score);
     }
 
-    return collector.clusters();
+    return collector.clusters().filter((cluster) => cluster.locations.length >= resolvedOptions.minLocations);
   }
 
   private matchingPairs(entries: readonly Entry[], threshold: number): MatchingPair[] {
