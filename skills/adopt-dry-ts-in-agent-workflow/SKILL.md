@@ -1,24 +1,24 @@
 ---
-name: adopt-dry4ts-in-agent-workflow
+name: adopt-dry-ts-in-agent-workflow
 description: >
-  Run dry4ts after AI-generated edits to catch structural duplication before it accumulates. Load when building autonomous review loops, triaging duplicate clusters, using JSON output after generated changes, or deciding when local duplicate checks should become CI gates.
+  Run dry-ts after AI-generated edits to catch structural duplication before it accumulates. Load when building autonomous review loops, triaging duplicate clusters, using JSON output after generated changes, or deciding when local duplicate checks should become CI gates.
 type: core
-library: dry4ts
+library: dry-ts
 library_version: "0.2.0"
 sources:
-  - "dry4ts:README.md"
-  - "dry4ts:AGENTS.md"
-  - "dry4ts:src/TypeScriptDuplicateFinder.ts"
-  - "dry4ts:src/Dry4Ts.ts"
-  - "dry4ts:test/dry4ts.test.ts"
+  - "dry-ts:README.md"
+  - "dry-ts:AGENTS.md"
+  - "dry-ts:src/TypeScriptDuplicateFinder.ts"
+  - "dry-ts:src/DryTs.ts"
+  - "dry-ts:test/dry-ts.test.ts"
 ---
 
-# dry4ts - Adopt in an Agent Workflow
+# dry-ts - Adopt in an Agent Workflow
 
 ## Setup
 
 ```bash
-bunx dry4ts --format json src test
+bunx dry-ts --format json src test
 ```
 
 Run this after generated edits to produce machine-readable duplicate clusters for review.
@@ -28,7 +28,7 @@ Run this after generated edits to produce machine-readable duplicate clusters fo
 ### Run a local guard after generated edits
 
 ```bash
-bunx dry4ts --format json src test
+bunx dry-ts --format json src test
 ```
 
 Use JSON when another agent, script, or review tool will consume the clustered result.
@@ -36,7 +36,7 @@ Use JSON when another agent, script, or review tool will consume the clustered r
 ### Keep cluster triage separate from refactoring
 
 ```ts
-import { TypeScriptDuplicateFinder, type Cluster } from "dry4ts";
+import { TypeScriptDuplicateFinder, type Cluster } from "dry-ts";
 
 const clusters = new TypeScriptDuplicateFinder().findClusters({
   paths: ["src", "test"],
@@ -59,7 +59,7 @@ Cluster output should drive a review decision before any abstraction is extracte
 ### Escalate repeated local checks into CI
 
 ```bash
-bunx dry4ts --format json --fail-on-duplicates src test
+bunx dry-ts --format json --fail-on-duplicates src test
 ```
 
 Use the failing form only when the team wants duplicate clusters to block a pipeline.
@@ -71,7 +71,7 @@ Use the failing form only when the team wants duplicate clusters to block a pipe
 Wrong:
 
 ```ts
-import { TypeScriptDuplicateFinder } from "dry4ts";
+import { TypeScriptDuplicateFinder } from "dry-ts";
 
 const clusters = new TypeScriptDuplicateFinder().findClusters({ paths: ["src"] });
 for (const cluster of clusters) {
@@ -82,7 +82,7 @@ for (const cluster of clusters) {
 Correct:
 
 ```ts
-import { TypeScriptDuplicateFinder } from "dry4ts";
+import { TypeScriptDuplicateFinder } from "dry-ts";
 
 const clusters = new TypeScriptDuplicateFinder().findClusters({ paths: ["src"] });
 for (const cluster of clusters) {
@@ -90,7 +90,7 @@ for (const cluster of clusters) {
 }
 ```
 
-dry4ts emits candidate duplicate regions, not a semantic proof that a new abstraction is warranted.
+dry-ts emits candidate duplicate regions, not a semantic proof that a new abstraction is warranted.
 
 Source: README.md:1
 
@@ -99,7 +99,7 @@ Source: README.md:1
 Wrong:
 
 ```ts
-import { TypeScriptDuplicateFinder } from "dry4ts";
+import { TypeScriptDuplicateFinder } from "dry-ts";
 
 const clusters = new TypeScriptDuplicateFinder().findClusters({ paths: ["src"] });
 console.log(clusters.length);
@@ -108,7 +108,7 @@ console.log(clusters.length);
 Correct:
 
 ```ts
-import { TypeScriptDuplicateFinder } from "dry4ts";
+import { TypeScriptDuplicateFinder } from "dry-ts";
 
 try {
   const clusters = new TypeScriptDuplicateFinder().findClusters({ paths: ["src"] });
@@ -128,13 +128,13 @@ Source: src/TypeScriptDuplicateFinder.ts:85
 Wrong:
 
 ```bash
-bunx dry4ts dist
+bunx dry-ts dist
 ```
 
 Correct:
 
 ```bash
-bunx dry4ts src test
+bunx dry-ts src test
 ```
 
 Declaration files are excluded by design, so agents should scan implementation sources rather than expecting `.d.ts` findings.

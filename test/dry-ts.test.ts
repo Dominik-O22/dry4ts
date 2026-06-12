@@ -543,7 +543,7 @@ export function process(items: number[]): number {
 const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 
 test("directory scan skips files and directories listed in .gitignore", async () => {
-  const projectDir = await mkdtemp(path.join(tmpdir(), "dry4ts-gitignore-"));
+  const projectDir = await mkdtemp(path.join(tmpdir(), "dry-ts-gitignore-"));
   const keptDir = path.join(projectDir, "kept");
   const ignoredDir = path.join(projectDir, "ignored");
   await mkdir(keptDir);
@@ -573,7 +573,7 @@ test("directory scan skips files and directories listed in .gitignore", async ()
 });
 
 test("directory scan includes ignored files when --no-gitignore is set", async () => {
-  const projectDir = await mkdtemp(path.join(tmpdir(), "dry4ts-no-gitignore-"));
+  const projectDir = await mkdtemp(path.join(tmpdir(), "dry-ts-no-gitignore-"));
   const keptDir = path.join(projectDir, "kept");
   const ignoredDir = path.join(projectDir, "ignored");
   await mkdir(keptDir);
@@ -603,7 +603,7 @@ test("directory scan includes ignored files when --no-gitignore is set", async (
 });
 
 test("explicit file argument scans ignored file even with gitignore enabled", async () => {
-  const projectDir = await mkdtemp(path.join(tmpdir(), "dry4ts-explicit-"));
+  const projectDir = await mkdtemp(path.join(tmpdir(), "dry-ts-explicit-"));
   const keptDir = path.join(projectDir, "kept");
   const ignoredDir = path.join(projectDir, "ignored");
   await mkdir(keptDir);
@@ -648,7 +648,7 @@ function scanFromCwd(projectDir: string) {
 }
 
 test("scans without error when cwd has no .gitignore", async () => {
-  const projectDir = await mkdtemp(path.join(tmpdir(), "dry4ts-no-ignore-file-"));
+  const projectDir = await mkdtemp(path.join(tmpdir(), "dry-ts-no-ignore-file-"));
   await writeFile(path.join(projectDir, "a.ts"), duplicateBody);
   await writeFile(path.join(projectDir, "b.ts"), duplicateBody);
 
@@ -656,7 +656,7 @@ test("scans without error when cwd has no .gitignore", async () => {
 });
 
 test("does not parse files inside gitignored directories", async () => {
-  const projectDir = await mkdtemp(path.join(tmpdir(), "dry4ts-prune-"));
+  const projectDir = await mkdtemp(path.join(tmpdir(), "dry-ts-prune-"));
   const ignoredDir = path.join(projectDir, "ignored");
   await mkdir(ignoredDir);
   await writeFile(path.join(projectDir, ".gitignore"), "ignored/\n");
@@ -668,7 +668,7 @@ test("does not parse files inside gitignored directories", async () => {
 });
 
 test("scans directory outside cwd and still finds duplicates", async () => {
-  const externalDir = await mkdtemp(path.join(tmpdir(), "dry4ts-external-"));
+  const externalDir = await mkdtemp(path.join(tmpdir(), "dry-ts-external-"));
   await writeFile(path.join(externalDir, "a.ts"), duplicateBody);
   await writeFile(path.join(externalDir, "b.ts"), duplicateBody);
 
@@ -688,7 +688,7 @@ test("scans directory outside cwd and still finds duplicates", async () => {
 });
 
 test("dedupes overlapping input paths", async () => {
-  const projectDir = await mkdtemp(path.join(tmpdir(), "dry4ts-dedup-"));
+  const projectDir = await mkdtemp(path.join(tmpdir(), "dry-ts-dedup-"));
   const subDir = path.join(projectDir, "sub");
   await mkdir(subDir);
   await writeFile(path.join(subDir, "a.ts"), duplicateBody);
@@ -723,7 +723,7 @@ async function scanFixture(
 }
 
 async function writeFixture(sources: Record<string, string>): Promise<{ files: Record<string, string>; dir: string }> {
-  const dir = await mkdtemp(path.join(tmpdir(), "dry4ts-"));
+  const dir = await mkdtemp(path.join(tmpdir(), "dry-ts-"));
   const files: Record<string, string> = {};
   for (const [name, text] of Object.entries(sources)) {
     files[name] = await writeSource(dir, name, text);
@@ -1048,7 +1048,7 @@ test("main --help prints USAGE to stdout", () => {
   } finally {
     console.log = original;
   }
-  assert.ok(lines.some((line) => line.includes("Usage: dry4ts")), `Expected USAGE in stdout, got: ${JSON.stringify(lines)}`);
+  assert.ok(lines.some((line) => line.includes("Usage: dry-ts")), `Expected USAGE in stdout, got: ${JSON.stringify(lines)}`);
   assert.ok(lines.some((line) => line.includes(USAGE.split("\n")[0])));
 });
 
@@ -1092,17 +1092,17 @@ test("main --fail-on-duplicates with duplicates sets exitCode 1", async () => {
     "beta.ts": duplicateBody,
   });
   const result = Bun.spawnSync(
-    ["bun", "run", "src/bin/dry4ts.ts", "--fail-on-duplicates", "--threshold", "0.2", "--min-lines", "3", "--min-nodes", "8", dir],
+    ["bun", "run", "src/bin/dry-ts.ts", "--fail-on-duplicates", "--threshold", "0.2", "--min-lines", "3", "--min-nodes", "8", dir],
     { cwd: repoRoot },
   );
   assert.equal(result.exitCode, 1);
 });
 
 test("main --fail-on-duplicates with no duplicates leaves exitCode 0", async () => {
-  const dir = await mkdtemp(path.join(tmpdir(), "dry4ts-nodups-"));
+  const dir = await mkdtemp(path.join(tmpdir(), "dry-ts-nodups-"));
   await writeFile(path.join(dir, "solo.ts"), duplicateBody);
   const result = Bun.spawnSync(
-    ["bun", "run", "src/bin/dry4ts.ts", "--fail-on-duplicates", "--threshold", "0.99", "--min-lines", "100", "--min-nodes", "9999", dir],
+    ["bun", "run", "src/bin/dry-ts.ts", "--fail-on-duplicates", "--threshold", "0.99", "--min-lines", "100", "--min-nodes", "9999", dir],
     { cwd: repoRoot },
   );
   assert.equal(result.exitCode, 0);

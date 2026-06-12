@@ -4,7 +4,7 @@ import { TypeScriptDuplicateFinder } from "./TypeScriptDuplicateFinder.js";
 import type { Cluster, ClusterLocation, ClusterReport, Location } from "./types.js";
 
 export const USAGE = [
-  "Usage: dry4ts [options] [file-or-directory ...]",
+  "Usage: dry-ts [options] [file-or-directory ...]",
   "",
   "Options:",
   "  --threshold N   Minimum structural similarity score, default 0.82",

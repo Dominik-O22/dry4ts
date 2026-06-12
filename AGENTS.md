@@ -1,6 +1,6 @@
 # Agent Instructions
 
-This repository contains `dry4ts`, a TypeScript/JavaScript duplicate-code candidate finder.
+This repository contains `dry-ts`, a TypeScript/JavaScript duplicate-code candidate finder.
 
 ## Commands
 
@@ -8,26 +8,26 @@ This repository contains `dry4ts`, a TypeScript/JavaScript duplicate-code candid
 - Run tests directly from TypeScript sources: `bun run test`
 - Build, test, and self-scan: `bun run check`
 - Full CI gate: `bun run ci`
-- Run the CLI locally after build: `bun ./dist/bin/dry4ts.js src test`
+- Run the CLI locally after build: `bun ./dist/bin/dry-ts.js src test`
 
 ## Agent-Friendly Output
 
 Use JSON output when another tool or agent needs to consume results:
 
 ```bash
-bun ./dist/bin/dry4ts.js --format json src test
+bun ./dist/bin/dry-ts.js --format json src test
 ```
 
 Use `--fail-on-duplicates` in CI or autonomous review loops:
 
 ```bash
-bun ./dist/bin/dry4ts.js --format json --fail-on-duplicates src test
+bun ./dist/bin/dry-ts.js --format json --fail-on-duplicates src test
 ```
 
 By default, directory scans skip files and directories matched by `.gitignore`. Pass `--no-gitignore` to include everything:
 
 ```bash
-bun ./dist/bin/dry4ts.js --format json --no-gitignore src test
+bun ./dist/bin/dry-ts.js --format json --no-gitignore src test
 ```
 
 Exit codes:

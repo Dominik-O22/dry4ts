@@ -1,18 +1,18 @@
 ---
 name: wire-duplicate-checks-into-ci
 description: >
-  Use dry4ts as a CI or automated review gate with --format json and --fail-on-duplicates. Load when writing GitHub Actions, parsing cluster JSON, or handling dry4ts exit codes 0, 1, and 2.
+  Use dry-ts as a CI or automated review gate with --format json and --fail-on-duplicates. Load when writing GitHub Actions, parsing cluster JSON, or handling dry-ts exit codes 0, 1, and 2.
 type: core
-library: dry4ts
+library: dry-ts
 library_version: "0.1.0"
 sources:
-  - "dry4ts:README.md"
-  - "dry4ts:AGENTS.md"
-  - "dry4ts:src/Dry4Ts.ts"
-  - "dry4ts:.github/workflows/ci.yml"
+  - "dry-ts:README.md"
+  - "dry-ts:AGENTS.md"
+  - "dry-ts:src/DryTs.ts"
+  - "dry-ts:.github/workflows/ci.yml"
 ---
 
-# dry4ts - Wire Duplicate Checks Into CI
+# dry-ts - Wire Duplicate Checks Into CI
 
 ## Setup
 
@@ -22,14 +22,14 @@ name: Duplicate Code
 on: [push, pull_request]
 
 jobs:
-  dry4ts:
+  dry-ts:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.6
-      - run: bunx dry4ts --format json --fail-on-duplicates src test
+      - run: bunx dry-ts --format json --fail-on-duplicates src test
 ```
 
 ## Core Patterns
@@ -37,7 +37,7 @@ jobs:
 ### Fail only when duplicate clusters are present
 
 ```bash
-bunx dry4ts --format json --fail-on-duplicates src test
+bunx dry-ts --format json --fail-on-duplicates src test
 ```
 
 `--fail-on-duplicates` changes duplicate findings from a report into exit code `1`.
@@ -45,7 +45,7 @@ bunx dry4ts --format json --fail-on-duplicates src test
 ### Emit JSON for agent consumers
 
 ```bash
-bunx dry4ts --format json src test
+bunx dry-ts --format json src test
 ```
 
 JSON output is stable and small: `{ "clusters": ClusterReport[] }`.
@@ -55,18 +55,18 @@ JSON output is stable and small: `{ "clusters": ClusterReport[] }`.
 ```ts
 import { spawnSync } from "node:child_process";
 
-const result = spawnSync("bunx", ["dry4ts", "--format", "json", "--fail-on-duplicates", "src", "test"], {
+const result = spawnSync("bunx", ["dry-ts", "--format", "json", "--fail-on-duplicates", "src", "test"], {
   encoding: "utf8",
 });
 
 if (result.status === 1) {
   const report = JSON.parse(result.stdout) as { clusters: unknown[] };
-  console.error(`dry4ts found ${report.clusters.length} duplicate clusters`);
+  console.error(`dry-ts found ${report.clusters.length} duplicate clusters`);
   process.exitCode = 1;
 } else if (result.status === 2) {
   throw new Error(result.stderr.trim());
 } else if (result.status !== 0) {
-  throw new Error(`dry4ts exited with ${result.status}`);
+  throw new Error(`dry-ts exited with ${result.status}`);
 }
 ```
 
@@ -77,16 +77,16 @@ if (result.status === 1) {
 Wrong:
 
 ```bash
-bunx dry4ts --format json src test
+bunx dry-ts --format json src test
 ```
 
 Correct:
 
 ```bash
-bunx dry4ts --format json --fail-on-duplicates src test
+bunx dry-ts --format json --fail-on-duplicates src test
 ```
 
-Without `--fail-on-duplicates`, dry4ts exits `0` even when duplicate clusters are found, so CI records a successful job.
+Without `--fail-on-duplicates`, dry-ts exits `0` even when duplicate clusters are found, so CI records a successful job.
 
 Source: README.md:109
 
@@ -95,13 +95,13 @@ Source: README.md:109
 Wrong:
 
 ```bash
-bunx dry4ts src test
+bunx dry-ts src test
 ```
 
 Correct:
 
 ```bash
-bunx dry4ts --format json src test
+bunx dry-ts --format json src test
 ```
 
 Text output is for humans; JSON is the stable cluster contract for tools and autonomous agents.
@@ -115,9 +115,9 @@ Wrong:
 ```ts
 import { spawnSync } from "node:child_process";
 
-const result = spawnSync("bunx", ["dry4ts", "--fail-on-duplicates", "src"], { encoding: "utf8" });
+const result = spawnSync("bunx", ["dry-ts", "--fail-on-duplicates", "src"], { encoding: "utf8" });
 if (result.status !== 0) {
-  throw new Error("dry4ts failed");
+  throw new Error("dry-ts failed");
 }
 ```
 
@@ -126,7 +126,7 @@ Correct:
 ```ts
 import { spawnSync } from "node:child_process";
 
-const result = spawnSync("bunx", ["dry4ts", "--format", "json", "--fail-on-duplicates", "src"], {
+const result = spawnSync("bunx", ["dry-ts", "--format", "json", "--fail-on-duplicates", "src"], {
   encoding: "utf8",
 });
 if (result.status === 1) {
@@ -145,16 +145,16 @@ Source: README.md:125
 Wrong:
 
 ```bash
-bunx dry4ts --format json --fail-on-duplicates
+bunx dry-ts --format json --fail-on-duplicates
 ```
 
 Correct:
 
 ```bash
-bunx dry4ts --format json --fail-on-duplicates src test
+bunx dry-ts --format json --fail-on-duplicates src test
 ```
 
-When no paths are passed, dry4ts scans only `src`, so CI can silently ignore test or package directories.
+When no paths are passed, dry-ts scans only `src`, so CI can silently ignore test or package directories.
 
 Source: README.md:46
 

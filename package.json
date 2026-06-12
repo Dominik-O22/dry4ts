@@ -22,8 +22,7 @@
     }
   },
   "bin": {
-    "dry-ts": "./dist/bin/dry4ts.js",
-    "dry4ts": "./dist/bin/dry4ts.js"
+    "dry-ts": "./dist/bin/dry-ts.js"
   },
   "files": [
     "dist",
@@ -32,9 +31,9 @@
     "!skills/_artifacts"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json && bun scripts/prepare-bin.mjs",
+    "build": "rm -rf dist && tsc -p tsconfig.json && bun scripts/prepare-bin.mjs",
     "test": "bun test",
-    "check": "bun run build && bun test && bun ./dist/bin/dry4ts.js --fail-on-duplicates src test",
+    "check": "bun run build && bun test && bun ./dist/bin/dry-ts.js --fail-on-duplicates src test",
     "ci": "bun run check",
     "bench": "bun run build && bun scripts/benchmark.mjs",
     "bench:corpus": "bun scripts/bench-corpus.mjs",

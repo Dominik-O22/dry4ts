@@ -1,6 +1,6 @@
 # Candidate Selection and Normalization
 
-dry4ts creates candidates from TypeScript declaration and function-like AST nodes, then compares each candidate's normalized fingerprint set.
+dry-ts creates candidates from TypeScript declaration and function-like AST nodes, then compares each candidate's normalized fingerprint set.
 
 Candidate roots include:
 

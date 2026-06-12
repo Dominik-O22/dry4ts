@@ -9,10 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Renamed the published npm package to `dry-ts` (the `dry4ts` name was taken on
-  npm by an unrelated scraped copy). The CLI binary is available as both
-  `dry-ts` and `dry4ts`; the repo, source, and documentation keep the dry4ts
-  name.
+- Renamed to `dry-ts` (the `dry4ts` name was taken on npm by an unrelated
+  scraped copy). The npm package, the CLI binary, and the docs now use `dry-ts`;
+  internal source files were renamed (`src/Dry4Ts.ts` → `src/DryTs.ts`,
+  `src/bin/dry4ts.ts` → `src/bin/dry-ts.ts`). The GitHub repository keeps the
+  dry4ts name, so clone URLs are unchanged.
 
 ### Added
 

@@ -1,6 +1,6 @@
-# dry4ts
+# dry-ts
 
-dry4ts is a CLI that finds candidate duplicate TypeScript code by comparing
+dry-ts is a CLI that finds candidate duplicate TypeScript code by comparing
 normalized AST structure. See README.md for usage; AGENTS.md for agent notes.
 
 Build/test/gate: `bun run build`, `bun run test`, `bun run check`.
