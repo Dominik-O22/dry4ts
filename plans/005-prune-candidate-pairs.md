@@ -7,7 +7,7 @@
 > `plans/README.md` unless a reviewer told you they maintain the index.
 >
 > **Drift check (run first)**:
-> `git diff --stat 6bd3210..HEAD -- src/TypeScriptDuplicateFinder.ts test/dry4ts.test.ts`
+> `git diff --stat f66e35c..HEAD -- src/TypeScriptDuplicateFinder.ts test/dry4ts.test.ts`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding. On a
 > mismatch, treat it as a STOP condition.
@@ -19,7 +19,10 @@
 - **Risk**: HIGH
 - **Depends on**: plans/004-intern-structural-fingerprints.md
 - **Category**: perf
-- **Planned at**: commit `6bd3210`, 2026-06-11
+- **Planned at**: commit `6bd3210`, 2026-06-11; reconciled against
+  `f66e35c`, 2026-06-12, after plan 004 merged. The all-pairs loop,
+  `similarity`, and `maxPossibleSimilarity` are still present; line numbers in
+  the current-state excerpts below were refreshed.
 
 ## Why this matters
 
@@ -35,33 +38,33 @@ similarity calls without silently dropping valid fuzzy duplicate clusters.
 - `findClusters` contains a direct all-pairs nested loop:
 
 ```ts
-src/TypeScriptDuplicateFinder.ts:55     for (let i = 0; i < entries.length; i += 1) {
-src/TypeScriptDuplicateFinder.ts:56       for (let j = i + 1; j < entries.length; j += 1) {
-src/TypeScriptDuplicateFinder.ts:57         const left = entries[i];
-src/TypeScriptDuplicateFinder.ts:58         const right = entries[j];
-src/TypeScriptDuplicateFinder.ts:59         if (overlaps(left, right) || maxPossibleSimilarity(left, right) < resolvedOptions.threshold) {
-src/TypeScriptDuplicateFinder.ts:62         const score = similarity(left, right);
-src/TypeScriptDuplicateFinder.ts:63         if (score >= resolvedOptions.threshold) {
+src/TypeScriptDuplicateFinder.ts:36     for (let i = 0; i < entries.length; i += 1) {
+src/TypeScriptDuplicateFinder.ts:37       for (let j = i + 1; j < entries.length; j += 1) {
+src/TypeScriptDuplicateFinder.ts:38         const left = entries[i];
+src/TypeScriptDuplicateFinder.ts:39         const right = entries[j];
+src/TypeScriptDuplicateFinder.ts:40         if (overlaps(left, right) || maxPossibleSimilarity(left, right) < resolvedOptions.threshold) {
+src/TypeScriptDuplicateFinder.ts:43         const score = similarity(left, right);
+src/TypeScriptDuplicateFinder.ts:44         if (score >= resolvedOptions.threshold) {
 ```
 
 - `maxPossibleSimilarity` is a useful filter but it is applied only after every
   `i,j` pair has already been visited:
 
 ```ts
-src/TypeScriptDuplicateFinder.ts:221 function maxPossibleSimilarity(left: Entry, right: Entry): number {
-src/TypeScriptDuplicateFinder.ts:222   const smaller = Math.min(left.fingerprints.size, right.fingerprints.size);
-src/TypeScriptDuplicateFinder.ts:223   const larger = Math.max(left.fingerprints.size, right.fingerprints.size);
-src/TypeScriptDuplicateFinder.ts:224   return larger === 0 ? 0 : smaller / larger;
+src/TypeScriptDuplicateFinder.ts:262 function maxPossibleSimilarity(left: Entry, right: Entry): number {
+src/TypeScriptDuplicateFinder.ts:263   const smaller = Math.min(left.fingerprints.size, right.fingerprints.size);
+src/TypeScriptDuplicateFinder.ts:264   const larger = Math.max(left.fingerprints.size, right.fingerprints.size);
+src/TypeScriptDuplicateFinder.ts:265   return larger === 0 ? 0 : smaller / larger;
 ```
 
 - Exact similarity is still the final authority:
 
 ```ts
-src/TypeScriptDuplicateFinder.ts:206 function similarity(left: Entry, right: Entry): number {
-src/TypeScriptDuplicateFinder.ts:210   const smaller = left.fingerprints.size <= right.fingerprints.size ? left.fingerprints : right.fingerprints;
-src/TypeScriptDuplicateFinder.ts:213   for (const fingerprint of smaller) {
-src/TypeScriptDuplicateFinder.ts:214     if (larger.has(fingerprint)) {
-src/TypeScriptDuplicateFinder.ts:218   return shared / (left.fingerprints.size + right.fingerprints.size - shared);
+src/TypeScriptDuplicateFinder.ts:247 function similarity(left: Entry, right: Entry): number {
+src/TypeScriptDuplicateFinder.ts:251   const smaller = left.fingerprints.size <= right.fingerprints.size ? left.fingerprints : right.fingerprints;
+src/TypeScriptDuplicateFinder.ts:254   for (const fingerprint of smaller) {
+src/TypeScriptDuplicateFinder.ts:255     if (larger.has(fingerprint)) {
+src/TypeScriptDuplicateFinder.ts:259   return shared / (left.fingerprints.size + right.fingerprints.size - shared);
 ```
 
 ## Commands you will need
