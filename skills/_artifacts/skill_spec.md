@@ -14,7 +14,7 @@ dry4ts finds candidate duplicate TypeScript and JavaScript code by comparing nor
 | Skill | Type | Domain | What it covers | Failure modes |
 | ----- | ---- | ------ | -------------- | ------------- |
 | Scan Code for Duplicate Candidates | core | Finding Duplicate Code | CLI paths, candidate roots, threshold, minLines, minNodes, text output, library API | 3 |
-| Wire Duplicate Checks Into CI | lifecycle | Automating Duplicate Checks | JSON output, --fail-on-duplicates, exit codes, Candidate JSON shape, GitHub Actions usage | 3 |
+| Wire Duplicate Checks Into CI | lifecycle | Automating Duplicate Checks | JSON output, --fail-on-duplicates, exit codes, cluster JSON shape, GitHub Actions usage | 3 |
 | Adopt dry4ts in an Agent Workflow | lifecycle | Automating Duplicate Checks | local review flow, agent-friendly JSON, candidate triage, CI escalation | 3 |
 
 ## Failure Mode Inventory

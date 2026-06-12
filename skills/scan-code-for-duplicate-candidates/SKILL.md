@@ -1,7 +1,7 @@
 ---
 name: scan-code-for-duplicate-candidates
 description: >
-  Run dry4ts locally or from code to find fuzzy structural duplicate candidates. Load when choosing paths, interpreting score and line-range output, tuning --threshold, --min-lines, --min-nodes, or using TypeScriptDuplicateFinder.findDuplicates.
+  Run dry4ts locally or from code to find fuzzy structural duplicate clusters. Load when choosing paths, interpreting score and line-range output, tuning --threshold, --min-lines, --min-nodes, or using TypeScriptDuplicateFinder.findDuplicates.
 type: core
 library: dry4ts
 library_version: "0.1.0"
@@ -52,15 +52,15 @@ bunx dry4ts src test --threshold 0.78 --min-lines 3 --min-nodes 12
 
 Lower `--threshold`, `--min-lines`, and `--min-nodes` only when intentionally looking for smaller or fuzzier structural matches.
 
-### Read candidate locations before refactoring
+### Read cluster locations before refactoring
 
 ```text
-DUPLICATE score=0.89
-  src/invoice.ts:12-25
-  src/receipt.ts:30-44
+CLUSTER 1 score=0.89 locations=2
+  src/invoice.ts:12-25 nodes=88
+  src/receipt.ts:30-44 nodes=91
 ```
 
-The score is structural similarity, and the line ranges identify candidate regions for review.
+The score is structural similarity, and the line ranges identify related duplicate regions for review. `nodes` is the normalized syntax node count for that duplicated block.
 
 ### Use the API from custom tooling
 

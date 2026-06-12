@@ -10,20 +10,22 @@ JSON output:
 
 ```json
 {
-  "candidates": [
+  "clusters": [
     {
-      "score": 0.8909090909090909,
-      "left": { "file": "src/invoice.ts", "startLine": 12, "endLine": 25 },
-      "right": { "file": "src/receipt.ts", "startLine": 30, "endLine": 44 },
-      "leftNodes": 88,
-      "rightNodes": 91
+      "score": { "min": 0.8909090909090909, "max": 0.8909090909090909 },
+      "locationCount": 2,
+      "locations": [
+        { "file": "src/invoice.ts", "startLine": 12, "endLine": 25, "nodes": 88 },
+        { "file": "src/receipt.ts", "startLine": 30, "endLine": 44, "nodes": 91 }
+      ]
     }
   ]
 }
 ```
 
-Candidate fields:
+Cluster fields:
 
-- `score`: structural similarity score
-- `left` and `right`: file and line range for each candidate region
-- `leftNodes` and `rightNodes`: normalized AST node counts after filtering
+- `score.min` and `score.max`: structural similarity score range across the duplicate matches that connected the cluster
+- `locationCount`: number of duplicate regions in the cluster
+- `locations`: file and line ranges for duplicate regions that belong to the same cluster
+- `locations[].nodes`: normalized syntax node count for the duplicated block

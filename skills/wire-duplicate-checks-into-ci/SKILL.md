@@ -1,7 +1,7 @@
 ---
 name: wire-duplicate-checks-into-ci
 description: >
-  Use dry4ts as a CI or automated review gate with --format json and --fail-on-duplicates. Load when writing GitHub Actions, parsing Candidate JSON, or handling dry4ts exit codes 0, 1, and 2.
+  Use dry4ts as a CI or automated review gate with --format json and --fail-on-duplicates. Load when writing GitHub Actions, parsing cluster JSON, or handling dry4ts exit codes 0, 1, and 2.
 type: core
 library: dry4ts
 library_version: "0.1.0"
@@ -34,7 +34,7 @@ jobs:
 
 ## Core Patterns
 
-### Fail only when candidates are present
+### Fail only when duplicate clusters are present
 
 ```bash
 bunx dry4ts --format json --fail-on-duplicates src test
@@ -48,7 +48,7 @@ bunx dry4ts --format json --fail-on-duplicates src test
 bunx dry4ts --format json src test
 ```
 
-JSON output is stable and small: `{ "candidates": Candidate[] }`.
+JSON output is stable and small: `{ "clusters": ClusterReport[] }`.
 
 ### Handle exit codes by meaning
 
@@ -60,8 +60,8 @@ const result = spawnSync("bunx", ["dry4ts", "--format", "json", "--fail-on-dupli
 });
 
 if (result.status === 1) {
-  const report = JSON.parse(result.stdout) as { candidates: unknown[] };
-  console.error(`dry4ts found ${report.candidates.length} duplicate candidates`);
+  const report = JSON.parse(result.stdout) as { clusters: unknown[] };
+  console.error(`dry4ts found ${report.clusters.length} duplicate clusters`);
   process.exitCode = 1;
 } else if (result.status === 2) {
   throw new Error(result.stderr.trim());
@@ -86,7 +86,7 @@ Correct:
 bunx dry4ts --format json --fail-on-duplicates src test
 ```
 
-Without `--fail-on-duplicates`, dry4ts exits `0` even when candidates are found, so CI records a successful job.
+Without `--fail-on-duplicates`, dry4ts exits `0` even when duplicate clusters are found, so CI records a successful job.
 
 Source: README.md:109
 
@@ -104,7 +104,7 @@ Correct:
 bunx dry4ts --format json src test
 ```
 
-Text output is for humans; JSON is the stable candidate contract for tools and autonomous agents.
+Text output is for humans; JSON is the stable cluster contract for tools and autonomous agents.
 
 Source: README.md:121
 
