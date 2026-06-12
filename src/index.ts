@@ -1,5 +1,5 @@
 export { maxScore, minScore } from "./Clusters.js";
-export { USAGE, formatCluster, main, printText, toEdn, toJson } from "./Dry4Ts.js";
+export { USAGE, formatCluster, main, printText, toEdn, toJson } from "./DryTs.js";
 export { NormalizedNode } from "./NormalizedNode.js";
 export { Options, type OptionsInput } from "./Options.js";
 export { TypeScriptDuplicateFinder } from "./TypeScriptDuplicateFinder.js";

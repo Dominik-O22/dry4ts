@@ -1,28 +1,28 @@
 ---
 name: scan-code-for-duplicate-candidates
 description: >
-  Run dry4ts locally or from code to find fuzzy structural duplicate clusters. Load when choosing paths, interpreting score and line-range output, tuning --threshold, --min-lines, --min-nodes, or using TypeScriptDuplicateFinder.findClusters.
+  Run dry-ts locally or from code to find fuzzy structural duplicate clusters. Load when choosing paths, interpreting score and line-range output, tuning --threshold, --min-lines, --min-nodes, or using TypeScriptDuplicateFinder.findClusters.
 type: core
-library: dry4ts
+library: dry-ts
 library_version: "0.2.0"
 sources:
-  - "dry4ts:README.md"
-  - "dry4ts:src/TypeScriptDuplicateFinder.ts"
-  - "dry4ts:src/TypeScriptNormalizer.ts"
-  - "dry4ts:src/Options.ts"
-  - "dry4ts:src/types.ts"
+  - "dry-ts:README.md"
+  - "dry-ts:src/TypeScriptDuplicateFinder.ts"
+  - "dry-ts:src/TypeScriptNormalizer.ts"
+  - "dry-ts:src/Options.ts"
+  - "dry-ts:src/types.ts"
 ---
 
-# dry4ts - Scan Code for Duplicate Candidates
+# dry-ts - Scan Code for Duplicate Candidates
 
 ## Setup
 
 ```bash
-bunx dry4ts src test
+bunx dry-ts src test
 ```
 
 ```ts
-import { TypeScriptDuplicateFinder } from "dry4ts";
+import { TypeScriptDuplicateFinder } from "dry-ts";
 
 const clusters = new TypeScriptDuplicateFinder().findClusters({
   paths: ["src", "test"],
@@ -39,7 +39,7 @@ console.log(clusters);
 ### Scan changed source and tests
 
 ```bash
-bunx dry4ts src test
+bunx dry-ts src test
 ```
 
 Path arguments can be files or directories. Directories are scanned recursively for `.js`, `.jsx`, `.ts`, `.tsx`, `.mts`, and `.cts` files.
@@ -47,7 +47,7 @@ Path arguments can be files or directories. Directories are scanned recursively 
 ### Tune sensitivity for smaller candidates
 
 ```bash
-bunx dry4ts src test --threshold 0.78 --min-lines 3 --min-nodes 12
+bunx dry-ts src test --threshold 0.78 --min-lines 3 --min-nodes 12
 ```
 
 Lower `--threshold`, `--min-lines`, and `--min-nodes` only when intentionally looking for smaller or fuzzier structural matches.
@@ -65,7 +65,7 @@ The score is structural similarity, and the line ranges identify related duplica
 ### Use the API from custom tooling
 
 ```ts
-import { TypeScriptDuplicateFinder, type Cluster } from "dry4ts";
+import { TypeScriptDuplicateFinder, type Cluster } from "dry-ts";
 
 const finder = new TypeScriptDuplicateFinder();
 const clusters = finder.findClusters({
@@ -89,16 +89,16 @@ for (const cluster of clusters) {
 Wrong:
 
 ```bash
-bunx dry4ts src
+bunx dry-ts src
 ```
 
 Correct:
 
 ```bash
-bunx dry4ts src
+bunx dry-ts src
 ```
 
-Treat the result as a fuzzy structural candidate list. dry4ts normalizes names and literal values away, so matches are not exact copy-paste proof.
+Treat the result as a fuzzy structural candidate list. dry-ts normalizes names and literal values away, so matches are not exact copy-paste proof.
 
 Source: README.md:7
 
@@ -107,16 +107,16 @@ Source: README.md:7
 Wrong:
 
 ```bash
-bunx dry4ts
+bunx dry-ts
 ```
 
 Correct:
 
 ```bash
-bunx dry4ts src test
+bunx dry-ts src test
 ```
 
-When no paths are passed, dry4ts scans only `src`, which can miss test duplication or package directories under review.
+When no paths are passed, dry-ts scans only `src`, which can miss test duplication or package directories under review.
 
 Source: README.md:46
 
@@ -125,13 +125,13 @@ Source: README.md:46
 Wrong:
 
 ```bash
-bunx dry4ts src --threshold 0.82
+bunx dry-ts src --threshold 0.82
 ```
 
 Correct:
 
 ```bash
-bunx dry4ts src --threshold 0.8 --min-lines 2 --min-nodes 8
+bunx dry-ts src --threshold 0.8 --min-lines 2 --min-nodes 8
 ```
 
 The defaults require at least 4 source lines and 20 normalized nodes, so small repeated helpers or expressions are intentionally filtered out.
@@ -142,7 +142,7 @@ Source: README.md:35
 
 Lower thresholds and size filters catch more generated duplication but also increase candidate noise. Agents optimizing for zero findings tend to over-refactor harmless structural similarity.
 
-See also: `adopt-dry4ts-in-agent-workflow/SKILL.md` - use cluster triage before extracting shared abstractions.
+See also: `adopt-dry-ts-in-agent-workflow/SKILL.md` - use cluster triage before extracting shared abstractions.
 
 ## References
 

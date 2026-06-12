@@ -17,7 +17,7 @@ for (let i = 0; i < runs; i += 1) {
   const start = performance.now();
   const result = spawnSync(
     "bun",
-    ["./dist/bin/dry4ts.js", "--format", "json", "--no-gitignore", ...scanPaths],
+    ["./dist/bin/dry-ts.js", "--format", "json", "--no-gitignore", ...scanPaths],
     { cwd: process.cwd(), encoding: "utf8", maxBuffer: 1024 * 1024 * 256 },
   );
   const elapsed = performance.now() - start;

@@ -1,13 +1,13 @@
-# dry4ts - Skill Spec
+# dry-ts - Skill Spec
 
-dry4ts finds candidate duplicate TypeScript and JavaScript code by comparing normalized TypeScript AST structure. It is useful as a quick local check after generated edits and as a CI or autonomous review guard against incremental codebase sloppification.
+dry-ts finds candidate duplicate TypeScript and JavaScript code by comparing normalized TypeScript AST structure. It is useful as a quick local check after generated edits and as a CI or autonomous review guard against incremental codebase sloppification.
 
 ## Domains
 
 | Domain | Description | Skills |
 | ------ | ----------- | ------ |
-| Finding Duplicate Code | Running dry4ts against source paths and tuning structural matching so duplicate-code candidates are useful rather than noisy. | scan-code-for-duplicate-candidates |
-| Automating Duplicate Checks | Using stable machine-readable output and exit codes to gate CI or drive autonomous agent review loops. | wire-duplicate-checks-into-ci, adopt-dry4ts-in-agent-workflow |
+| Finding Duplicate Code | Running dry-ts against source paths and tuning structural matching so duplicate-code candidates are useful rather than noisy. | scan-code-for-duplicate-candidates |
+| Automating Duplicate Checks | Using stable machine-readable output and exit codes to gate CI or drive autonomous agent review loops. | wire-duplicate-checks-into-ci, adopt-dry-ts-in-agent-workflow |
 
 ## Skill Inventory
 
@@ -15,7 +15,7 @@ dry4ts finds candidate duplicate TypeScript and JavaScript code by comparing nor
 | ----- | ---- | ------ | -------------- | ------------- |
 | Scan Code for Duplicate Candidates | core | Finding Duplicate Code | CLI paths, candidate roots, threshold, minLines, minNodes, text output, library API | 3 |
 | Wire Duplicate Checks Into CI | lifecycle | Automating Duplicate Checks | JSON output, --fail-on-duplicates, exit codes, cluster JSON shape, GitHub Actions usage | 3 |
-| Adopt dry4ts in an Agent Workflow | lifecycle | Automating Duplicate Checks | local review flow, agent-friendly JSON, candidate triage, CI escalation | 3 |
+| Adopt dry-ts in an Agent Workflow | lifecycle | Automating Duplicate Checks | local review flow, agent-friendly JSON, candidate triage, CI escalation | 3 |
 
 ## Failure Mode Inventory
 
@@ -35,7 +35,7 @@ dry4ts finds candidate duplicate TypeScript and JavaScript code by comparing nor
 | 2 | Parse text output in agents | HIGH | README.md:121 | - |
 | 3 | Treat exit 1 as tool crash | HIGH | README.md:125 | - |
 
-### Adopt dry4ts in an Agent Workflow (3 failure modes)
+### Adopt dry-ts in an Agent Workflow (3 failure modes)
 
 | # | Mistake | Priority | Source | Cross-skill? |
 | - | ------- | -------- | ------ | ------------ |
@@ -47,7 +47,7 @@ dry4ts finds candidate duplicate TypeScript and JavaScript code by comparing nor
 
 | Tension | Skills | Agent implication |
 | ------- | ------ | ----------------- |
-| Signal versus noise | scan-code-for-duplicate-candidates <-> adopt-dry4ts-in-agent-workflow | An agent may over-refactor harmless structural similarity if it optimizes only for zero findings. |
+| Signal versus noise | scan-code-for-duplicate-candidates <-> adopt-dry-ts-in-agent-workflow | An agent may over-refactor harmless structural similarity if it optimizes only for zero findings. |
 | Human output versus agent output | scan-code-for-duplicate-candidates <-> wire-duplicate-checks-into-ci | An agent may build brittle parsers if it uses local human output in CI or review loops. |
 
 ## Cross-References
@@ -56,7 +56,7 @@ dry4ts finds candidate duplicate TypeScript and JavaScript code by comparing nor
 | ---- | -- | ------ |
 | scan-code-for-duplicate-candidates | wire-duplicate-checks-into-ci | A local scan that becomes team policy needs --fail-on-duplicates and stable JSON semantics. |
 | wire-duplicate-checks-into-ci | scan-code-for-duplicate-candidates | Useful CI thresholds depend on understanding candidate size filters and score interpretation. |
-| adopt-dry4ts-in-agent-workflow | scan-code-for-duplicate-candidates | Agent review loops need the same candidate interpretation rules as manual local scans. |
+| adopt-dry-ts-in-agent-workflow | scan-code-for-duplicate-candidates | Agent review loops need the same candidate interpretation rules as manual local scans. |
 
 ## Subsystems & Reference Candidates
 
@@ -64,20 +64,20 @@ dry4ts finds candidate duplicate TypeScript and JavaScript code by comparing nor
 | ----- | ---------- | -------------------- |
 | scan-code-for-duplicate-candidates | - | Candidate root kinds and normalization behavior |
 | wire-duplicate-checks-into-ci | - | Exit-code and JSON contract |
-| adopt-dry4ts-in-agent-workflow | - | Review policy examples |
+| adopt-dry-ts-in-agent-workflow | - | Review policy examples |
 
 ## Remaining Gaps
 
 | Skill | Question | Status |
 | ----- | -------- | ------ |
 | scan-code-for-duplicate-candidates | Which threshold and size-filter tuning guidance should be recommended for small libraries versus larger application codebases? Maintainer has no stronger guidance yet because the project is new. | open |
-| adopt-dry4ts-in-agent-workflow | What local agent-review policy should be recommended when candidates are found: warn only, request human review, or automatically block? This remains a product-learning area. | open |
+| adopt-dry-ts-in-agent-workflow | What local agent-review policy should be recommended when candidates are found: warn only, request human review, or automatically block? This remains a product-learning area. | open |
 
 ## Recommended Skill File Structure
 
 - **Core skills:** scan-code-for-duplicate-candidates
 - **Framework skills:** none
-- **Lifecycle skills:** wire-duplicate-checks-into-ci, adopt-dry4ts-in-agent-workflow
+- **Lifecycle skills:** wire-duplicate-checks-into-ci, adopt-dry-ts-in-agent-workflow
 - **Composition skills:** none
 - **Reference files:** candidate root kinds and normalization behavior may deserve a compact reference file if the generated scan skill becomes too long
 

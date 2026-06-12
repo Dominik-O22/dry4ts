@@ -5,6 +5,22 @@ All notable changes to dry4ts are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-06-12
+
+### Changed
+
+- Renamed to `dry-ts` (the `dry4ts` name was taken on npm by an unrelated
+  scraped copy). The npm package, the CLI binary, and the docs now use `dry-ts`;
+  internal source files were renamed (`src/Dry4Ts.ts` → `src/DryTs.ts`,
+  `src/bin/dry4ts.ts` → `src/bin/dry-ts.ts`). The GitHub repository keeps the
+  dry4ts name, so clone URLs are unchanged.
+
+### Added
+
+- Release automation: pushing a published GitHub Release (tag `vX.Y.Z`) now
+  builds, tests, and publishes to npm with provenance via
+  `.github/workflows/publish.yml`. Requires the `NPM_TOKEN` repo secret.
+
 ## [0.2.0] - 2026-06-12
 
 ### Added

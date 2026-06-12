@@ -1,10 +1,10 @@
-# dry4ts
+# dry-ts
 
-dry4ts finds candidate duplicate TypeScript code across files and directories. It reports fuzzy structural matches as clusters of related filename and line ranges so another mechanism can evaluate and reduce duplication.
+dry-ts finds candidate duplicate TypeScript code across files and directories. It reports fuzzy structural matches as clusters of related filename and line ranges so another mechanism can evaluate and reduce duplication.
 
 ## Overview
 
-dry4ts parses TypeScript source with the TypeScript compiler API, selects TypeScript declarations and function-like nodes as comparison candidates, normalizes each candidate's AST, and compares sets of structural fingerprints with Jaccard similarity:
+dry-ts parses TypeScript source with the TypeScript compiler API, selects TypeScript declarations and function-like nodes as comparison candidates, normalizes each candidate's AST, and compares sets of structural fingerprints with Jaccard similarity:
 
 ```text
 score = shared fingerprints / all fingerprints seen in either candidate
@@ -17,8 +17,8 @@ Names and literal values normalize away, while TypeScript syntax shape remains. 
 Run without installing after the package is published:
 
 ```bash
-bunx dry4ts [options] [file-or-directory ...]
-npx dry4ts [options] [file-or-directory ...]
+bunx dry-ts [options] [file-or-directory ...]
+npx dry-ts [options] [file-or-directory ...]
 ```
 
 Run from this repository:
@@ -26,7 +26,7 @@ Run from this repository:
 ```bash
 bun install
 bun run build
-bun ./dist/bin/dry4ts.js [options] [file-or-directory ...]
+bun ./dist/bin/dry-ts.js [options] [file-or-directory ...]
 ```
 
 Options:
@@ -46,7 +46,7 @@ Options:
 --no-gitignore  Include files and directories ignored by .gitignore
 ```
 
-When no paths are provided, dry4ts scans `src`. Directory arguments recursively include `.js`, `.jsx`, `.ts`, `.tsx`, `.mts`, and `.cts` files, excluding TypeScript declaration files. Directory scans respect `.gitignore` from the working directory by default; pass `--no-gitignore` to include ignored paths. Explicit file arguments are always scanned even when they match a `.gitignore` pattern.
+When no paths are provided, dry-ts scans `src`. Directory arguments recursively include `.js`, `.jsx`, `.ts`, `.tsx`, `.mts`, and `.cts` files, excluding TypeScript declaration files. Directory scans respect `.gitignore` from the working directory by default; pass `--no-gitignore` to include ignored paths. Explicit file arguments are always scanned even when they match a `.gitignore` pattern.
 
 Default text output:
 
@@ -87,7 +87,7 @@ JSON output:
 ## Library API
 
 ```ts
-import { TypeScriptDuplicateFinder } from "dry4ts";
+import { TypeScriptDuplicateFinder } from "dry-ts";
 
 const clusters = new TypeScriptDuplicateFinder().findClusters({
   paths: ["src"],
@@ -109,17 +109,17 @@ name: Duplicate Code
 on: [push, pull_request]
 
 jobs:
-  dry4ts:
+  dry-ts:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.6
-      - run: bunx dry4ts --format json --fail-on-duplicates src
+      - run: bunx dry-ts --format json --fail-on-duplicates src
 ```
 
-For this repository, `bun run ci` builds, tests, and runs dry4ts against `src test`.
+For this repository, `bun run ci` builds, tests, and runs dry-ts against `src test`.
 
 ## AI Agents
 
@@ -128,7 +128,7 @@ If you use an AI agent, run `npx @tanstack/intent@latest install`.
 Prefer JSON output for autonomous tools:
 
 ```bash
-bunx dry4ts --format json src test
+bunx dry-ts --format json src test
 ```
 
 Exit codes are stable for automation:
