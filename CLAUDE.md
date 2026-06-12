@@ -6,6 +6,8 @@ normalized AST structure. See README.md for usage; AGENTS.md for agent notes.
 Build/test/gate: `bun run build`, `bun run test`, `bun run check`.
 Benchmarks: `bun run bench`, `bun run bench:setup`, `bun run bench:corpus` (see
 README "Benchmarking").
+Performance plans: `plans/README.md` — prioritized implementation plans, each
+self-contained and ready to execute.
 
 ## Skill routing
 
