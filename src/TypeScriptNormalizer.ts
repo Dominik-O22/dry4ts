@@ -26,11 +26,11 @@ export class TypeScriptNormalizer {
     return result;
   }
 
-  private tag(node: ts.Node): string {
+  tag(node: ts.Node): string {
     return ts.SyntaxKind[node.kind] ?? `SyntaxKind${node.kind}`;
   }
 
-  private keepsStructuralChild(child: ts.Node): boolean {
+  keepsStructuralChild(child: ts.Node): boolean {
     return !this.isName(child) && !this.isLiteral(child) && child.kind !== ts.SyntaxKind.JSDocComment;
   }
 
@@ -51,7 +51,7 @@ export class TypeScriptNormalizer {
     );
   }
 
-  private markers(node: ts.Node): string[] {
+  markers(node: ts.Node): string[] {
     const markers: string[] = [];
     this.addDecoratorMarkers(node, markers);
     this.addModifierMarkers(node, markers);
