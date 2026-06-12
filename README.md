@@ -35,7 +35,8 @@ Options:
 --threshold N   Minimum structural similarity score, default 0.82
 --min-lines N   Minimum source lines in a candidate declaration, default 4
 --min-nodes N   Minimum normalized syntax nodes, default 20; candidates
-                pruned before fingerprinting, so raising this speeds scans
+                below this threshold are excluded before pair matching,
+                so raising this speeds scans
 --min-locations N
                 Minimum locations in a reported cluster, default 2
 --format F      text, json, or edn, default text
