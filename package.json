@@ -1,8 +1,17 @@
 {
-  "name": "dry4ts",
-  "version": "0.2.0",
+  "name": "dry-ts",
+  "version": "0.2.1",
   "description": "Find candidate duplicate TypeScript code by comparing normalized AST structure.",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Dominik-O22/dry4ts.git"
+  },
+  "homepage": "https://github.com/Dominik-O22/dry4ts#readme",
+  "bugs": {
+    "url": "https://github.com/Dominik-O22/dry4ts/issues"
+  },
+  "author": "Dominik-O22",
   "packageManager": "bun@1.3.6",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -13,6 +22,7 @@
     }
   },
   "bin": {
+    "dry-ts": "./dist/bin/dry4ts.js",
     "dry4ts": "./dist/bin/dry4ts.js"
   },
   "files": [
