@@ -72,10 +72,10 @@ src/TypeScriptNormalizer.ts:16     return new NormalizedNode(this.tag(node), chi
 - Entries currently call `nodeCount()` and `fingerprints()` separately:
 
 ```ts
-src/TypeScriptDuplicateFinder.ts:177   private entry(file: string, node: ts.Node, startLine: number, endLine: number): Entry {
-src/TypeScriptDuplicateFinder.ts:178     const normalized = this.normalizer.normalize(node);
-src/TypeScriptDuplicateFinder.ts:183       nodes: normalized.nodeCount(),
-src/TypeScriptDuplicateFinder.ts:184       fingerprints: normalized.fingerprints(),
+src/TypeScriptDuplicateFinder.ts:193   private entry(file: string, node: ts.Node, startLine: number, endLine: number, ctx: ScanContext, memo: Map<ts.Node, NormalizedNode>): Entry {
+src/TypeScriptDuplicateFinder.ts:201     const normalized = this.normalizer.normalize(node, memo);
+src/TypeScriptDuplicateFinder.ts:206       nodes: normalized.nodeCount(),
+src/TypeScriptDuplicateFinder.ts:207       fingerprints: normalized.fingerprints(ctx.interner),
 ```
 
 ## Commands you will need
