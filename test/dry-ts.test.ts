@@ -19,6 +19,7 @@ import {
   type Cluster,
 } from "../src/index.js";
 import { ClusterCollector } from "../src/Clusters.js";
+import { FileScanner } from "../src/FileScanner.js";
 import { FingerprintInterner, type NormalizedNode } from "../src/NormalizedNode.js";
 
 test("reports structural duplicate candidates with file and line ranges", async () => {
@@ -150,21 +151,6 @@ test("filters candidates shorter than the minimum line count", async () => {
     { threshold: 0.8, minLines: 3, minNodes: 1 },
   );
 
-  assert.deepEqual(clusters, []);
-});
-
-test("does not normalize candidates shorter than minLines", async () => {
-  const { dir } = await writeFixture({
-    "short.ts": "function short(x: number) { return x; }\n",
-  });
-  const finder = new TypeScriptDuplicateFinder();
-  // Replace the normalizer with a test double that throws if called.
-  (finder as unknown as { normalizer: { normalize: () => never } }).normalizer = {
-    normalize() {
-      throw new Error("normalizer should not be called for below-minLines candidates");
-    },
-  };
-  const clusters = finder.findClusters({ paths: [dir], threshold: 0.8, minLines: 5, minNodes: 1 });
   assert.deepEqual(clusters, []);
 });
 
@@ -870,12 +856,13 @@ function exhaustiveSimilarity(left: ExhaustiveEntry, right: ExhaustiveEntry): nu
     return 0;
   }
   const [smaller, larger] =
-    left.fingerprints.size <= right.fingerprints.size
+    left.fingerprints.length <= right.fingerprints.length
       ? [left.fingerprints, right.fingerprints]
       : [right.fingerprints, left.fingerprints];
+  const largerSet = new Set(larger);
   let shared = 0;
   smaller.forEach((fingerprint) => {
-    if (larger.has(fingerprint)) {
+    if (largerSet.has(fingerprint)) {
       shared += 1;
     }
   });
@@ -883,7 +870,7 @@ function exhaustiveSimilarity(left: ExhaustiveEntry, right: ExhaustiveEntry): nu
 }
 
 function exhaustiveMaxPossibleSimilarity(left: ExhaustiveEntry, right: ExhaustiveEntry): number {
-  const [smaller, larger] = [left.fingerprints.size, right.fingerprints.size].sort((a, b) => a - b);
+  const [smaller, larger] = [left.fingerprints.length, right.fingerprints.length].sort((a, b) => a - b);
   return larger > 0 ? smaller / larger : 0;
 }
 
@@ -908,7 +895,7 @@ type MatchingPairProbeEntry = {
   readonly startLine: number;
   readonly endLine: number;
   readonly nodes: number;
-  readonly fingerprints: Set<string>;
+  readonly fingerprints: Float64Array;
 };
 
 type MatchingPairProbe = readonly [MatchingPairProbeEntry, MatchingPairProbeEntry, number];
@@ -920,13 +907,27 @@ function matchingPairsForTest(entries: readonly MatchingPairProbeEntry[], thresh
   return finder.matchingPairs(entries, threshold);
 }
 
+const probeFingerprintIds = new Map<string, number>();
+
+function probeFingerprintId(fingerprint: string): number {
+  const existing = probeFingerprintIds.get(fingerprint);
+  if (existing !== undefined) {
+    return existing;
+  }
+  const id = probeFingerprintIds.size;
+  probeFingerprintIds.set(fingerprint, id);
+  return id;
+}
+
 function matchingPairEntry(
   file: string,
   startLine: number,
   endLine: number,
   fingerprints: readonly string[],
 ): MatchingPairProbeEntry {
-  return { file, startLine, endLine, nodes: fingerprints.length, fingerprints: new Set(fingerprints) };
+  const ids = Float64Array.from(new Set(fingerprints.map(probeFingerprintId)));
+  ids.sort();
+  return { file, startLine, endLine, nodes: ids.length, fingerprints: ids };
 }
 
 function matchingPairLocation(entry: MatchingPairProbeEntry): {
@@ -1037,14 +1038,14 @@ export function handle(values: number[]): number {
   );
 });
 
-test("main --help prints USAGE to stdout", () => {
+test("main --help prints USAGE to stdout", async () => {
   const lines: string[] = [];
   const original = console.log;
   console.log = (...args: unknown[]) => {
     lines.push(args.map(String).join(" "));
   };
   try {
-    main(["--help"]);
+    await main(["--help"]);
   } finally {
     console.log = original;
   }
@@ -1052,7 +1053,7 @@ test("main --help prints USAGE to stdout", () => {
   assert.ok(lines.some((line) => line.includes(USAGE.split("\n")[0])));
 });
 
-test("main with invalid --threshold value sets exitCode 2 and writes to stderr", () => {
+test("main with invalid --threshold value sets exitCode 2 and writes to stderr", async () => {
   const errors: string[] = [];
   const originalError = console.error;
   console.error = (...args: unknown[]) => {
@@ -1060,7 +1061,7 @@ test("main with invalid --threshold value sets exitCode 2 and writes to stderr",
   };
   try {
     process.exitCode = 0;
-    main(["--threshold", "bad"]);
+    await main(["--threshold", "bad"]);
     assert.equal(process.exitCode, 2);
     assert.ok(errors.length > 0, "Expected something written to stderr");
   } finally {
@@ -1077,7 +1078,7 @@ test("main with --format xml sets exitCode 2", async () => {
   console.log = () => {};
   try {
     process.exitCode = 0;
-    main(["--format", "xml", dir]);
+    await main(["--format", "xml", dir]);
     assert.equal(process.exitCode, 2);
   } finally {
     console.error = originalError;
@@ -1184,4 +1185,63 @@ test("toEdn escapes backslash and double quote in file names", () => {
   collector.addMatch(left, right, 0.9);
   const edn = toEdn(collector.clusters());
   assert.ok(edn.includes('path\\\\to\\\\\\"file\\"'), `Expected escaped path in edn, got: ${edn}`);
+});
+
+// Regression: minLines gate in FileScanner — normalizer mock on TypeScriptDuplicateFinder
+// no longer intercepts FileScanner's internal normalizer. Verify the gate via FileScanner directly.
+test("FileScanner.scanFile excludes candidates shorter than minLines", async () => {
+  const { dir } = await writeFixture({
+    "short.ts": "function short(x: number) { return x; }\n",
+  });
+  const file = path.join(dir, "short.ts");
+  const entries = new FileScanner().scanFile(file, 5, 1);
+  assert.deepEqual(entries, [], "single-line function should not produce an entry when minLines=5");
+});
+
+test("FileScanner.scanFile includes candidates spanning exactly minLines", async () => {
+  const { dir } = await writeFixture({
+    "exact.ts": "function exact(x: number): number {\n  const y = x + 1;\n  return y;\n}\n",
+  });
+  const file = path.join(dir, "exact.ts");
+  assert.equal(new FileScanner().scanFile(file, 4, 1).length, 1, "4-line function included at minLines=4");
+  assert.equal(new FileScanner().scanFile(file, 5, 1).length, 0, "4-line function excluded at minLines=5");
+});
+
+test("FileScanner.scanFile propagates errors for missing files", async () => {
+  const { dir } = await writeFixture({});
+  assert.throws(() => new FileScanner().scanFile(path.join(dir, "missing.ts"), 1, 1), /ENOENT/);
+});
+
+test("FingerprintInterner.idFor is order-sensitive over children", () => {
+  const interner = new FingerprintInterner();
+  const a = interner.idFor("LeafA", []);
+  const b = interner.idFor("LeafB", []);
+  assert.notEqual(a, b);
+  const ab = interner.idFor("Parent", [a, b]);
+  const ba = interner.idFor("Parent", [b, a]);
+  assert.notEqual(ab, ba, "child order must change the hash");
+  assert.equal(interner.idFor("Parent", [a, b]), ab, "same children give same hash");
+});
+
+test("FileScanner.scanFile throws on files with parse errors", async () => {
+  const { dir } = await writeFixture({
+    "broken.ts": "const = (((((\n",
+  });
+  const file = path.join(dir, "broken.ts");
+  assert.throws(
+    () => new FileScanner().scanFile(file, 1, 1),
+    /Unable to parse/,
+    "Expected scanFile to throw on syntactically invalid TypeScript",
+  );
+});
+
+test("FingerprintInterner.idFor returns consistent hashes for same tag and children", () => {
+  const interner = new FingerprintInterner();
+  const id1 = interner.idFor("FunctionDeclaration", []);
+  const id2 = interner.idFor("FunctionDeclaration", []);
+  assert.equal(id1, id2, "Same tag+children should produce the same 53-bit hash");
+  const id3 = interner.idFor("ClassDeclaration", []);
+  assert.notEqual(id1, id3, "Different tags should produce different hashes");
+  assert.ok(id1 >= 0, "Hash should be non-negative");
+  assert.ok(id1 < 2 ** 53, "Hash should fit in 53 bits");
 });
