@@ -1,16 +1,4 @@
-import type { Candidate, Cluster, ClusterLocation, Location, ScoreRange } from "./types.js";
-
-export function clusterCandidates(candidates: readonly Candidate[]): Cluster[] {
-  const collector = new ClusterCollector();
-  for (const candidate of candidates) {
-    collector.addMatch(
-      { ...candidate.left, nodes: candidate.leftNodes },
-      { ...candidate.right, nodes: candidate.rightNodes },
-      candidate.score,
-    );
-  }
-  return collector.clusters();
-}
+import type { Cluster, ClusterLocation, Location, ScoreRange } from "./types.js";
 
 export class ClusterCollector {
   private readonly parents = new Map<string, string>();

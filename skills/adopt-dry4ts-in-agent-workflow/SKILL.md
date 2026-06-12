@@ -4,7 +4,7 @@ description: >
   Run dry4ts after AI-generated edits to catch structural duplication before it accumulates. Load when building autonomous review loops, triaging duplicate clusters, using JSON output after generated changes, or deciding when local duplicate checks should become CI gates.
 type: core
 library: dry4ts
-library_version: "0.1.0"
+library_version: "0.2.0"
 sources:
   - "dry4ts:README.md"
   - "dry4ts:AGENTS.md"
@@ -33,33 +33,28 @@ bunx dry4ts --format json src test
 
 Use JSON when another agent, script, or review tool will consume the clustered result.
 
-### Keep candidate triage separate from refactoring
+### Keep cluster triage separate from refactoring
 
 ```ts
-import { TypeScriptDuplicateFinder, type Candidate } from "dry4ts";
+import { TypeScriptDuplicateFinder, type Cluster } from "dry4ts";
 
-function candidateKey(candidate: Candidate): string {
-  return `${candidate.left.file}:${candidate.left.startLine}-${candidate.left.endLine}`;
-}
-
-const candidates = new TypeScriptDuplicateFinder().findDuplicates({
+const clusters = new TypeScriptDuplicateFinder().findClusters({
   paths: ["src", "test"],
   threshold: 0.82,
   minLines: 4,
   minNodes: 20,
 });
 
-const reviewItems = candidates.map((candidate) => ({
-  id: candidateKey(candidate),
-  score: candidate.score,
-  left: candidate.left,
-  right: candidate.right,
+const reviewItems = clusters.map((cluster) => ({
+  scoreMax: cluster.score.max,
+  scoreMin: cluster.score.min,
+  locations: cluster.locations.map((loc) => `${loc.file}:${loc.startLine}-${loc.endLine}`),
 }));
 
 console.log(JSON.stringify({ reviewItems }, null, 2));
 ```
 
-Candidate or cluster output should drive a review decision before any abstraction is extracted.
+Cluster output should drive a review decision before any abstraction is extracted.
 
 ### Escalate repeated local checks into CI
 
@@ -71,16 +66,16 @@ Use the failing form only when the team wants duplicate clusters to block a pipe
 
 ## Common Mistakes
 
-### HIGH Refactor every candidate immediately
+### HIGH Refactor every cluster immediately
 
 Wrong:
 
 ```ts
 import { TypeScriptDuplicateFinder } from "dry4ts";
 
-const candidates = new TypeScriptDuplicateFinder().findDuplicates({ paths: ["src"] });
-for (const candidate of candidates) {
-  console.log(`extract shared helper for ${candidate.left.file} and ${candidate.right.file}`);
+const clusters = new TypeScriptDuplicateFinder().findClusters({ paths: ["src"] });
+for (const cluster of clusters) {
+  console.log(`extract shared helper for ${cluster.locations.map((l) => l.file).join(" and ")}`);
 }
 ```
 
@@ -89,9 +84,9 @@ Correct:
 ```ts
 import { TypeScriptDuplicateFinder } from "dry4ts";
 
-const candidates = new TypeScriptDuplicateFinder().findDuplicates({ paths: ["src"] });
-for (const candidate of candidates) {
-  console.log(`review structural candidate ${candidate.left.file}:${candidate.left.startLine}`);
+const clusters = new TypeScriptDuplicateFinder().findClusters({ paths: ["src"] });
+for (const cluster of clusters) {
+  console.log(`review structural cluster at ${cluster.locations[0].file}:${cluster.locations[0].startLine}`);
 }
 ```
 
@@ -106,8 +101,8 @@ Wrong:
 ```ts
 import { TypeScriptDuplicateFinder } from "dry4ts";
 
-const candidates = new TypeScriptDuplicateFinder().findDuplicates({ paths: ["src"] });
-console.log(candidates.length);
+const clusters = new TypeScriptDuplicateFinder().findClusters({ paths: ["src"] });
+console.log(clusters.length);
 ```
 
 Correct:
@@ -116,8 +111,8 @@ Correct:
 import { TypeScriptDuplicateFinder } from "dry4ts";
 
 try {
-  const candidates = new TypeScriptDuplicateFinder().findDuplicates({ paths: ["src"] });
-  console.log(candidates.length);
+  const clusters = new TypeScriptDuplicateFinder().findClusters({ paths: ["src"] });
+  console.log(clusters.length);
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 2;
@@ -152,4 +147,4 @@ Lower thresholds and size filters catch more generated duplication but also incr
 
 See also: `scan-code-for-duplicate-candidates/SKILL.md` - use score, line range, and size filters to triage before refactoring.
 
-See also: `scan-code-for-duplicate-candidates/SKILL.md` - agent review loops need the same candidate interpretation rules as manual local scans.
+See also: `scan-code-for-duplicate-candidates/SKILL.md` - agent review loops need the same cluster interpretation rules as manual local scans.

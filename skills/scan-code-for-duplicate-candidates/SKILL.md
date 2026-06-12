@@ -1,10 +1,10 @@
 ---
 name: scan-code-for-duplicate-candidates
 description: >
-  Run dry4ts locally or from code to find fuzzy structural duplicate clusters. Load when choosing paths, interpreting score and line-range output, tuning --threshold, --min-lines, --min-nodes, or using TypeScriptDuplicateFinder.findDuplicates.
+  Run dry4ts locally or from code to find fuzzy structural duplicate clusters. Load when choosing paths, interpreting score and line-range output, tuning --threshold, --min-lines, --min-nodes, or using TypeScriptDuplicateFinder.findClusters.
 type: core
 library: dry4ts
-library_version: "0.1.0"
+library_version: "0.2.0"
 sources:
   - "dry4ts:README.md"
   - "dry4ts:src/TypeScriptDuplicateFinder.ts"
@@ -24,14 +24,14 @@ bunx dry4ts src test
 ```ts
 import { TypeScriptDuplicateFinder } from "dry4ts";
 
-const candidates = new TypeScriptDuplicateFinder().findDuplicates({
+const clusters = new TypeScriptDuplicateFinder().findClusters({
   paths: ["src", "test"],
   threshold: 0.82,
   minLines: 4,
   minNodes: 20,
 });
 
-console.log(candidates);
+console.log(clusters);
 ```
 
 ## Core Patterns
@@ -65,18 +65,20 @@ The score is structural similarity, and the line ranges identify related duplica
 ### Use the API from custom tooling
 
 ```ts
-import { TypeScriptDuplicateFinder } from "dry4ts";
+import { TypeScriptDuplicateFinder, type Cluster } from "dry4ts";
 
 const finder = new TypeScriptDuplicateFinder();
-const candidates = finder.findDuplicates({
+const clusters = finder.findClusters({
   paths: ["src", "test"],
   threshold: 0.82,
   minLines: 4,
   minNodes: 20,
 });
 
-for (const candidate of candidates) {
-  console.log(`${candidate.score.toFixed(2)} ${candidate.left.file}:${candidate.left.startLine}`);
+for (const cluster of clusters) {
+  for (const location of cluster.locations) {
+    console.log(`${cluster.score.max.toFixed(2)} ${location.file}:${location.startLine}`);
+  }
 }
 ```
 
@@ -140,7 +142,7 @@ Source: README.md:35
 
 Lower thresholds and size filters catch more generated duplication but also increase candidate noise. Agents optimizing for zero findings tend to over-refactor harmless structural similarity.
 
-See also: `adopt-dry4ts-in-agent-workflow/SKILL.md` - use candidate triage before extracting shared abstractions.
+See also: `adopt-dry4ts-in-agent-workflow/SKILL.md` - use cluster triage before extracting shared abstractions.
 
 ## References
 
