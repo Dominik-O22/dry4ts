@@ -13,8 +13,16 @@ const targetDir = path.join(".bench", "TypeScript");
 const scanPath = path.join(targetDir, "src", "compiler");
 
 if (existsSync(scanPath)) {
-  console.log(JSON.stringify({ status: "already present", tag: PINNED_TAG, scanPath }, null, 2));
-  process.exit(0);
+  const tagCheck = spawnSync("git", ["describe", "--tags", "--exact-match", "HEAD"], {
+    cwd: path.resolve(targetDir),
+    encoding: "utf8",
+  });
+  const currentTag = tagCheck.stdout?.trim();
+  if (currentTag === PINNED_TAG) {
+    console.log(JSON.stringify({ status: "already present", tag: PINNED_TAG, scanPath }, null, 2));
+    process.exit(0);
+  }
+  console.log(JSON.stringify({ status: "stale checkout, re-cloning", currentTag, expected: PINNED_TAG }, null, 2));
 }
 
 await mkdir(".bench", { recursive: true });

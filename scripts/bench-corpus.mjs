@@ -32,7 +32,14 @@ if (!REGIMES[regime]) {
   process.exit(2);
 }
 const count = integerFlag("--count", REGIMES[regime].defaultCount);
-const outDir = stringFlag("--out", path.join(".bench", "corpus", regime));
+const outDir = (() => {
+  const resolved = path.resolve(stringFlag("--out", path.join(".bench", "corpus", regime)));
+  const allowedBase = path.resolve(".bench");
+  if (resolved !== allowedBase && !resolved.startsWith(allowedBase + path.sep)) {
+    throw new Error(`--out path must be inside .bench directory, got: ${resolved}`);
+  }
+  return resolved;
+})();
 
 await rm(outDir, { recursive: true, force: true });
 await mkdir(outDir, { recursive: true });
@@ -88,7 +95,7 @@ function generateOneliners(total) {
 
 function generateNested(maxDepth) {
   const files = [];
-  for (const depth of [Math.ceil(maxDepth / 3), Math.ceil((2 * maxDepth) / 3), maxDepth]) {
+  for (const depth of [...new Set([Math.ceil(maxDepth / 3), Math.ceil((2 * maxDepth) / 3), maxDepth])]) {
     let expression = "seed";
     for (let i = 0; i < depth; i += 1) {
       expression = `(seed + ${expression})`;
