@@ -7,7 +7,7 @@
 > `plans/README.md` unless a reviewer told you they maintain the index.
 >
 > **Drift check (run first)**:
-> `git diff --stat 6bd3210..HEAD -- package.json README.md src/Clusters.ts src/Dry4Ts.ts src/TypeScriptDuplicateFinder.ts src/index.ts src/types.ts test/dry4ts.test.ts`
+> `git diff --stat a8ab4fb..HEAD -- package.json README.md src/Clusters.ts src/Dry4Ts.ts src/TypeScriptDuplicateFinder.ts src/index.ts src/types.ts test/dry4ts.test.ts`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding. On a
 > mismatch, treat it as a STOP condition.
@@ -19,7 +19,13 @@
 - **Risk**: MED
 - **Depends on**: plans/001-respect-gitignore.md
 - **Category**: cleanup (API surface)
-- **Planned at**: commit `6bd3210`, 2026-06-11
+- **Planned at**: commit `6bd3210`, 2026-06-11; reconciled against `a8ab4fb`,
+  2026-06-12 (plan 001 merged; line numbers in excerpts shifted — e.g.
+  `findDuplicates` now at `src/TypeScriptDuplicateFinder.ts:25`,
+  `formatCandidate` at `src/Dry4Ts.ts:77`, `Library API` at `README.md:85`,
+  `scanFixture` at `test/dry4ts.test.ts:493`. Substance unchanged. Tests use
+  `clusterCandidates`/`pair` in MORE places than excerpted, including around
+  `test/dry4ts.test.ts:606` and `:627` — Step 3 applies to all of them.)
 
 ## Why this matters
 
@@ -115,6 +121,8 @@ test/dry4ts.test.ts:306   return { files, candidates };
 - `src/index.ts`
 - `src/types.ts`
 - `test/dry4ts.test.ts`
+- `skills/scan-code-for-duplicate-candidates/SKILL.md`
+- `skills/adopt-dry4ts-in-agent-workflow/SKILL.md`
 
 **Out of scope**:
 
@@ -166,19 +174,28 @@ In `src/Clusters.ts`:
 In `src/index.ts`:
 
 - Stop exporting `clusterCandidates`, `formatCandidate`, and `Candidate`.
-- Before removing package-root exports, grep the shipped `skills/` directory
-  (it is in the `files` array of `package.json`) for imports of `dry4ts` as a
-  package: `rg -n "from .dry4ts.|require\(.dry4ts.\)" skills`. If any skill
-  imports the library entry point, treat that as a STOP condition.
-- Because this package is CLI-only, also remove package-root library exports
-  from `package.json` if no tooling requires them:
-  - remove `"main"`
-  - remove `"types"`
-  - remove `"exports"`
+- **Keep `"main"`, `"types"`, and `"exports"` in `package.json` unchanged.**
+  The shipped skills (`skills/scan-code-for-duplicate-candidates/SKILL.md`,
+  `skills/adopt-dry4ts-in-agent-workflow/SKILL.md`) document library import of
+  `dry4ts` via `findClusters`-capable entry point — the verification grep
+  proved the import surface is needed. Only the raw-pair API is removed.
 - Keep the `"bin"` field unchanged.
 
-If removing package-root exports breaks `bun run check` for a reason unrelated
-to tests, STOP and report. Do not reintroduce the raw pair API as a workaround.
+### Step 2b: Update shipped skills to the cluster API
+
+In `skills/scan-code-for-duplicate-candidates/SKILL.md` and
+`skills/adopt-dry4ts-in-agent-workflow/SKILL.md`:
+
+- Replace every use of `findDuplicates`, `type Candidate`, raw `candidate.left`
+  / `candidate.right` access, and any pair-keyed helpers (e.g. `candidateKey`)
+  with the cluster API: `findClusters`, `type Cluster`, `cluster.locations`,
+  `cluster.score` range fields.
+- Keep each skill's intent, structure, and prose style; change only what the
+  removed API forces.
+- Verify the rewritten code samples compile in spirit against the real types
+  in `src/types.ts` (no invented fields).
+
+**Verify**: `rg -n "findDuplicates|Candidate" skills` -> no matches.
 
 **Verify**: `bun run test` still may fail until tests are updated, but
 TypeScript errors should only point at removed test imports/usages.
@@ -227,16 +244,17 @@ function hasClusterContaining(clusters: readonly Cluster[], ...files: string[]):
 
 **Verify**: `bun run test` -> exits 0.
 
-### Step 4: Remove library API documentation
+### Step 4: Trim library API documentation to clusters only
 
 In `README.md`:
 
-- Delete the `## Library API` section at `README.md:84`.
+- **Keep** the `## Library API` section (the import surface stays, see Step 2),
+  but ensure it documents only the cluster API (`findClusters`, `Cluster`).
+  Remove any mention of `findDuplicates`, `Candidate`, `formatCandidate`, or
+  `clusterCandidates` if present.
 - Keep CLI usage, CI, AI agent, publishing, and development sections.
-- If package metadata exports were removed in Step 2, ensure README does not
-  imply package import support anywhere else.
 
-**Verify**: `rg -n "Library API|findDuplicates|formatCandidate|Candidate" README.md src test package.json` -> no matches, except `candidate` as a generic English word inside prose/tests only if not referring to the removed raw pair API.
+**Verify**: `rg -n "findDuplicates|formatCandidate|clusterCandidates|\bCandidate\b" README.md src test package.json skills` -> no matches, except `candidate` as a generic English word inside prose/tests only if not referring to the removed raw pair API.
 
 ### Step 5: Run the full gate
 
@@ -269,9 +287,11 @@ Expected result:
   `findDuplicates`.
 - [ ] No production code exports `Candidate`, `formatCandidate`, or
   `clusterCandidates`.
-- [ ] README no longer contains a `Library API` section.
-- [ ] `package.json` keeps the CLI `"bin"` entry and no longer advertises a
-  package-root import surface unless a verification command proves it is needed.
+- [ ] README `Library API` section documents only the cluster API.
+- [ ] `package.json` keeps the CLI `"bin"` entry; `"main"`/`"types"`/`"exports"`
+  stay (shipped skills import the package — verified need).
+- [ ] Shipped skills reference only `findClusters`/`Cluster`, never
+  `findDuplicates`/`Candidate`.
 - [ ] Tests assert cluster behavior directly.
 - [ ] `bun run test` exits 0.
 - [ ] `bun run check` exits 0.

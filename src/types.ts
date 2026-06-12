@@ -8,14 +8,6 @@ export interface ClusterLocation extends Location {
   readonly nodes: number;
 }
 
-export interface Candidate {
-  readonly score: number;
-  readonly left: Location;
-  readonly right: Location;
-  readonly leftNodes: number;
-  readonly rightNodes: number;
-}
-
 export interface ScoreRange {
   readonly min: number;
   readonly max: number;

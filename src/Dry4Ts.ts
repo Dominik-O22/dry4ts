@@ -1,7 +1,7 @@
 import { maxScore, minScore } from "./Clusters.js";
 import { Options } from "./Options.js";
 import { TypeScriptDuplicateFinder } from "./TypeScriptDuplicateFinder.js";
-import type { Candidate, Cluster, ClusterLocation, ClusterReport, Location } from "./types.js";
+import type { Cluster, ClusterLocation, ClusterReport, Location } from "./types.js";
 
 export const USAGE = [
   "Usage: dry4ts [options] [file-or-directory ...]",
@@ -72,10 +72,6 @@ export function formatCluster(cluster: Cluster, ordinal: number): string {
   const header = `CLUSTER ${ordinal} score=${scoreRange(cluster)} locations=${cluster.locations.length}`;
   const lines = cluster.locations.map((location) => `  ${clusterLineRange(location)}`);
   return [header, ...lines].join("\n");
-}
-
-export function formatCandidate(candidate: Candidate): string {
-  return `DUPLICATE score=${candidate.score.toFixed(2)}\n  ${lineRange(candidate.left)}\n  ${lineRange(candidate.right)}`;
 }
 
 export function toEdn(clusters: readonly Cluster[]): string {

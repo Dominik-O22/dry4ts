@@ -5,8 +5,6 @@ import path from "node:path";
 import test from "node:test";
 
 import {
-  clusterCandidates,
-  formatCandidate,
   formatCluster,
   main,
   Options,
@@ -15,12 +13,12 @@ import {
   toJson,
   USAGE,
   TypeScriptDuplicateFinder,
-  type Candidate,
+  type Cluster,
 } from "../src/index.js";
 import { ClusterCollector } from "../src/Clusters.js";
 
 test("reports structural duplicate candidates with file and line ranges", async () => {
-  const { files, candidates } = await scanFixture(
+  const { files, clusters } = await scanFixture(
     {
       "left.ts": `
 export class Left {
@@ -42,16 +40,19 @@ export class Right {
     { threshold: 0.5, minLines: 3, minNodes: 8 },
   );
 
-  const candidate = candidates.find(
-    (each) =>
-      each.left.file === files["left.ts"] &&
-      each.right.file === files["right.ts"] &&
-      each.left.startLine === 3 &&
-      each.right.startLine === 3,
+  assert.ok(hasClusterContaining(clusters, "left.ts", "right.ts"));
+  const cluster = clusters.find((c) =>
+    c.locations.some((loc) => loc.file === files["left.ts"]) &&
+    c.locations.some((loc) => loc.file === files["right.ts"]),
   );
-  assert.ok(candidate);
-  assert.equal(candidate.left.endLine, 6);
-  assert.equal(candidate.right.endLine, 6);
+  assert.ok(cluster);
+  // The cluster groups both class-level and method-level locations; find the method location (startLine 3).
+  const leftLoc = cluster.locations.find((loc) => loc.file === files["left.ts"] && loc.startLine === 3);
+  const rightLoc = cluster.locations.find((loc) => loc.file === files["right.ts"] && loc.startLine === 3);
+  assert.ok(leftLoc);
+  assert.ok(rightLoc);
+  assert.equal(leftLoc.endLine, 6);
+  assert.equal(rightLoc.endLine, 6);
 });
 
 const matchedPairCases = [
@@ -101,14 +102,14 @@ enum Two {
 
 for (const { name, sources, options } of matchedPairCases) {
   test(name, async () => {
-    const { candidates } = await scanFixture(sources, options);
+    const { clusters } = await scanFixture(sources, options);
 
-    assert.ok(hasDuplicate(candidates, "one.ts", "two.ts"));
+    assert.ok(hasClusterContaining(clusters, "one.ts", "two.ts"));
   });
 }
 
 test("scans JavaScript, JSX, and TSX files", async () => {
-  const { candidates } = await scanFixture(
+  const { clusters } = await scanFixture(
     {
       "one.js": `
 export function total(items) {
@@ -132,12 +133,12 @@ export function grandTotal(lines: Array<{ active: boolean; value: number }>): nu
     { threshold: 0.5, minLines: 3, minNodes: 8 },
   );
 
-  assert.ok(hasDuplicate(candidates, "one.js", "two.jsx"));
-  assert.ok(hasDuplicate(candidates, "one.js", "three.tsx"));
+  assert.ok(hasClusterContaining(clusters, "one.js", "two.jsx"));
+  assert.ok(hasClusterContaining(clusters, "one.js", "three.tsx"));
 });
 
 test("filters candidates shorter than the minimum line count", async () => {
-  const { candidates } = await scanFixture(
+  const { clusters } = await scanFixture(
     {
       "one.ts": "function one(x: number) { return x + 1; }\n",
       "two.ts": "function two(y: number) { return y + 2; }\n",
@@ -145,7 +146,7 @@ test("filters candidates shorter than the minimum line count", async () => {
     { threshold: 0.8, minLines: 3, minNodes: 1 },
   );
 
-  assert.deepEqual(candidates, []);
+  assert.deepEqual(clusters, []);
 });
 
 test("parses command line options and paths", () => {
@@ -202,25 +203,14 @@ test("rejects out-of-range option values", () => {
   assert.throws(() => Options.from({ minNodes: -1 }), /minNodes must be/);
 });
 
-test("formats text output with line ranges", () => {
-  assert.equal(
-    formatCandidate({
-      score: 0.875,
-      left: { file: "a.ts", startLine: 10, endLine: 14 },
-      right: { file: "b.ts", startLine: 20, endLine: 24 },
-      leftNodes: 88,
-      rightNodes: 91,
-    }),
-    "DUPLICATE score=0.88\n  a.ts:10-14\n  b.ts:20-24",
-  );
-});
-
 test("groups transitively connected candidates into clusters", () => {
-  const ab = pair("a.ts", "b.ts", 0.9);
-  const bc = pair("b.ts", "c.ts", 0.85);
-  const de = pair("d.ts", "e.ts", 0.95);
+  const collector = new ClusterCollector();
+  const loc = (file: string) => ({ file, startLine: 10, endLine: 14, nodes: 50 });
+  collector.addMatch(loc("a.ts"), loc("b.ts"), 0.9);
+  collector.addMatch(loc("b.ts"), loc("c.ts"), 0.85);
+  collector.addMatch(loc("d.ts"), loc("e.ts"), 0.95);
 
-  const clusters = clusterCandidates([de, ab, bc]);
+  const clusters = collector.clusters();
 
   assert.equal(clusters.length, 2);
   assert.deepEqual(
@@ -231,7 +221,12 @@ test("groups transitively connected candidates into clusters", () => {
 });
 
 test("formats clusters with score range, location count, and node size", () => {
-  const clusters = clusterCandidates([pair("a.ts", "b.ts", 0.9), pair("b.ts", "c.ts", 0.85)]);
+  const collector = new ClusterCollector();
+  const loc = (file: string) => ({ file, startLine: 10, endLine: 14, nodes: 50 });
+  collector.addMatch(loc("a.ts"), loc("b.ts"), 0.9);
+  collector.addMatch(loc("b.ts"), loc("c.ts"), 0.85);
+
+  const clusters = collector.clusters();
 
   assert.equal(
     formatCluster(clusters[0], 1),
@@ -241,11 +236,15 @@ test("formats clusters with score range, location count, and node size", () => {
 
 test("does not expose complete pairwise match counts in cluster output", () => {
   const files = ["a.ts", "b.ts", "c.ts", "d.ts", "e.ts"];
-  const candidates = files.flatMap((left, leftIndex) =>
-    files.slice(leftIndex + 1).map((right) => pair(left, right, 1)),
-  );
+  const collector = new ClusterCollector();
+  const loc = (file: string) => ({ file, startLine: 10, endLine: 14, nodes: 50 });
+  for (let i = 0; i < files.length; i += 1) {
+    for (let j = i + 1; j < files.length; j += 1) {
+      collector.addMatch(loc(files[i]), loc(files[j]), 1);
+    }
+  }
 
-  const [cluster] = clusterCandidates(candidates);
+  const [cluster] = collector.clusters();
 
   assert.equal(cluster.locations.length, 5);
   assert.equal(formatCluster(cluster, 1).split("\n")[0], "CLUSTER 1 score=1.00 locations=5");
@@ -283,8 +282,11 @@ test("prints edn", () => {
 });
 
 test("prints edn clusters instead of every candidate pair", () => {
-  const candidate = pair("a.ts", "b.ts", 0.875);
-  const clusters = clusterCandidates([candidate]);
+  const collector = new ClusterCollector();
+  const loc = (file: string) => ({ file, startLine: 10, endLine: 14, nodes: 50 });
+  collector.addMatch(loc("a.ts"), loc("b.ts"), 0.875);
+
+  const clusters = collector.clusters();
 
   assert.equal(
     toEdn(clusters),
@@ -293,18 +295,21 @@ test("prints edn clusters instead of every candidate pair", () => {
 });
 
 test("prints json clusters for agents and ci integrations", () => {
-  const ab = pair("a.ts", "b.ts", 0.875);
-  const bc = pair("b.ts", "c.ts", 0.925);
-  const clusters = clusterCandidates([ab, bc]);
+  const collector = new ClusterCollector();
+  const loc = (file: string) => ({ file, startLine: 10, endLine: 14, nodes: 50 });
+  collector.addMatch(loc("a.ts"), loc("b.ts"), 0.875);
+  collector.addMatch(loc("b.ts"), loc("c.ts"), 0.925);
+
+  const clusters = collector.clusters();
 
   assert.deepEqual(JSON.parse(toJson(clusters)), {
     clusters: [{
       score: { min: 0.875, max: 0.925 },
       locationCount: 3,
       locations: [
-        { ...ab.left, nodes: ab.leftNodes },
-        { ...ab.right, nodes: ab.rightNodes },
-        { ...bc.right, nodes: bc.rightNodes },
+        { file: "a.ts", startLine: 10, endLine: 14, nodes: 50 },
+        { file: "b.ts", startLine: 10, endLine: 14, nodes: 50 },
+        { file: "c.ts", startLine: 10, endLine: 14, nodes: 50 },
       ],
     }],
   });
@@ -493,10 +498,10 @@ async function writeSource(dir: string, name: string, text: string): Promise<str
 async function scanFixture(
   sources: Record<string, string>,
   options: { threshold: number; minLines: number; minNodes: number },
-): Promise<{ files: Record<string, string>; candidates: Candidate[] }> {
+): Promise<{ files: Record<string, string>; clusters: Cluster[] }> {
   const { files, dir } = await writeFixture(sources);
-  const candidates = new TypeScriptDuplicateFinder().findDuplicates({ paths: [dir], ...options });
-  return { files, candidates };
+  const clusters = new TypeScriptDuplicateFinder().findClusters({ paths: [dir], ...options });
+  return { files, clusters };
 }
 
 async function writeFixture(sources: Record<string, string>): Promise<{ files: Record<string, string>; dir: string }> {
@@ -508,13 +513,10 @@ async function writeFixture(sources: Record<string, string>): Promise<{ files: R
   return { files, dir };
 }
 
-function pair(left: string, right: string, score: number): Candidate {
-  const location = (file: string) => ({ file, startLine: 10, endLine: 14 });
-  return { score, left: location(left), right: location(right), leftNodes: 50, rightNodes: 50 };
-}
-
-function hasDuplicate(candidates: readonly Candidate[], left: string, right: string): boolean {
-  return candidates.some((candidate) => candidate.left.file.endsWith(left) && candidate.right.file.endsWith(right));
+function hasClusterContaining(clusters: readonly Cluster[], ...files: string[]): boolean {
+  return clusters.some((cluster) =>
+    files.every((file) => cluster.locations.some((location) => location.file.endsWith(file))),
+  );
 }
 
 test("main --help prints USAGE to stdout", () => {
@@ -603,7 +605,11 @@ test("printText with empty clusters prints no duplicate clusters found", () => {
 });
 
 test("printText with two clusters separates them with a blank line", () => {
-  const clusters = clusterCandidates([pair("a.ts", "b.ts", 0.9), pair("c.ts", "d.ts", 0.8)]);
+  const collector = new ClusterCollector();
+  const loc = (file: string) => ({ file, startLine: 10, endLine: 14, nodes: 50 });
+  collector.addMatch(loc("a.ts"), loc("b.ts"), 0.9);
+  collector.addMatch(loc("c.ts"), loc("d.ts"), 0.8);
+  const clusters = collector.clusters();
   const lines: string[] = [];
   const original = console.log;
   console.log = (...args: unknown[]) => {
@@ -624,7 +630,11 @@ test("toJson with empty clusters returns object with empty clusters array", () =
 });
 
 test("toEdn with two clusters includes both entries", () => {
-  const clusters = clusterCandidates([pair("x.ts", "y.ts", 0.9), pair("p.ts", "q.ts", 0.8)]);
+  const collector = new ClusterCollector();
+  const loc = (file: string) => ({ file, startLine: 10, endLine: 14, nodes: 50 });
+  collector.addMatch(loc("x.ts"), loc("y.ts"), 0.9);
+  collector.addMatch(loc("p.ts"), loc("q.ts"), 0.8);
+  const clusters = collector.clusters();
   const edn = toEdn(clusters);
   assert.ok(edn.includes('"x.ts"'), `Expected x.ts in edn, got: ${edn}`);
   assert.ok(edn.includes('"y.ts"'), `Expected y.ts in edn, got: ${edn}`);

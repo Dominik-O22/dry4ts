@@ -7,7 +7,7 @@ import ts from "typescript";
 import { ClusterCollector } from "./Clusters.js";
 import { Options, type OptionsInput } from "./Options.js";
 import { TypeScriptNormalizer } from "./TypeScriptNormalizer.js";
-import type { Candidate, Cluster, Location } from "./types.js";
+import type { Cluster, Location } from "./types.js";
 
 interface Entry {
   readonly file: string;
@@ -21,34 +21,6 @@ type IgnoreMatcher = (filePath: string, isDirectory: boolean) => boolean;
 
 export class TypeScriptDuplicateFinder {
   private readonly normalizer = new TypeScriptNormalizer();
-
-  findDuplicates(options: Options | OptionsInput = Options.defaults()): Candidate[] {
-    const resolvedOptions = options instanceof Options ? options : Options.from(options);
-    const entries = this.entriesFor(resolvedOptions);
-    const candidates: Candidate[] = [];
-
-    for (let i = 0; i < entries.length; i += 1) {
-      for (let j = i + 1; j < entries.length; j += 1) {
-        const left = entries[i];
-        const right = entries[j];
-        if (overlaps(left, right) || maxPossibleSimilarity(left, right) < resolvedOptions.threshold) {
-          continue;
-        }
-        const score = similarity(left, right);
-        if (score >= resolvedOptions.threshold) {
-          candidates.push({
-            score,
-            left: location(left),
-            right: location(right),
-            leftNodes: left.nodes,
-            rightNodes: right.nodes,
-          });
-        }
-      }
-    }
-
-    return candidates.sort(compareCandidates);
-  }
 
   findClusters(options: Options | OptionsInput = Options.defaults()): Cluster[] {
     const resolvedOptions = options instanceof Options ? options : Options.from(options);
@@ -268,12 +240,3 @@ function maxPossibleSimilarity(left: Entry, right: Entry): number {
   return larger === 0 ? 0 : smaller / larger;
 }
 
-function compareCandidates(left: Candidate, right: Candidate): number {
-  return (
-    right.score - left.score ||
-    left.left.file.localeCompare(right.left.file) ||
-    left.left.startLine - right.left.startLine ||
-    left.right.file.localeCompare(right.right.file) ||
-    left.right.startLine - right.right.startLine
-  );
-}
