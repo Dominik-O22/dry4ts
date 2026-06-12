@@ -90,10 +90,13 @@ export class TypeScriptDuplicateFinder {
   private gitignoreMatcher(): IgnoreMatcher | null {
     const cwd = process.cwd();
     const gitignorePath = path.join(cwd, ".gitignore");
-    if (!fs.existsSync(gitignorePath)) {
+    let content: string;
+    try {
+      content = fs.readFileSync(gitignorePath, "utf8");
+    } catch {
       return null;
     }
-    const matcher = ignore().add(fs.readFileSync(gitignorePath, "utf8"));
+    const matcher = ignore().add(content);
     return (filePath, isDirectory) => {
       const relative = path.relative(cwd, filePath);
       if (relative === "" || relative.startsWith("..") || path.isAbsolute(relative)) {
