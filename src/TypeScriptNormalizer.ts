@@ -3,17 +3,27 @@ import ts from "typescript";
 import { NormalizedNode } from "./NormalizedNode.js";
 
 export class TypeScriptNormalizer {
-  normalize(node: ts.Node): NormalizedNode {
+  normalize(node: ts.Node, memo?: Map<ts.Node, NormalizedNode>): NormalizedNode {
+    if (memo) {
+      const cached = memo.get(node);
+      if (cached) {
+        return cached;
+      }
+    }
     const children: NormalizedNode[] = [];
     for (const marker of this.markers(node)) {
       children.push(new NormalizedNode(marker, []));
     }
     node.forEachChild((child) => {
       if (this.keepsStructuralChild(child)) {
-        children.push(this.normalize(child));
+        children.push(this.normalize(child, memo));
       }
     });
-    return new NormalizedNode(this.tag(node), children);
+    const result = new NormalizedNode(this.tag(node), children);
+    if (memo) {
+      memo.set(node, result);
+    }
+    return result;
   }
 
   private tag(node: ts.Node): string {

@@ -10,8 +10,8 @@ starting, honor its STOP conditions, and update the plan row when done.
 |------|-------|----------|--------|------------|--------|
 | [001](001-respect-gitignore.md) | Respect .gitignore during directory scans | P1 | M | - | DONE (merged to main via PR #5, `a8ab4fb`) |
 | [002](002-remove-raw-pair-api.md) | Remove the raw duplicate-pair API | P1 | M | 001 | DONE (merged to main via PR #6, `9cb1714`; plan revised: import surface kept, skills rewritten to cluster API) |
-| [003](003-skip-short-candidates-before-normalization.md) | Skip short candidates before normalization | P2 | S | 001 | DONE (commit `8d3455f` on worktree branch `worktree-agent-ac34ac2d0fd1a28a7`, awaiting merge) |
-| [004](004-intern-structural-fingerprints.md) | Intern structural fingerprints | P2 | M | 003 | TODO |
+| [003](003-skip-short-candidates-before-normalization.md) | Skip short candidates before normalization | P2 | S | 001 | DONE (merged to main via PR #7, `7e77580`; oneliners ~37% faster, compiler corpus ~10% faster, clusters unchanged) |
+| [004](004-intern-structural-fingerprints.md) | Intern structural fingerprints | P2 | M | 003 | DONE (executed 2026-06-12, approved at `83d6af2`, awaiting merge; deep-nesting benchmark ~916ms → <4ms; compiler corpus 13.2s → 6.4s avg, clusters unchanged at 246) |
 | [005](005-prune-candidate-pairs.md) | Prune candidate pairs before exact similarity | P2 | L | 004 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |

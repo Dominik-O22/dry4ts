@@ -7,7 +7,7 @@
 > `plans/README.md` unless a reviewer told you they maintain the index.
 >
 > **Drift check (run first)**:
-> `git diff --stat 6bd3210..HEAD -- src/NormalizedNode.ts src/TypeScriptDuplicateFinder.ts src/TypeScriptNormalizer.ts test/dry4ts.test.ts`
+> `git diff --stat 7e77580..HEAD -- src/NormalizedNode.ts src/TypeScriptDuplicateFinder.ts src/TypeScriptNormalizer.ts test/dry4ts.test.ts`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding. On a
 > mismatch, treat it as a STOP condition.
@@ -19,7 +19,18 @@
 - **Risk**: MED
 - **Depends on**: plans/003-skip-short-candidates-before-normalization.md
 - **Category**: perf
-- **Planned at**: commit `6bd3210`, 2026-06-11
+- **Planned at**: commit `6bd3210`, 2026-06-11; reconciled against `7e77580`,
+  2026-06-12. `src/NormalizedNode.ts` and `src/TypeScriptNormalizer.ts` are
+  unchanged since planning. Plan 003 changed the finder pipeline:
+  `scanFile(file, minLines)` at line 126,
+  `collectEntries(file, sourceFile, node, entries, minLines)` at line 142
+  (computes `lineRangeFor` before calling `entry`), and
+  `entry(file, node, startLine, endLine)` at line 177 (calls
+  `normalized.nodeCount()` / `normalized.fingerprints()` at lines 183-184).
+  Thread the interner alongside `minLines` (or switch to a small context
+  object). Plan 003 also added the test
+  `does not normalize candidates shorter than minLines` which replaces the
+  private `normalizer` with a throwing double — keep it passing.
 
 ## Why this matters
 
@@ -61,9 +72,10 @@ src/TypeScriptNormalizer.ts:16     return new NormalizedNode(this.tag(node), chi
 - Entries currently call `nodeCount()` and `fingerprints()` separately:
 
 ```ts
-src/TypeScriptDuplicateFinder.ts:163     const normalized = this.normalizer.normalize(node);
-src/TypeScriptDuplicateFinder.ts:168       nodes: normalized.nodeCount(),
-src/TypeScriptDuplicateFinder.ts:169       fingerprints: normalized.fingerprints(),
+src/TypeScriptDuplicateFinder.ts:193   private entry(file: string, node: ts.Node, startLine: number, endLine: number, ctx: ScanContext, memo: Map<ts.Node, NormalizedNode>): Entry {
+src/TypeScriptDuplicateFinder.ts:201     const normalized = this.normalizer.normalize(node, memo);
+src/TypeScriptDuplicateFinder.ts:206       nodes: normalized.nodeCount(),
+src/TypeScriptDuplicateFinder.ts:207       fingerprints: normalized.fingerprints(ctx.interner),
 ```
 
 ## Commands you will need
