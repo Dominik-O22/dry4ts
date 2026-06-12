@@ -23,6 +23,8 @@ interface ScanContext {
   readonly interner: FingerprintInterner;
 }
 
+type MatchingPair = readonly [Entry, Entry, number];
+
 type IgnoreMatcher = (filePath: string, isDirectory: boolean) => boolean;
 
 export class TypeScriptDuplicateFinder {
@@ -33,21 +35,53 @@ export class TypeScriptDuplicateFinder {
     const entries = this.entriesFor(resolvedOptions);
     const collector = new ClusterCollector();
 
-    for (let i = 0; i < entries.length; i += 1) {
-      for (let j = i + 1; j < entries.length; j += 1) {
-        const left = entries[i];
-        const right = entries[j];
-        if (overlaps(left, right) || maxPossibleSimilarity(left, right) < resolvedOptions.threshold) {
-          continue;
-        }
-        const score = similarity(left, right);
-        if (score >= resolvedOptions.threshold) {
-          collector.addMatch({ ...location(left), nodes: left.nodes }, { ...location(right), nodes: right.nodes }, score);
-        }
-      }
+    for (const [left, right, score] of this.matchingPairs(entries, resolvedOptions.threshold)) {
+      collector.addMatch({ ...location(left), nodes: left.nodes }, { ...location(right), nodes: right.nodes }, score);
     }
 
     return collector.clusters();
+  }
+
+  private matchingPairs(entries: readonly Entry[], threshold: number): MatchingPair[] {
+    const pairs: MatchingPair[] = [];
+    const fingerprintKeys = new Map<Entry, string>();
+    const identicalGroups = new Map<string, Entry[]>();
+    for (const entry of entries) {
+      const key = fingerprintSetKey(entry);
+      fingerprintKeys.set(entry, key);
+      const group = identicalGroups.get(key) ?? [];
+      group.push(entry);
+      identicalGroups.set(key, group);
+    }
+
+    for (const group of identicalGroups.values()) {
+      if (group.length > 1 && group[0].fingerprints.size > 0) {
+        addIdenticalFingerprintPairs(group, pairs);
+      }
+    }
+
+    const entriesBySize = [...entries].sort(compareEntriesByFingerprintSize);
+    for (let i = 0; i < entriesBySize.length; i += 1) {
+      const left = entriesBySize[i];
+      const maximumRightSize = Math.floor(left.fingerprints.size / threshold);
+      for (let j = i + 1; j < entriesBySize.length; j += 1) {
+        const right = entriesBySize[j];
+        if (right.fingerprints.size > maximumRightSize) {
+          break;
+        }
+        if (fingerprintKeys.get(left) === fingerprintKeys.get(right)) {
+          continue;
+        }
+        if (overlaps(left, right) || maxPossibleSimilarity(left, right) < threshold) {
+          continue;
+        }
+        const score = similarity(left, right);
+        if (score >= threshold) {
+          pairs.push([left, right, score]);
+        }
+      }
+    }
+    return pairs;
   }
 
   private entriesFor(options: Options): Entry[] {
@@ -242,6 +276,43 @@ function location(entry: Entry): Location {
 
 function overlaps(left: Entry, right: Entry): boolean {
   return left.file === right.file && left.startLine <= right.endLine && right.startLine <= left.endLine;
+}
+
+function addIdenticalFingerprintPairs(group: readonly Entry[], pairs: MatchingPair[]): void {
+  const components: Entry[][] = [];
+  for (const entry of group) {
+    const connectors: Array<{ componentIndex: number; entry: Entry }> = [];
+    for (let componentIndex = 0; componentIndex < components.length; componentIndex += 1) {
+      const connector = components[componentIndex].find((candidate) => !overlaps(candidate, entry));
+      if (connector) {
+        connectors.push({ componentIndex, entry: connector });
+      }
+    }
+
+    if (connectors.length === 0) {
+      components.push([entry]);
+      continue;
+    }
+
+    const primary = connectors[0];
+    pairs.push([primary.entry, entry, 1]);
+    components[primary.componentIndex].push(entry);
+
+    for (let i = connectors.length - 1; i >= 1; i -= 1) {
+      const connector = connectors[i];
+      pairs.push([connector.entry, entry, 1]);
+      components[primary.componentIndex].push(...components[connector.componentIndex]);
+      components.splice(connector.componentIndex, 1);
+    }
+  }
+}
+
+function fingerprintSetKey(entry: Entry): string {
+  return [...entry.fingerprints].sort().join("\0");
+}
+
+function compareEntriesByFingerprintSize(left: Entry, right: Entry): number {
+  return left.fingerprints.size - right.fingerprints.size;
 }
 
 function similarity(left: Entry, right: Entry): number {

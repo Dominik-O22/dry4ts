@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+
+import ts from "typescript";
 
 import {
   formatCluster,
@@ -13,9 +15,11 @@ import {
   toJson,
   USAGE,
   TypeScriptDuplicateFinder,
+  TypeScriptNormalizer,
   type Cluster,
 } from "../src/index.js";
 import { ClusterCollector } from "../src/Clusters.js";
+import { FingerprintInterner, type NormalizedNode } from "../src/NormalizedNode.js";
 
 test("reports structural duplicate candidates with file and line ranges", async () => {
   const { files, clusters } = await scanFixture(
@@ -292,6 +296,174 @@ export function two(values: number[]): number {
   assert.deepEqual(clusters[0].locations.map((location) => location.file), [files["one.ts"], files["two.ts"]]);
 });
 
+const exhaustiveEquivalenceFixtures = [
+  {
+    name: "functions with identical, near-identical, and different bodies",
+    sources: {
+      "same-a.ts": `
+export function sameA(items: number[]): number {
+  const kept = items.filter((item) => item % 2 === 0);
+  return kept.map((item) => item * 2).reduce((sum, next) => sum + next, 0);
+}
+`,
+      "same-b.ts": `
+export function sameB(values: number[]): number {
+  const chosen = values.filter((value) => value % 3 === 1);
+  return chosen.map((value) => value + 4).reduce((total, next) => total + next, 10);
+}
+`,
+      "near.ts": `
+export function near(rows: number[]): number {
+  const selected = rows.filter((row) => row > 10);
+  const adjusted = selected.map((row) => row - 1);
+  return adjusted.reduce((total, next) => total + next, 0);
+}
+`,
+      "different.ts": `
+export function different(limit: number): number {
+  let total = 0;
+  for (let outer = 0; outer < limit; outer += 1) {
+    for (let inner = 0; inner < outer; inner += 1) {
+      total += inner;
+    }
+  }
+  return total;
+}
+`,
+    },
+  },
+  {
+    name: "classes, methods, and type aliases",
+    sources: {
+      "alpha.ts": `
+export class Alpha {
+  total(items: number[]): number {
+    const kept = items.filter((item) => item.active);
+    return kept.map((item) => item.amount).reduce((sum, next) => sum + next, 0);
+  }
+}
+`,
+      "beta.ts": `
+export class Beta {
+  subtotal(rows: Array<{ enabled: boolean; value: number }>): number {
+    const selected = rows.filter((row) => row.enabled);
+    return selected.map((row) => row.value).reduce((sum, next) => sum + next, 0);
+  }
+}
+`,
+      "types.ts": `
+export type Invoice = {
+  id: string;
+  amount: number;
+  payable: (now: Date) => boolean;
+};
+
+export type Receipt = {
+  code: string;
+  total: number;
+  closed: (today: Date) => boolean;
+};
+`,
+      "enum.ts": `
+export enum Status {
+  Ready = 1,
+  Done = 2,
+}
+`,
+    },
+  },
+  {
+    name: "same-file and cross-file candidate roots",
+    sources: {
+      "container.ts": `
+export class Container {
+  one(items: number[]): number {
+    const kept = items.filter((item) => item > 0);
+    return kept.map((item) => item + 1).reduce((sum, next) => sum + next, 0);
+  }
+
+  two(items: number[]): number {
+    const kept = items.filter((item) => item > 0);
+    return kept.map((item) => item + 1).reduce((sum, next) => sum + next, 0);
+  }
+}
+`,
+      "external.ts": `
+export function external(values: number[]): number {
+  const chosen = values.filter((value) => value > 0);
+  return chosen.map((value) => value + 1).reduce((total, next) => total + next, 0);
+}
+`,
+      "unrelated.ts": `
+export const unrelated = {
+  read(input: string): string {
+    return input.trim().toUpperCase();
+  },
+};
+`,
+    },
+  },
+] satisfies Array<{ name: string; sources: Record<string, string> }>;
+
+for (const fixture of exhaustiveEquivalenceFixtures) {
+  for (const threshold of [0.2, 0.5, 0.82]) {
+    test(`matches exhaustive duplicate clusters for ${fixture.name} at threshold ${threshold}`, async () => {
+      const { files } = await writeFixture(fixture.sources);
+      const paths = Object.values(files);
+      const options = { paths, threshold, minLines: 3, minNodes: 1 };
+
+      const optimized = new TypeScriptDuplicateFinder().findClusters(options);
+      const exhaustive = await exhaustiveClusters(paths, options);
+
+      assert.deepEqual(canonicalClusters(optimized), canonicalClusters(exhaustive));
+    });
+  }
+}
+
+test("connects dense identical fingerprint groups without all pair matches", () => {
+  const entries = Array.from({ length: 8 }, (_, index) =>
+    matchingPairEntry(`dense-${index}.ts`, 1, 5, ["call", "filter", "map", "reduce"]),
+  );
+
+  const pairs = matchingPairsForTest(entries, 0.82);
+
+  assert.equal(pairs.length, entries.length - 1);
+  assert.ok(pairs.every(([left, right, score]) => score === 1 && !testEntriesOverlap(left, right)));
+
+  const collector = new ClusterCollector();
+  for (const [left, right, score] of pairs) {
+    collector.addMatch(matchingPairLocation(left), matchingPairLocation(right), score);
+  }
+  assert.deepEqual(collector.clusters().map((cluster) => cluster.locations.length), [entries.length]);
+});
+
+test("does not emit identical fingerprint group matches for overlapping entries", () => {
+  const contained = matchingPairEntry("same.ts", 3, 5, ["same", "shape"]);
+  const container = matchingPairEntry("same.ts", 1, 8, ["same", "shape"]);
+
+  assert.deepEqual(matchingPairsForTest([container, contained], 0.82), []);
+
+  const external = matchingPairEntry("external.ts", 1, 8, ["same", "shape"]);
+  const bridgedPairs = matchingPairsForTest([container, contained, external], 0.82);
+
+  assert.equal(bridgedPairs.length, 2);
+  assert.ok(bridgedPairs.every(([left, right]) => !testEntriesOverlap(left, right)));
+});
+
+test("keeps only size-window boundary candidates for exact similarity", () => {
+  const base = matchingPairEntry("base.ts", 1, 5, ["a", "b", "c", "d"]);
+  const lowerInside = matchingPairEntry("lower-inside.ts", 1, 5, ["a", "b"]);
+  const lowerOutside = matchingPairEntry("lower-outside.ts", 1, 5, ["z"]);
+  const upperInside = matchingPairEntry("upper-inside.ts", 1, 5, ["a", "b", "c", "d", "e", "f", "g", "h"]);
+  const upperOutside = matchingPairEntry("upper-outside.ts", 1, 5, ["a", "b", "c", "d", "i", "j", "k", "l", "m"]);
+
+  const pairKeys = matchingPairsForTest([base, lowerInside, lowerOutside, upperInside, upperOutside], 0.5).map(
+    matchingPairKey,
+  );
+
+  assert.deepEqual(pairKeys, ["base.ts|lower-inside.ts", "base.ts|upper-inside.ts"]);
+});
+
 test("prints edn", () => {
   assert.equal(toEdn([]), "{:clusters []}");
 });
@@ -526,6 +698,226 @@ async function writeFixture(sources: Record<string, string>): Promise<{ files: R
     files[name] = await writeSource(dir, name, text);
   }
   return { files, dir };
+}
+
+type ExhaustiveEntry = MatchingPairProbeEntry;
+
+async function exhaustiveClusters(
+  files: readonly string[],
+  options: { threshold: number; minLines: number; minNodes: number },
+): Promise<Cluster[]> {
+  const entries = await exhaustiveEntries(files, options);
+  const collector = new ClusterCollector();
+
+  for (let i = 0; i < entries.length; i += 1) {
+    for (let j = i + 1; j < entries.length; j += 1) {
+      const left = entries[i];
+      const right = entries[j];
+      if (testEntriesOverlap(left, right) || exhaustiveMaxPossibleSimilarity(left, right) < options.threshold) {
+        continue;
+      }
+      const score = exhaustiveSimilarity(left, right);
+      if (score >= options.threshold) {
+        collector.addMatch(exhaustiveLocation(left), exhaustiveLocation(right), score);
+      }
+    }
+  }
+
+  return collector.clusters();
+}
+
+async function exhaustiveEntries(
+  files: readonly string[],
+  options: { minLines: number; minNodes: number },
+): Promise<ExhaustiveEntry[]> {
+  const normalizer = new TypeScriptNormalizer();
+  const interner = new FingerprintInterner();
+  const entries: ExhaustiveEntry[] = [];
+
+  for (const file of [...files].sort()) {
+    const text = await readFile(file, "utf8");
+    const sourceFile = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, exhaustiveScriptKind(file));
+    const parseDiagnostics = (sourceFile as ts.SourceFile & { parseDiagnostics?: readonly ts.DiagnosticWithLocation[] })
+      .parseDiagnostics;
+    if (parseDiagnostics && parseDiagnostics.length > 0) {
+      const first = parseDiagnostics[0];
+      const message = ts.flattenDiagnosticMessageText(first.messageText, "\n");
+      throw new Error(`Unable to parse ${file}: ${message}`);
+    }
+
+    const memo = new Map<ts.Node, NormalizedNode>();
+    exhaustiveCollectEntries(file, sourceFile, sourceFile, entries, options, normalizer, interner, memo);
+  }
+
+  return entries.filter((entry) => entry.nodes >= options.minNodes);
+}
+
+function exhaustiveCollectEntries(
+  file: string,
+  sourceFile: ts.SourceFile,
+  node: ts.Node,
+  entries: ExhaustiveEntry[],
+  options: { minLines: number },
+  normalizer: TypeScriptNormalizer,
+  interner: FingerprintInterner,
+  memo: Map<ts.Node, NormalizedNode>,
+): void {
+  if (exhaustiveIsCandidateRoot(node)) {
+    const { startLine, endLine } = exhaustiveLineRangeFor(sourceFile, node);
+    if (endLine - startLine + 1 >= options.minLines) {
+      const normalized = normalizer.normalize(node, memo);
+      entries.push({
+        file,
+        startLine,
+        endLine,
+        nodes: normalized.nodeCount(),
+        fingerprints: normalized.fingerprints(interner),
+      });
+    }
+  }
+  node.forEachChild((child) =>
+    exhaustiveCollectEntries(file, sourceFile, child, entries, options, normalizer, interner, memo),
+  );
+}
+
+const exhaustiveCandidateChecks: ReadonlyArray<(node: ts.Node) => boolean> = [
+  ts.isClassDeclaration,
+  ts.isInterfaceDeclaration,
+  ts.isTypeAliasDeclaration,
+  ts.isEnumDeclaration,
+  ts.isModuleDeclaration,
+  ts.isFunctionDeclaration,
+  ts.isMethodDeclaration,
+  ts.isConstructorDeclaration,
+  ts.isGetAccessorDeclaration,
+  ts.isSetAccessorDeclaration,
+  ts.isPropertyDeclaration,
+  ts.isPropertySignature,
+  ts.isMethodSignature,
+  ts.isCallSignatureDeclaration,
+  ts.isConstructSignatureDeclaration,
+  ts.isIndexSignatureDeclaration,
+  ts.isVariableStatement,
+  ts.isEnumMember,
+  ts.isArrowFunction,
+  ts.isFunctionExpression,
+];
+
+function exhaustiveIsCandidateRoot(node: ts.Node): boolean {
+  return exhaustiveCandidateChecks.some((isCandidate) => isCandidate(node));
+}
+
+function exhaustiveScriptKind(file: string): ts.ScriptKind {
+  switch (path.extname(file)) {
+    case ".jsx":
+      return ts.ScriptKind.JSX;
+    case ".js":
+      return ts.ScriptKind.JS;
+    case ".tsx":
+      return ts.ScriptKind.TSX;
+    default:
+      return ts.ScriptKind.TS;
+  }
+}
+
+function exhaustiveLineRangeFor(sourceFile: ts.SourceFile, node: ts.Node): { startLine: number; endLine: number } {
+  const start = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile, false));
+  const end = sourceFile.getLineAndCharacterOfPosition(node.getEnd());
+  return {
+    startLine: start.line + 1,
+    endLine: end.line + 1,
+  };
+}
+
+function exhaustiveLocation(entry: ExhaustiveEntry): { file: string; startLine: number; endLine: number; nodes: number } {
+  return { file: entry.file, startLine: entry.startLine, endLine: entry.endLine, nodes: entry.nodes };
+}
+
+function exhaustiveSimilarity(left: ExhaustiveEntry, right: ExhaustiveEntry): number {
+  const union = new Set([...left.fingerprints, ...right.fingerprints]);
+  if (union.size === 0) {
+    return 0;
+  }
+  const [smaller, larger] =
+    left.fingerprints.size <= right.fingerprints.size
+      ? [left.fingerprints, right.fingerprints]
+      : [right.fingerprints, left.fingerprints];
+  let shared = 0;
+  smaller.forEach((fingerprint) => {
+    if (larger.has(fingerprint)) {
+      shared += 1;
+    }
+  });
+  return shared / union.size;
+}
+
+function exhaustiveMaxPossibleSimilarity(left: ExhaustiveEntry, right: ExhaustiveEntry): number {
+  const [smaller, larger] = [left.fingerprints.size, right.fingerprints.size].sort((a, b) => a - b);
+  return larger > 0 ? smaller / larger : 0;
+}
+
+function canonicalClusters(clusters: readonly Cluster[]): Array<{
+  readonly score: { readonly min: number; readonly max: number };
+  readonly locations: readonly string[];
+}> {
+  return clusters
+    .map((cluster) => ({
+      score: cluster.score,
+      locations: cluster.locations.map(canonicalLocation).sort(),
+    }))
+    .sort((left, right) => left.locations.join("\0").localeCompare(right.locations.join("\0")));
+}
+
+function canonicalLocation(location: { file: string; startLine: number; endLine: number; nodes: number }): string {
+  return `${location.file}:${location.startLine}-${location.endLine}:${location.nodes}`;
+}
+
+type MatchingPairProbeEntry = {
+  readonly file: string;
+  readonly startLine: number;
+  readonly endLine: number;
+  readonly nodes: number;
+  readonly fingerprints: Set<string>;
+};
+
+type MatchingPairProbe = readonly [MatchingPairProbeEntry, MatchingPairProbeEntry, number];
+
+function matchingPairsForTest(entries: readonly MatchingPairProbeEntry[], threshold: number): MatchingPairProbe[] {
+  const finder = new TypeScriptDuplicateFinder() as unknown as {
+    matchingPairs(entries: readonly MatchingPairProbeEntry[], threshold: number): MatchingPairProbe[];
+  };
+  return finder.matchingPairs(entries, threshold);
+}
+
+function matchingPairEntry(
+  file: string,
+  startLine: number,
+  endLine: number,
+  fingerprints: readonly string[],
+): MatchingPairProbeEntry {
+  return { file, startLine, endLine, nodes: fingerprints.length, fingerprints: new Set(fingerprints) };
+}
+
+function matchingPairLocation(entry: MatchingPairProbeEntry): {
+  file: string;
+  startLine: number;
+  endLine: number;
+  nodes: number;
+} {
+  return { file: entry.file, startLine: entry.startLine, endLine: entry.endLine, nodes: entry.nodes };
+}
+
+function testEntriesOverlap(left: MatchingPairProbeEntry, right: MatchingPairProbeEntry): boolean {
+  if (left.file !== right.file) {
+    return false;
+  }
+  const firstEndingLine = Math.min(left.endLine, right.endLine);
+  const lastStartingLine = Math.max(left.startLine, right.startLine);
+  return lastStartingLine <= firstEndingLine;
+}
+
+function matchingPairKey([left, right]: MatchingPairProbe): string {
+  return [left.file, right.file].sort().join("|");
 }
 
 function hasClusterContaining(clusters: readonly Cluster[], ...files: string[]): boolean {
