@@ -5,6 +5,7 @@ import ignore from "ignore";
 import ts from "typescript";
 
 import { ClusterCollector } from "./Clusters.js";
+import { FingerprintInterner, NormalizedNode } from "./NormalizedNode.js";
 import { Options, type OptionsInput } from "./Options.js";
 import { TypeScriptNormalizer } from "./TypeScriptNormalizer.js";
 import type { Cluster, Location } from "./types.js";
@@ -15,6 +16,11 @@ interface Entry {
   readonly endLine: number;
   readonly nodes: number;
   readonly fingerprints: Set<string>;
+}
+
+interface ScanContext {
+  readonly minLines: number;
+  readonly interner: FingerprintInterner;
 }
 
 type IgnoreMatcher = (filePath: string, isDirectory: boolean) => boolean;
@@ -45,16 +51,18 @@ export class TypeScriptDuplicateFinder {
   }
 
   private entriesFor(options: Options): Entry[] {
-    return this.scan(options).filter((entry) => entry.nodes >= options.minNodes);
+    const interner = new FingerprintInterner();
+    const ctx: ScanContext = { minLines: options.minLines, interner };
+    return this.scan(options, ctx).filter((entry) => entry.nodes >= options.minNodes);
   }
 
-  private scan(options: Options): Entry[] {
+  private scan(options: Options, ctx: ScanContext): Entry[] {
     const isIgnored = options.respectGitignore ? this.gitignoreMatcher() : null;
     return this.dedupeFiles(
       options.paths.flatMap((sourcePath) => this.typeScriptFiles(sourcePath, isIgnored)),
     )
       .sort()
-      .flatMap((file) => this.scanFile(file, options.minLines));
+      .flatMap((file) => this.scanFile(file, ctx));
   }
 
   private gitignoreMatcher(): IgnoreMatcher | null {
@@ -123,7 +131,7 @@ export class TypeScriptDuplicateFinder {
     return files.sort();
   }
 
-  private scanFile(file: string, minLines: number): Entry[] {
+  private scanFile(file: string, ctx: ScanContext): Entry[] {
     const text = fs.readFileSync(file, "utf8");
     const sourceFile = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, scriptKind(file));
     const parseDiagnostics = (sourceFile as ts.SourceFile & { parseDiagnostics?: readonly ts.DiagnosticWithLocation[] })
@@ -134,19 +142,27 @@ export class TypeScriptDuplicateFinder {
       throw new Error(`Unable to parse ${file}: ${message}`);
     }
 
+    const memo = new Map<ts.Node, NormalizedNode>();
     const entries: Entry[] = [];
-    this.collectEntries(file, sourceFile, sourceFile, entries, minLines);
+    this.collectEntries(file, sourceFile, sourceFile, entries, ctx, memo);
     return entries;
   }
 
-  private collectEntries(file: string, sourceFile: ts.SourceFile, node: ts.Node, entries: Entry[], minLines: number): void {
+  private collectEntries(
+    file: string,
+    sourceFile: ts.SourceFile,
+    node: ts.Node,
+    entries: Entry[],
+    ctx: ScanContext,
+    memo: Map<ts.Node, NormalizedNode>,
+  ): void {
     if (this.isCandidateRoot(node)) {
       const { startLine, endLine } = lineRangeFor(sourceFile, node);
-      if (endLine - startLine + 1 >= minLines) {
-        entries.push(this.entry(file, node, startLine, endLine));
+      if (endLine - startLine + 1 >= ctx.minLines) {
+        entries.push(this.entry(file, node, startLine, endLine, ctx, memo));
       }
     }
-    node.forEachChild((child) => this.collectEntries(file, sourceFile, child, entries, minLines));
+    node.forEachChild((child) => this.collectEntries(file, sourceFile, child, entries, ctx, memo));
   }
 
   private isCandidateRoot(node: ts.Node): boolean {
@@ -174,14 +190,21 @@ export class TypeScriptDuplicateFinder {
     );
   }
 
-  private entry(file: string, node: ts.Node, startLine: number, endLine: number): Entry {
-    const normalized = this.normalizer.normalize(node);
+  private entry(
+    file: string,
+    node: ts.Node,
+    startLine: number,
+    endLine: number,
+    ctx: ScanContext,
+    memo: Map<ts.Node, NormalizedNode>,
+  ): Entry {
+    const normalized = this.normalizer.normalize(node, memo);
     return {
       file,
       startLine,
       endLine,
       nodes: normalized.nodeCount(),
-      fingerprints: normalized.fingerprints(),
+      fingerprints: normalized.fingerprints(ctx.interner),
     };
   }
 }
@@ -241,4 +264,3 @@ function maxPossibleSimilarity(left: Entry, right: Entry): number {
   const larger = Math.max(left.fingerprints.size, right.fingerprints.size);
   return larger === 0 ? 0 : smaller / larger;
 }
-

@@ -534,6 +534,86 @@ function hasClusterContaining(clusters: readonly Cluster[], ...files: string[]):
   );
 }
 
+test("structurally identical snippets with different names cluster together", async () => {
+  const { clusters } = await scanFixture(
+    {
+      "alpha.ts": `
+function computeAlpha(items: number[]): number {
+  const kept = items.filter((item) => item % 2 === 0);
+  return kept.map((item) => item * 2).reduce((acc, val) => acc + val, 0);
+}
+`,
+      "beta.ts": `
+function computeBeta(values: number[]): number {
+  const kept = values.filter((value) => value % 3 === 1);
+  return kept.map((value) => value + 1).reduce((acc, val) => acc + val, 0);
+}
+`,
+    },
+    { threshold: 0.5, minLines: 3, minNodes: 8 },
+  );
+
+  assert.ok(hasClusterContaining(clusters, "alpha.ts", "beta.ts"));
+});
+
+test("clearly different snippets do not cluster at high threshold", async () => {
+  const { dir } = await writeFixture({
+    "add.ts": `
+function add(a: number, b: number): number {
+  return a + b;
+}
+`,
+    "nested.ts": `
+function deeply(x: number): number {
+  if (x > 0) {
+    for (let i = 0; i < x; i++) {
+      while (i > 0) {
+        i -= 1;
+      }
+    }
+  }
+  return x;
+}
+`,
+  });
+  const clusters = new TypeScriptDuplicateFinder().findClusters({
+    paths: [dir],
+    threshold: 0.95,
+    minLines: 3,
+    minNodes: 1,
+  });
+  assert.equal(clusters.length, 0, "structurally distinct functions should not cluster at 0.95 threshold");
+});
+
+test("findClusters called twice on same instance returns same shape", async () => {
+  const { dir } = await writeFixture({
+    "one.ts": `
+export function process(items: number[]): number {
+  const kept = items.filter((item) => item % 2 === 0);
+  return kept.map((item) => item * 2).reduce((sum, next) => sum + next, 0);
+}
+`,
+    "two.ts": `
+export function handle(values: number[]): number {
+  const kept = values.filter((value) => value % 2 === 1);
+  return kept.map((value) => value + 1).reduce((sum, next) => sum + next, 0);
+}
+`,
+  });
+
+  const finder = new TypeScriptDuplicateFinder();
+  const opts = { paths: [dir], threshold: 0.3, minLines: 3, minNodes: 4 };
+  const first = finder.findClusters(opts);
+  const second = finder.findClusters(opts);
+
+  assert.equal(first.length, second.length, "cluster count should be stable across calls");
+  assert.deepEqual(
+    first.map((c) => c.locations.map((l) => l.file).sort()).sort(),
+    second.map((c) => c.locations.map((l) => l.file).sort()).sort(),
+    "cluster files should be identical across calls",
+  );
+});
+
 test("main --help prints USAGE to stdout", () => {
   const lines: string[] = [];
   const original = console.log;
