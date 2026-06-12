@@ -34,7 +34,8 @@ Options:
 ```text
 --threshold N   Minimum structural similarity score, default 0.82
 --min-lines N   Minimum source lines in a candidate declaration, default 4
---min-nodes N   Minimum normalized syntax nodes, default 20
+--min-nodes N   Minimum normalized syntax nodes, default 20; candidates
+                pruned before fingerprinting, so raising this speeds scans
 --min-locations N
                 Minimum locations in a reported cluster, default 2
 --format F      text, json, or edn, default text
@@ -195,6 +196,7 @@ bun run bench:corpus identical -- --count 1200
 bun run bench -- --runs 5 .bench/corpus/identical
 ```
 
-Baseline (2026-06-11, pre-optimization, TypeScript v5.9.3 corpus):
-`src/compiler` scans in ~16.2s and reports 246 clusters. Performance work
-should reduce the time without changing the cluster count.
+Baseline (2026-06-13, v0.3.0, TypeScript v5.9.3 corpus):
+`src/compiler` scans in ~1.5s and reports 246 clusters. Use this as a
+regression check: cluster count should stay at 246 and timing should not
+regress across further changes.
