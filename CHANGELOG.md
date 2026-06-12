@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   everything. Files passed explicitly on the command line are always scanned.
 - Option validation: out-of-range `--threshold`, `--min-lines`, and
   `--min-nodes` values now fail fast with a clear error and exit code 2.
+- `--min-locations N` filters reported clusters to those with at least `N`
+  member locations (default 2); values below 2 fail fast with exit code 2.
 - Benchmark tooling: `bun run bench` measures scan time, `bun run bench:setup`
   pins a large real-world corpus (microsoft/TypeScript v5.9.3), and
   `bun run bench:corpus` generates deterministic synthetic corpora.

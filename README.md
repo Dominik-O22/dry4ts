@@ -35,6 +35,8 @@ Options:
 --threshold N   Minimum structural similarity score, default 0.82
 --min-lines N   Minimum source lines in a candidate declaration, default 4
 --min-nodes N   Minimum normalized syntax nodes, default 20
+--min-locations N
+                Minimum locations in a reported cluster, default 2
 --format F      text, json, or edn, default text
 --edn           Same as --format edn
 --json          Same as --format json
@@ -92,6 +94,7 @@ const clusters = new TypeScriptDuplicateFinder().findClusters({
   threshold: 0.82,
   minLines: 4,
   minNodes: 20,
+  minLocations: 2,
   respectGitignore: true, // default; set false to include .gitignore-d paths
 });
 ```
