@@ -45,9 +45,7 @@ export class TypeScriptDuplicateFinder {
   }
 
   private entriesFor(options: Options): Entry[] {
-    return this.scan(options)
-      .filter((entry) => lines(entry) >= options.minLines)
-      .filter((entry) => entry.nodes >= options.minNodes);
+    return this.scan(options).filter((entry) => entry.nodes >= options.minNodes);
   }
 
   private scan(options: Options): Entry[] {
@@ -56,7 +54,7 @@ export class TypeScriptDuplicateFinder {
       options.paths.flatMap((sourcePath) => this.typeScriptFiles(sourcePath, isIgnored)),
     )
       .sort()
-      .flatMap((file) => this.scanFile(file));
+      .flatMap((file) => this.scanFile(file, options.minLines));
   }
 
   private gitignoreMatcher(): IgnoreMatcher | null {
@@ -125,7 +123,7 @@ export class TypeScriptDuplicateFinder {
     return files.sort();
   }
 
-  private scanFile(file: string): Entry[] {
+  private scanFile(file: string, minLines: number): Entry[] {
     const text = fs.readFileSync(file, "utf8");
     const sourceFile = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, scriptKind(file));
     const parseDiagnostics = (sourceFile as ts.SourceFile & { parseDiagnostics?: readonly ts.DiagnosticWithLocation[] })
@@ -137,15 +135,18 @@ export class TypeScriptDuplicateFinder {
     }
 
     const entries: Entry[] = [];
-    this.collectEntries(file, sourceFile, sourceFile, entries);
+    this.collectEntries(file, sourceFile, sourceFile, entries, minLines);
     return entries;
   }
 
-  private collectEntries(file: string, sourceFile: ts.SourceFile, node: ts.Node, entries: Entry[]): void {
+  private collectEntries(file: string, sourceFile: ts.SourceFile, node: ts.Node, entries: Entry[], minLines: number): void {
     if (this.isCandidateRoot(node)) {
-      entries.push(this.entry(file, sourceFile, node));
+      const { startLine, endLine } = lineRangeFor(sourceFile, node);
+      if (endLine - startLine + 1 >= minLines) {
+        entries.push(this.entry(file, node, startLine, endLine));
+      }
     }
-    node.forEachChild((child) => this.collectEntries(file, sourceFile, child, entries));
+    node.forEachChild((child) => this.collectEntries(file, sourceFile, child, entries, minLines));
   }
 
   private isCandidateRoot(node: ts.Node): boolean {
@@ -173,9 +174,7 @@ export class TypeScriptDuplicateFinder {
     );
   }
 
-  private entry(file: string, sourceFile: ts.SourceFile, node: ts.Node): Entry {
-    const startLine = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile, false)).line + 1;
-    const endLine = sourceFile.getLineAndCharacterOfPosition(node.getEnd()).line + 1;
+  private entry(file: string, node: ts.Node, startLine: number, endLine: number): Entry {
     const normalized = this.normalizer.normalize(node);
     return {
       file,
@@ -207,8 +206,11 @@ function scriptKind(file: string): ts.ScriptKind {
   return ts.ScriptKind.TS;
 }
 
-function lines(entry: Entry): number {
-  return entry.endLine - entry.startLine + 1;
+function lineRangeFor(sourceFile: ts.SourceFile, node: ts.Node): { startLine: number; endLine: number } {
+  return {
+    startLine: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile, false)).line + 1,
+    endLine: sourceFile.getLineAndCharacterOfPosition(node.getEnd()).line + 1,
+  };
 }
 
 function location(entry: Entry): Location {
