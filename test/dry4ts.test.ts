@@ -149,6 +149,21 @@ test("filters candidates shorter than the minimum line count", async () => {
   assert.deepEqual(clusters, []);
 });
 
+test("does not normalize candidates shorter than minLines", async () => {
+  const { dir } = await writeFixture({
+    "short.ts": "function short(x: number) { return x; }\n",
+  });
+  const finder = new TypeScriptDuplicateFinder();
+  // Replace the normalizer with a test double that throws if called.
+  (finder as unknown as { normalizer: { normalize: () => never } }).normalizer = {
+    normalize() {
+      throw new Error("normalizer should not be called for below-minLines candidates");
+    },
+  };
+  const clusters = finder.findClusters({ paths: [dir], threshold: 0.8, minLines: 5, minNodes: 1 });
+  assert.deepEqual(clusters, []);
+});
+
 test("parses command line options and paths", () => {
   const options = Options.parse(
     "--threshold",

@@ -7,7 +7,7 @@
 > `plans/README.md` unless a reviewer told you they maintain the index.
 >
 > **Drift check (run first)**:
-> `git diff --stat 6bd3210..HEAD -- src/TypeScriptDuplicateFinder.ts test/dry4ts.test.ts`
+> `git diff --stat 9cb1714..HEAD -- src/TypeScriptDuplicateFinder.ts test/dry4ts.test.ts`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding. On a
 > mismatch, treat it as a STOP condition.
@@ -19,7 +19,10 @@
 - **Risk**: LOW
 - **Depends on**: plans/001-respect-gitignore.md
 - **Category**: perf
-- **Planned at**: commit `6bd3210`, 2026-06-11
+- **Planned at**: commit `6bd3210`, 2026-06-11; reconciled against `9cb1714`,
+  2026-06-12 (plans 001+002 merged: `scan` already takes full `Options` for
+  gitignore handling, `findDuplicates` is removed, the short-candidate test
+  already asserts clusters)
 
 ## Why this matters
 
@@ -32,26 +35,31 @@ reduces cost in codebases with many trivial declarations.
 ## Current state
 
 - `entriesFor` filters by line count only after `scan` has already built
-  entries:
+  entries. Note `scan` already receives the full `Options` (it needs
+  `respectGitignore`), so threading `minLines` deeper is straightforward:
 
 ```ts
-src/TypeScriptDuplicateFinder.ts:72   private entriesFor(options: Options): Entry[] {
-src/TypeScriptDuplicateFinder.ts:73     return this.scan(options.paths)
-src/TypeScriptDuplicateFinder.ts:74       .filter((entry) => lines(entry) >= options.minLines)
-src/TypeScriptDuplicateFinder.ts:75       .filter((entry) => entry.nodes >= options.minNodes);
+src/TypeScriptDuplicateFinder.ts:47   private entriesFor(options: Options): Entry[] {
+src/TypeScriptDuplicateFinder.ts:48     return this.scan(options)
+src/TypeScriptDuplicateFinder.ts:49       .filter((entry) => lines(entry) >= options.minLines)
+src/TypeScriptDuplicateFinder.ts:50       .filter((entry) => entry.nodes >= options.minNodes);
+src/TypeScriptDuplicateFinder.ts:53   private scan(options: Options): Entry[] {
+src/TypeScriptDuplicateFinder.ts:54     const isIgnored = options.respectGitignore ? this.gitignoreMatcher() : null;
 ```
 
-- `collectEntries` creates an entry for every candidate root, and `entry`
-  normalizes before returning:
+- `scan` ends with `.flatMap((file) => this.scanFile(file))`; `scanFile`
+  (line 128) parses and calls `collectEntries`. `collectEntries` creates an
+  entry for every candidate root, and `entry` normalizes before returning:
 
 ```ts
-src/TypeScriptDuplicateFinder.ts:128   private collectEntries(file: string, sourceFile: ts.SourceFile, node: ts.Node, entries: Entry[]): void {
-src/TypeScriptDuplicateFinder.ts:129     if (this.isCandidateRoot(node)) {
-src/TypeScriptDuplicateFinder.ts:130       entries.push(this.entry(file, sourceFile, node));
-src/TypeScriptDuplicateFinder.ts:160   private entry(file: string, sourceFile: ts.SourceFile, node: ts.Node): Entry {
-src/TypeScriptDuplicateFinder.ts:161     const startLine = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile, false)).line + 1;
-src/TypeScriptDuplicateFinder.ts:162     const endLine = sourceFile.getLineAndCharacterOfPosition(node.getEnd()).line + 1;
-src/TypeScriptDuplicateFinder.ts:163     const normalized = this.normalizer.normalize(node);
+src/TypeScriptDuplicateFinder.ts:144   private collectEntries(file: string, sourceFile: ts.SourceFile, node: ts.Node, entries: Entry[]): void {
+src/TypeScriptDuplicateFinder.ts:145     if (this.isCandidateRoot(node)) {
+src/TypeScriptDuplicateFinder.ts:146       entries.push(this.entry(file, sourceFile, node));
+src/TypeScriptDuplicateFinder.ts:148     node.forEachChild((child) => this.collectEntries(file, sourceFile, child, entries));
+src/TypeScriptDuplicateFinder.ts:176   private entry(file: string, sourceFile: ts.SourceFile, node: ts.Node): Entry {
+src/TypeScriptDuplicateFinder.ts:177     const startLine = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile, false)).line + 1;
+src/TypeScriptDuplicateFinder.ts:178     const endLine = sourceFile.getLineAndCharacterOfPosition(node.getEnd()).line + 1;
+src/TypeScriptDuplicateFinder.ts:179     const normalized = this.normalizer.normalize(node);
 ```
 
 ## Commands you will need
@@ -90,8 +98,8 @@ calling `entry`.
 
 Suggested shape:
 
-- Change `scan(options.paths)` to a form that can pass `options.minLines` into
-  `scanFile` and `collectEntries`.
+- `scan` already receives `Options`; pass `options.minLines` (or `options`)
+  through `scanFile` into `collectEntries`.
 - Extract a helper that computes line range without normalization:
 
 ```ts
@@ -116,9 +124,9 @@ is:
 
 ### Step 2: Add a regression test for behavior and optional instrumentation
 
-Keep the existing test at `test/dry4ts.test.ts:135` that verifies short
-candidates are filtered. If plan 002 has already removed `findDuplicates`,
-rewrite that test to use `findClusters`.
+Keep the existing test `filters candidates shorter than the minimum line count`
+(around `test/dry4ts.test.ts:138`) — it already uses `findClusters` via the
+`scanFixture` helper and asserts `assert.deepEqual(clusters, [])`.
 
 Add one instrumentation-style test only if it is not brittle:
 
