@@ -6,7 +6,7 @@ This repository contains `dry4ts`, a TypeScript/JavaScript duplicate-code candid
 
 - Install dependencies: `bun install`
 - Run tests directly from TypeScript sources: `bun run test`
-- Build and test: `bun run check`
+- Build, test, and self-scan: `bun run check`
 - Full CI gate: `bun run ci`
 - Run the CLI locally after build: `bun ./dist/bin/dry4ts.js src test`
 

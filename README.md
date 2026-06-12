@@ -92,6 +92,7 @@ const clusters = new TypeScriptDuplicateFinder().findClusters({
   threshold: 0.82,
   minLines: 4,
   minNodes: 20,
+  respectGitignore: true, // default; set false to include .gitignore-d paths
 });
 ```
 
@@ -177,6 +178,12 @@ Three corpus tiers, all scanned with `bun run bench -- <paths>`:
      stresses entry filtering
    - `nested` (default depth 300): deeply nested expressions, stresses
      fingerprint construction
+
+   Both `bench:corpus` and `bench` pass `--no-gitignore` so corpus paths under
+   `.bench/` (which is gitignored) are scanned correctly.
+
+   `bench:corpus` also accepts `--count N` to override the default size and
+   `--out DIR` to write the corpus to a custom directory.
 
 Example:
 

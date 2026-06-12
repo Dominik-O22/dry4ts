@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - JSON and EDN output now contain a `clusters` array instead of `candidates`;
-  each cluster holds its member locations and representative score. (Package is
+  each cluster holds its member locations and a score range (min/max). (Package is
   unpublished, so no published consumers are affected.)
 - Text output groups duplicates by cluster instead of printing raw pairs.
 
@@ -34,5 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Trailing-slash `.gitignore` patterns (e.g. `build/`) now correctly prune the
   matching directories during scans.
-- A `.gitignore` that disappears or becomes unreadable mid-scan no longer
-  crashes the run; filtering degrades gracefully to scanning everything.
+- A `.gitignore` that cannot be read at scan start (missing, unreadable)
+  no longer crashes the run; filtering is skipped and all paths are scanned.
+- Overlapping path arguments (e.g. `dry4ts src src/utils`) no longer cause
+  files in the overlap to be scanned and compared twice.
