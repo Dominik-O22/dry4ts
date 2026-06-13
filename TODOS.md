@@ -2,6 +2,14 @@
 
 Known deferred work. Performance plans live in `plans/README.md`.
 
+- [ ] Pathspec-bound the `--changed-from` diff (P3, S with CC): `GitProvider.diffSince`
+  runs `git diff <base> --` over the whole repo, not the scan paths. A large or
+  parser-hostile change outside the scanned corpus can overflow `maxBuffer`
+  (256 MiB) or trip the strict hunk parser, turning a valid `--changed-from src`
+  gate into exit 2. Fails closed (loud), so deferred. Fix: pass the canonical
+  scan pathspecs after `--` in `diffSince`, mirroring `indexedFiles`; watch the
+  interaction with `-M` rename detection across the pathspec boundary. (From
+  Codex adversarial review of incremental-gating, 2026-06-13.)
 - [ ] Baseline-file provider for incremental gating (P3, M→S with CC): a
   checked-in fingerprint baseline as an alternative changed-region provider,
   enabling "debt only shrinks" ratchet workflows and repos without useful git
