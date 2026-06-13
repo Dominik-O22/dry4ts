@@ -13,9 +13,57 @@ starting, honor its STOP conditions, and update the plan row when done.
 | [003](003-skip-short-candidates-before-normalization.md) | Skip short candidates before normalization | P2 | S | 001 | DONE (merged to main via PR #7, `7e77580`; oneliners ~37% faster, compiler corpus ~10% faster, clusters unchanged) |
 | [004](004-intern-structural-fingerprints.md) | Intern structural fingerprints | P2 | M | 003 | DONE (merged to main via PR #8, `f66e35c`; deep-nesting benchmark ~916ms → <4ms; compiler corpus 13.2s → 6.4s avg, clusters unchanged at 246) |
 | [005](005-prune-candidate-pairs.md) | Prune candidate pairs before exact similarity | P2 | L | 004 | DONE (executed 2026-06-12, approved at `1dbe7f0` on branch `advisor/005-prune-candidate-pairs`; test/check/bench passed) |
+| [006](006-only-new-output-filter.md) | `--only-new` output filter (#24) | P1 | XS | - | DONE (branch `advisor/006-only-new`; Options.onlyNew + DryTs output filter, 4 tests, gate green at 103 pass) |
+| [007](007-exclude-candidate-kinds.md) | Exclude boilerplate candidate kinds (#19) | P1 | S | - | TODO |
+| [008](008-kind-diversity-floor.md) | Kind-diversity (entropy) floor (#20) | P2 | S-M | 007 | TODO |
+| [009](009-dry-ignore-directive.md) | Inline `// dry-ignore` directive (#22) | P2 | S | - | TODO |
+| [010](010-type-aware-normalization.md) | Optional type-aware normalization (#21) | P3 | M | 007,008 (soft) | TODO |
+| [011](011-dryrc-config-file.md) | `.dryrc` config + per-path overrides (#23) | P3 | L | 007,008 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale).
+
+## False-positive-reduction set (plans 006–011, from issues #19–#24)
+
+Generated 2026-06-14 from open-issue triage. Recommended order:
+006 → 007 → 008 → 009 → 010 → 011 (by ROI/effort, honoring deps below). All six
+default to current behavior unless opted in, so each lands independently.
+
+- 006 (`--only-new`) is orthogonal (reporting-only) — land any time, highest ROI.
+- 007 and 008 edit the same candidate gate (`FileScanner.ts:62`); land 007
+  first, then rebase 008, or co-develop with one shared scan-param signature.
+- 009 (`// dry-ignore`) is independent; minor merge friction in `scanFile` if
+  built alongside 007/008.
+- 010 (type-aware) is functionally independent but should land after the
+  007/008 flag surface settles; its off-path must stay byte-for-byte identical.
+- 011 (`.dryrc`) is the umbrella config surface — build LAST so per-path
+  `excludeKinds` (007) / `minDistinctKinds` (008) can ride its `overrides`.
+
+### Codex second-opinion notes (2026-06-14)
+
+- Consider doing 009 (`// dry-ignore`) **before/alongside** 007/008 — it is a
+  cheap, independent escape hatch that lets users suppress unavoidable false
+  positives while the heuristics mature.
+- 010 should NOT ship as `--type-aware` (misnomer — it is syntax-aware, not
+  type-checker-aware). Rename to `--keep-type-reference-names`. See plan 010.
+- 019/007 exclusion is **candidate-root-only**, not fingerprint removal — be
+  explicit in docs; users expecting `Constructor` exclusion to also stop
+  class-level DI matches will only get partial relief.
+
+### Candidate follow-up issues (codex-surfaced, filed 2026-06-14)
+
+Real AST-dup tools also reduce false positives with reducers absent from
+#19–#24. Filed as issues (no plans yet):
+
+- #26 — generated-file suppression (detect generated headers / default ignore
+  globs for codegen output).
+- #27 — absolute shared-fingerprint floor in addition to Jaccard ratio, to kill
+  small-but-high-ratio matches.
+- #28 — "require same top-level kind / declaration category" so interface shapes
+  do not match class/property-heavy shapes.
+- #29 — match explainability in output: shared fingerprint count, candidate
+  kind, dominant kinds. Shares the per-candidate kind histogram with plan 008,
+  so build them together.
 
 ## Dependency Notes
 
