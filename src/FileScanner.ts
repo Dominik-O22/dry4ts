@@ -21,11 +21,21 @@ export class FileScanner {
   private readonly interner = new FingerprintInterner();
   private readonly markerHashes = new Map<string, number>();
 
-  scanFiles(files: readonly string[], minLines: number, minNodes = 1): Entry[] {
-    return files.flatMap((file) => this.scanFile(file, minLines, minNodes));
+  scanFiles(
+    files: readonly string[],
+    minLines: number,
+    minNodes = 1,
+    excludeKinds: ReadonlySet<ts.SyntaxKind> = EMPTY_KIND_SET,
+  ): Entry[] {
+    return files.flatMap((file) => this.scanFile(file, minLines, minNodes, excludeKinds));
   }
 
-  scanFile(file: string, minLines: number, minNodes = 1): Entry[] {
+  scanFile(
+    file: string,
+    minLines: number,
+    minNodes = 1,
+    excludeKinds: ReadonlySet<ts.SyntaxKind> = EMPTY_KIND_SET,
+  ): Entry[] {
     const text = fs.readFileSync(file, "utf8");
     const sourceFile = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, false, scriptKind(file));
     const parseDiagnostics = (sourceFile as ts.SourceFile & { parseDiagnostics?: readonly ts.DiagnosticWithLocation[] })
@@ -59,7 +69,7 @@ export class FileScanner {
       const hash = this.interner.idFor(this.normalizer.tag(node), childHashes);
       hashes.push(hash);
 
-      if (candidateRootKinds.has(node.kind) && hashes.length - rangeStart >= minNodes) {
+      if (candidateRootKinds.has(node.kind) && !excludeKinds.has(node.kind) && hashes.length - rangeStart >= minNodes) {
         const { startLine, endLine } = lineRangeFor(sourceFile, node);
         if (endLine - startLine + 1 >= minLines) {
           entries.push({
@@ -134,6 +144,33 @@ const candidateRootKinds = new Set<ts.SyntaxKind>([
   ts.SyntaxKind.ArrowFunction,
   ts.SyntaxKind.FunctionExpression,
 ]);
+
+const EMPTY_KIND_SET: ReadonlySet<ts.SyntaxKind> = new Set();
+
+// Maps every excludable name to its SyntaxKind. Derived from candidateRootKinds
+// so the two can never drift: only kinds actually promoted to candidate roots
+// are excludable.
+const candidateKindByName = new Map<string, ts.SyntaxKind>(
+  [...candidateRootKinds].map((kind) => [ts.SyntaxKind[kind], kind]),
+);
+
+// The names a user may pass to --exclude-kinds, in declaration order.
+export const candidateKindNames: readonly string[] = [...candidateKindByName.keys()];
+
+// Resolves --exclude-kinds names to SyntaxKinds, validating each against the
+// candidate set. An unknown or non-candidate name throws rather than silently
+// no-op'ing — a silent gate-flag bypass is a footgun.
+export function resolveExcludeKinds(names: readonly string[]): ReadonlySet<ts.SyntaxKind> {
+  const kinds = new Set<ts.SyntaxKind>();
+  for (const name of names) {
+    const kind = candidateKindByName.get(name);
+    if (kind === undefined) {
+      throw new Error(`Unknown candidate kind: ${name}`);
+    }
+    kinds.add(kind);
+  }
+  return kinds;
+}
 
 function scriptKind(file: string): ts.ScriptKind {
   if (file.endsWith(".jsx")) {

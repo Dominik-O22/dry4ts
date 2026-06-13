@@ -1,3 +1,4 @@
+import { resolveExcludeKinds } from "./FileScanner.js";
 import type { OutputFormat } from "./types.js";
 
 export interface OptionsInput {
@@ -14,6 +15,7 @@ export interface OptionsInput {
   readonly changed?: readonly string[];
   readonly explainChanged?: boolean;
   readonly onlyNew?: boolean;
+  readonly excludeKinds?: readonly string[];
 }
 
 export class Options {
@@ -31,6 +33,7 @@ export class Options {
     public readonly changed: readonly string[] = [],
     public readonly explainChanged: boolean = false,
     public readonly onlyNew: boolean = false,
+    public readonly excludeKinds: readonly string[] = [],
   ) {
     if (!(threshold > 0 && threshold <= 1)) {
       throw new Error(`threshold must be greater than 0 and at most 1, got ${threshold}`);
@@ -50,6 +53,9 @@ export class Options {
     if (onlyNew && changedFrom === undefined && changed.length === 0) {
       throw new Error("--only-new requires --changed-from or --changed");
     }
+    // Validate names eagerly so an unknown/non-candidate kind fails at
+    // construction time, not silently at scan time.
+    resolveExcludeKinds(excludeKinds);
   }
 
   static defaults(): Options {
@@ -73,6 +79,7 @@ export class Options {
       input.changed ?? [],
       input.explainChanged ?? defaults.explainChanged,
       input.onlyNew ?? defaults.onlyNew,
+      input.excludeKinds ?? [],
     );
   }
 
@@ -90,6 +97,7 @@ export class Options {
     const changed: string[] = [];
     let explainChanged = false;
     let onlyNew = false;
+    const excludeKinds: string[] = [];
 
     for (let i = 0; i < args.length; i += 1) {
       const arg = args[i];
@@ -120,6 +128,14 @@ export class Options {
           break;
         case "--only-new":
           onlyNew = true;
+          break;
+        case "--exclude-kinds":
+          for (const name of valueFor(args, ++i, arg).split(",")) {
+            const trimmed = name.trim();
+            if (trimmed.length > 0) {
+              excludeKinds.push(trimmed);
+            }
+          }
           break;
         case "--edn":
           format = "edn";
@@ -167,6 +183,7 @@ export class Options {
       changed,
       explainChanged,
       onlyNew,
+      excludeKinds,
     );
   }
 }
