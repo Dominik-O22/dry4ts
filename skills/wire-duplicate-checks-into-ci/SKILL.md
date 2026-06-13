@@ -1,10 +1,10 @@
 ---
 name: wire-duplicate-checks-into-ci
 description: >
-  Use dry-ts as a CI or automated review gate with --format json and --fail-on-duplicates. Load when writing GitHub Actions, parsing cluster JSON, or handling dry-ts exit codes 0, 1, and 2.
+  Use dry-ts as a CI or automated review gate with --format json and --fail-on-duplicates. Load when writing GitHub Actions, gating a PR only on new duplication with --changed-from, parsing cluster JSON status, or handling dry-ts exit codes 0, 1, and 2.
 type: core
 library: dry-ts
-library_version: "0.1.0"
+library_version: "0.4.0"
 sources:
   - "dry-ts:README.md"
   - "dry-ts:AGENTS.md"
@@ -16,6 +16,8 @@ sources:
 
 ## Setup
 
+Gate a PR only when it introduces *new* duplication, tolerating known debt:
+
 ```yaml
 name: Duplicate Code
 
@@ -26,21 +28,40 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # merge-base needs history; the default shallow checkout breaks it.
+          fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.6
-      - run: bunx dry-ts --format json --fail-on-duplicates src test
+      - run: bunx dry-ts --format json --fail-on-duplicates --changed-from origin/${{ github.base_ref || 'main' }} src test
 ```
+
+To gate on *all* duplication (zero-tolerance) instead, drop `--changed-from`:
+`bunx dry-ts --format json --fail-on-duplicates src test`.
 
 ## Core Patterns
 
-### Fail only when duplicate clusters are present
+### Gate only on new duplication (recommended)
+
+```bash
+bunx dry-ts --format json --fail-on-duplicates --changed-from origin/main src test
+```
+
+A cluster is a finding (`status: "new"`) when one of its locations intersects
+code changed since `merge-base(origin/main, HEAD)`. Pre-existing duplication
+stays `status: "known"` and never fails the build, so the gate only goes red
+when the change makes the codebase wetter. Use this for PRs.
+
+### Fail on all duplication (zero-tolerance)
 
 ```bash
 bunx dry-ts --format json --fail-on-duplicates src test
 ```
 
-`--fail-on-duplicates` changes duplicate findings from a report into exit code `1`.
+With no changed-scope flag, `--fail-on-duplicates` turns *any* cluster into exit
+code `1` and every cluster reports `status: "unscoped"`. Read the exit code, not
+`status`, in this mode.
 
 ### Emit JSON for agent consumers
 
@@ -136,9 +157,9 @@ if (result.status === 1) {
 }
 ```
 
-Exit code `1` means duplicates were found with `--fail-on-duplicates`; usage and configuration errors use exit code `2`.
+Exit code `1` means findings with `--fail-on-duplicates` (clusters with `status: "new"` under a changed-scope; any cluster otherwise). Exit code `2` is usage/configuration errors **and** any git or scanner failure — under `--changed-from`, a missing git binary, bad ref, or unparseable diff fails closed as `2`, never a silent green or a misleading `1`.
 
-Source: README.md:125
+Source: README.md (Exit codes)
 
 ### MEDIUM Scan default src accidentally
 
