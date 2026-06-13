@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   prints to stderr so the suppression is visible. Honored across `text`, `json`,
   and `edn`. Errors if used without a changed-scope flag (there is no `new`
   status without one).
+- `--exclude-kinds KIND[,KIND...]` drops candidate declarations of the named
+  `SyntaxKind`s before matching, to suppress structural false positives such as
+  dep-only DI constructors (`--exclude-kinds Constructor`) or port/interface
+  member signatures (`--exclude-kinds PropertySignature,MethodSignature`).
+  Comma-separated and repeatable. Opt-in only: with no flag, output is
+  byte-for-byte unchanged (no default exclusions). Excluding a kind never hides
+  a longer child candidate — children are always visited. An unknown or
+  non-candidate kind name is a hard error.
 
 ## [0.4.0] - 2026-06-13
 

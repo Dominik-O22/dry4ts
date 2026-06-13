@@ -11,6 +11,10 @@
 
 ## Status
 
+- **Status**: DONE (executed 2026-06-14 by subagent on `advisor/007-exclude-kinds`
+  off origin/main, cherry-picked onto `advisor/006-only-new` to ship in 0.5.0;
+  opt-in only, no default exclusions; `bun run check` green; no perf regression
+  on the sentry/compiler corpora)
 - **Priority**: P1
 - **Effort**: S
 - **Risk**: LOW-MED (touches the hot scan path and the default candidate set)
