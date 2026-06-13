@@ -43,20 +43,58 @@ Options:
 --edn           Same as --format edn
 --json          Same as --format json
 --text          Same as --format text
+--changed-from REF
+                Incremental gating: mark clusters that intersect code changed
+                since merge-base(REF, HEAD) as status "new". Untracked scanned
+                files count as fully changed. Requires a git repository.
+--changed FILE  Incremental gating: mark clusters intersecting FILE (every
+                line) as status "new". Repeatable; for agents/non-git callers.
+                Cannot be combined with --changed-from.
+--explain-changed
+                Dump the resolved changed-region map to stderr for debugging.
 --fail-on-duplicates
-                Exit with status 1 when duplicate candidates are found
+                Exit 1 on findings. With --changed-from/--changed, only
+                clusters with status "new" gate; otherwise any cluster does.
 --no-gitignore  Include files and directories ignored by .gitignore
 ```
+
+### Incremental gating
+
+`--fail-on-duplicates` on its own is zero-tolerance: any cluster anywhere fails
+the build, which no real codebase survives. Pair it with a changed-scope flag to
+gate only on duplication a change introduces — "no change makes the codebase
+wetter" — while still reporting known debt. No baseline file, no state.
+
+Every cluster carries a `status`:
+
+- `new` — at least one location intersects the changed scope. This is the
+  *finding*, even when the counterpart location is old code (you copied
+  something). Only `new` clusters gate under `--fail-on-duplicates`.
+- `known` — pre-existing duplication, entirely in unchanged code. Reported,
+  never gates.
+- `unscoped` — emitted for every cluster when no changed-scope flag is active
+  (the tool cannot know what is "known" without a scope).
+
+`--changed-from` resolves `merge-base(REF, HEAD)` and diffs from there, so a
+branch behind its base does not see base-side changes pollute the result. Write
+`--changed-from origin/main` and get correct PR semantics directly.
+
+A file renamed into scope with no edits gates nothing — moving code is not
+duplicating it. `--changed FILE` scopes the *whole* file (file granularity),
+including any pre-existing duplication inside it; use `--changed-from` for
+line-level precision.
 
 When no paths are provided, dry-ts scans `src`. Directory arguments recursively include `.js`, `.jsx`, `.ts`, `.tsx`, `.mts`, and `.cts` files, excluding TypeScript declaration files. Directory scans respect `.gitignore` from the working directory by default; pass `--no-gitignore` to include ignored paths. Explicit file arguments are always scanned even when they match a `.gitignore` pattern.
 
 Default text output:
 
 ```text
-CLUSTER 1 score=0.89 locations=2
+CLUSTER 1 score=0.89 locations=2 status=unscoped
   src/invoice.ts:12-25 nodes=88
   src/receipt.ts:30-44 nodes=91
 ```
+
+Under a changed-scope, findings are marked: `status=new (intersects your change)`.
 
 EDN output:
 
@@ -64,6 +102,7 @@ EDN output:
 {:clusters
  [{:score-min 0.8909090909090909
    :score-max 0.8909090909090909
+   :status :unscoped
    :location-count 2
    :locations [{:file "src/invoice.ts", :start-line 12, :end-line 25, :nodes 88}
                {:file "src/receipt.ts", :start-line 30, :end-line 44, :nodes 91}]}]}
@@ -76,6 +115,7 @@ JSON output:
   "clusters": [
     {
       "score": { "min": 0.8909090909090909, "max": 0.8909090909090909 },
+      "status": "unscoped",
       "locationCount": 2,
       "locations": [
         { "file": "src/invoice.ts", "startLine": 12, "endLine": 25, "nodes": 88 },
@@ -103,7 +143,8 @@ const clusters = new TypeScriptDuplicateFinder().findClusters({
 
 ## CI
 
-Use `--fail-on-duplicates` to make duplicate candidates fail the job:
+Gate a PR only when it introduces *new* duplication, tolerating known debt, with
+`--changed-from` against the PR's base branch:
 
 ```yaml
 name: Duplicate Code
@@ -115,11 +156,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # merge-base needs history; the default shallow checkout breaks it.
+          fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.6
-      - run: bunx dry-ts --format json --fail-on-duplicates src
+      - run: bunx dry-ts --format json --fail-on-duplicates --changed-from origin/${{ github.base_ref || 'main' }} src
 ```
+
+To gate on *all* duplication (zero-tolerance) instead, drop `--changed-from`:
+`bunx dry-ts --format json --fail-on-duplicates src`.
 
 For this repository, `bun run ci` builds, tests, and runs dry-ts against `src test`.
 
@@ -136,12 +183,17 @@ bunx dry-ts --format json src test
 Exit codes are stable for automation:
 
 ```text
-0  success
-1  duplicate candidates found with --fail-on-duplicates
-2  CLI usage/configuration error
+0  success: no findings, or no --fail-on-duplicates
+1  findings with --fail-on-duplicates (status "new" under a changed-scope;
+   any cluster otherwise)
+2  usage/configuration error, or any git/scanner failure (fail-closed)
 ```
 
-The JSON shape is intentionally small and stable: `{ "clusters": ClusterReport[] }`. Each cluster includes a `score` range, `locationCount`, and grouped `locations`. Each location includes `nodes`, the normalized syntax node count for that duplicated block.
+The gate fails closed: a missing git binary, a bad ref, unparseable diff output,
+an unreadable source file, or zero files scanned under `--fail-on-duplicates` all
+exit 2 with a message — never a silent green or a 1 that reads as "findings".
+
+The JSON shape is intentionally small and stable: `{ "clusters": ClusterReport[] }`. Each cluster includes a `score` range, a `status` (`"new" | "known" | "unscoped"`), `locationCount`, and grouped `locations`. Each location includes `nodes`, the normalized syntax node count for that duplicated block.
 
 ## Publishing
 

@@ -12,15 +12,23 @@ type MatchingPair = readonly [Entry, Entry, number];
 
 type IgnoreMatcher = (filePath: string, isDirectory: boolean) => boolean;
 
+export interface ScanResult {
+  readonly files: readonly string[];
+  readonly clusters: readonly Cluster[];
+}
+
 export class TypeScriptDuplicateFinder {
   findClusters(options: Options | OptionsInput = Options.defaults()): Cluster[] {
+    return [...this.scan(options).clusters];
+  }
+
+  // Like findClusters, but also reports which files were scanned — the gate
+  // needs the file list for the untracked rule and the zero-files check.
+  scan(options: Options | OptionsInput = Options.defaults()): ScanResult {
     const resolvedOptions = options instanceof Options ? options : Options.from(options);
-    const entries = new FileScanner().scanFiles(
-      this.sourceFiles(resolvedOptions),
-      resolvedOptions.minLines,
-      resolvedOptions.minNodes,
-    );
-    return this.clustersFor(entries, resolvedOptions);
+    const files = this.sourceFiles(resolvedOptions);
+    const entries = new FileScanner().scanFiles(files, resolvedOptions.minLines, resolvedOptions.minNodes);
+    return { files, clusters: this.clustersFor(entries, resolvedOptions) };
   }
 
   private clustersFor(entries: readonly Entry[], options: Options): Cluster[] {
