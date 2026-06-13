@@ -39,7 +39,7 @@ Options:
                 so raising this speeds scans
 --min-locations N
                 Minimum locations in a reported cluster, default 2
---format F      text, json, or edn, default text
+--format F      text, json, edn, github, or gitlab, default text
 --edn           Same as --format edn
 --json          Same as --format json
 --text          Same as --format text
@@ -174,6 +174,66 @@ To gate on *all* duplication (zero-tolerance) instead, drop `--changed-from`:
 `bunx dry-ts --format json --fail-on-duplicates src`.
 
 For this repository, `bun run ci` builds, tests, and runs dry-ts against `src test`.
+
+### PR-grade annotations
+
+`--format github` and `--format gitlab` surface each *new* duplication finding
+**inline on the PR/MR diff**, anchored at the first changed line inside the
+duplicated block. Both write to stdout and emit only the changed copies of
+`status: "new"` clusters — pre-existing debt is never annotated, so always pair
+them with `--changed-from`. These produce CI **annotations**, not threaded
+review comments.
+
+**GitHub Actions** — `--format github` prints `::error` workflow commands the
+runner renders on the Files-changed tab and Checks summary (capped at 10 per
+step, with a `::notice` overflow summary). No `checks: write` permission is
+needed; the commands ride stdout.
+
+```yaml
+name: Duplicate Code
+on: [pull_request]
+permissions:
+  contents: read
+jobs:
+  dry-ts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # merge-base needs history
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.6
+      - run: bunx dry-ts --format github --fail-on-duplicates --changed-from origin/${{ github.base_ref || 'main' }} src
+```
+
+**GitLab CI** — `--format gitlab` prints a CodeClimate-format JSON array;
+redirect it to the artifact GitLab reads as a Code Quality report. A plain `>`
+preserves dry-ts's exit code, so a single pass both gates and produces the
+artifact (no `|| true`, no `allow_failure`).
+
+```yaml
+dry-ts:
+  image: oven/bun:1.3.6
+  variables:
+    GIT_DEPTH: "0" # merge-base needs history
+  # MR-only: dry-ts is change-scoped (it owns the diff via --changed-from), so
+  # there is no default-branch baseline report for GitLab to diff against. On a
+  # default-branch pipeline CI_MERGE_REQUEST_TARGET_BRANCH_NAME is unset and the
+  # fetch below would fail, so the job is gated to merge requests.
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  script:
+    - git fetch origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+    - bunx dry-ts --format gitlab --fail-on-duplicates --changed-from FETCH_HEAD src > gl-code-quality-report.json
+  artifacts:
+    when: always
+    reports:
+      codequality: gl-code-quality-report.json
+```
+
+**GitLab tier caveat:** Free/Premium render the findings only in the MR **Code
+Quality widget**; the **inline Changes-view annotations require Ultimate**.
 
 ## AI Agents
 

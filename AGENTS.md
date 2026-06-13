@@ -24,6 +24,10 @@ Use `--fail-on-duplicates` in CI or autonomous review loops:
 bun ./dist/bin/dry-ts.js --format json --fail-on-duplicates src test
 ```
 
+The `github` and `gitlab` formats are CI-presentation only — they emit inline
+PR/MR annotations for human review. Agent loops should keep using `--format
+json`, which carries the full cluster/status/location data.
+
 By default, directory scans skip files and directories matched by `.gitignore`. Pass `--no-gitignore` to include everything:
 
 ```bash
