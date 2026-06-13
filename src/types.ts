@@ -32,4 +32,4 @@ export interface ClusterReport {
   readonly status: ClusterStatus;
 }
 
-export type OutputFormat = "text" | "edn" | "json";
+export type OutputFormat = "text" | "edn" | "json" | "github" | "gitlab";

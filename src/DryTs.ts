@@ -1,9 +1,11 @@
 import fs from "node:fs";
 
 import { canonicalPath, ChangedRegions, parseUnifiedDiff } from "./ChangedRegions.js";
+import { toGithub, toGitlab } from "./CiFormats.js";
 import { maxScore, minScore } from "./Clusters.js";
 import { GitProvider } from "./GitProvider.js";
 import { Options } from "./Options.js";
+import { type ChangedScope, reportClusters, toLegacyClusters } from "./Report.js";
 import { TypeScriptDuplicateFinder } from "./TypeScriptDuplicateFinder.js";
 import type { Cluster, ClusterLocation, ClusterReport, ClusterStatus, Location } from "./types.js";
 
@@ -16,7 +18,7 @@ export const USAGE = [
   "  --min-nodes N   Minimum normalized syntax nodes, default 20",
   "  --min-locations N",
   "                  Minimum locations in a reported cluster, default 2",
-  "  --format F      text, json, or edn, default text",
+  "  --format F      text, json, edn, github, or gitlab, default text",
   "  --edn           Same as --format edn",
   "  --json          Same as --format json",
   "  --text          Same as --format text",
@@ -58,7 +60,7 @@ export function main(args: readonly string[] = process.argv.slice(2)): void {
 }
 
 function run(options: Options): void {
-  const { files, clusters } = new TypeScriptDuplicateFinder().scan(options);
+  const { files, clusters, structuralKeys } = new TypeScriptDuplicateFinder().scan(options);
   if (options.failOnDuplicates && files.length === 0) {
     throw new Error("No files were scanned; refusing to exit 0 under --fail-on-duplicates");
   }
@@ -69,32 +71,39 @@ function run(options: Options): void {
     console.error(scope ? scope.regions.describe() : "  (no changed scope active)");
   }
 
-  const reported: Cluster[] = clusters.map((cluster) => ({
-    ...cluster,
-    status: scope ? statusFor(cluster, scope) : "unscoped",
-  }));
+  const model = reportClusters(clusters, structuralKeys, scope);
 
   switch (options.format) {
     case "edn":
-      console.log(toEdn(reported));
+      console.log(toEdn(toLegacyClusters(model)));
       break;
     case "json":
-      console.log(toJson(reported));
+      console.log(toJson(toLegacyClusters(model)));
       break;
     case "text":
-      printText(reported);
+      printText(toLegacyClusters(model));
       break;
+    case "github":
+      console.log(toGithub(model));
+      break;
+    case "gitlab":
+      console.log(toGitlab(model));
+      break;
+    default:
+      assertNever(options.format);
   }
 
-  const failing = scope ? reported.some((cluster) => cluster.status === "new") : reported.length > 0;
+  const failing = scope ? model.some((cluster) => cluster.status === "new") : model.length > 0;
   if (options.failOnDuplicates && failing) {
     process.exitCode = 1;
   }
 }
 
-interface ChangedScope {
-  readonly root: string;
-  readonly regions: ChangedRegions;
+// A missing switch arm would compile, select no output, yet still exit 1 under
+// --fail-on-duplicates — failing red while annotating nothing. This makes the
+// gap a compile error instead.
+function assertNever(value: never): never {
+  throw new Error(`Unhandled output format: ${String(value)}`);
 }
 
 function resolveChangedScope(options: Options, files: readonly string[]): ChangedScope | null {
@@ -163,13 +172,6 @@ function listedScope(options: Options, files: readonly string[]): ChangedScope {
     }
   }
   return { root, regions };
-}
-
-function statusFor(cluster: Cluster, scope: ChangedScope): ClusterStatus {
-  const intersects = cluster.locations.some((location) =>
-    scope.regions.intersectsLocation(canonicalPath(scope.root, location.file), location.startLine, location.endLine),
-  );
-  return intersects ? "new" : "known";
 }
 
 function statusOf(cluster: Cluster): ClusterStatus {

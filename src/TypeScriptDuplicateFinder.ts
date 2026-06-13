@@ -15,6 +15,9 @@ type IgnoreMatcher = (filePath: string, isDirectory: boolean) => boolean;
 export interface ScanResult {
   readonly files: readonly string[];
   readonly clusters: readonly Cluster[];
+  // Per-location line-independent structural key (locationKey → key), threaded
+  // for the GitLab fingerprint. Empty for callers that do not gate.
+  readonly structuralKeys: ReadonlyMap<string, string>;
 }
 
 export class TypeScriptDuplicateFinder {
@@ -28,16 +31,20 @@ export class TypeScriptDuplicateFinder {
     const resolvedOptions = options instanceof Options ? options : Options.from(options);
     const files = this.sourceFiles(resolvedOptions);
     const entries = new FileScanner().scanFiles(files, resolvedOptions.minLines, resolvedOptions.minNodes);
-    return { files, clusters: this.clustersFor(entries, resolvedOptions) };
-  }
-
-  private clustersFor(entries: readonly Entry[], options: Options): Cluster[] {
-    // FileScanner already enforces minNodes; entries arrive pre-filtered.
     const collector = new ClusterCollector();
-    for (const [left, right, score] of this.matchingPairs(entries, options.threshold)) {
-      collector.addMatch({ ...location(left), nodes: left.nodes }, { ...location(right), nodes: right.nodes }, score);
+    for (const [left, right, score] of this.matchingPairs(entries, resolvedOptions.threshold)) {
+      collector.addMatch(
+        { ...location(left), nodes: left.nodes },
+        { ...location(right), nodes: right.nodes },
+        score,
+        fingerprintSetKey(left),
+        fingerprintSetKey(right),
+      );
     }
-    return collector.clusters().filter((cluster) => cluster.locations.length >= options.minLocations);
+    const clusters = collector
+      .clusters()
+      .filter((cluster) => cluster.locations.length >= resolvedOptions.minLocations);
+    return { files, clusters, structuralKeys: collector.structuralKeys() };
   }
 
   private matchingPairs(entries: readonly Entry[], threshold: number): MatchingPair[] {

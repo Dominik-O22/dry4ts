@@ -43,6 +43,27 @@ export class ChangedRegions {
     return ranges.some((range) => range.start <= endLine && startLine <= range.end);
   }
 
+  // First line within [startLine, endLine] that falls in a changed range, or
+  // null when the location does not intersect. The annotation anchor: a block
+  // can start outside the rendered diff hunk, so anchoring at startLine would
+  // make GitHub silently drop the annotation.
+  firstChangedLine(file: string, startLine: number, endLine: number): number | null {
+    const ranges = this.rangesByFile.get(file);
+    if (!ranges) {
+      return null;
+    }
+    let best: number | null = null;
+    for (const range of ranges) {
+      if (range.start <= endLine && startLine <= range.end) {
+        const candidate = Math.max(range.start, startLine);
+        if (best === null || candidate < best) {
+          best = candidate;
+        }
+      }
+    }
+    return best;
+  }
+
   entries(): Array<{ file: string; ranges: readonly ChangedRange[] }> {
     return [...this.rangesByFile.entries()]
       .map(([file, ranges]) => ({ file, ranges: [...ranges].sort((a, b) => a.start - b.start) }))

@@ -169,7 +169,7 @@ function valueFor(args: readonly string[], index: number, option: string): strin
 
 function formatValue(args: readonly string[], index: number, option: string): OutputFormat {
   const value = valueFor(args, index, option);
-  if (value !== "text" && value !== "edn" && value !== "json") {
+  if (value !== "text" && value !== "edn" && value !== "json" && value !== "github" && value !== "gitlab") {
     throw new Error(`Unknown format: ${value}`);
   }
   return value;

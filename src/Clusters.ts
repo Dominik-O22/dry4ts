@@ -4,12 +4,26 @@ export class ClusterCollector {
   private readonly parents = new Map<string, string>();
   private readonly locationsByKey = new Map<string, ClusterLocation>();
   private readonly scoresByRoot = new Map<string, ScoreRange>();
+  private readonly structuralKeysByLocation = new Map<string, string>();
 
-  addMatch(left: ClusterLocation, right: ClusterLocation, score: number): void {
-    const leftRoot = this.add(left);
-    const rightRoot = this.add(right);
+  addMatch(
+    left: ClusterLocation,
+    right: ClusterLocation,
+    score: number,
+    leftKey = "",
+    rightKey = "",
+  ): void {
+    const leftRoot = this.add(left, leftKey);
+    const rightRoot = this.add(right, rightKey);
     const root = this.union(leftRoot, rightRoot);
     this.addScore(root, score);
+  }
+
+  // Line-independent structural identity per location key, for stable GitLab
+  // fingerprints. Copies in one cluster share a key (that is what makes them
+  // duplicates), so any contributor's key is correct for the kept location.
+  structuralKeys(): Map<string, string> {
+    return new Map(this.structuralKeysByLocation);
   }
 
   clusters(): Cluster[] {
@@ -49,7 +63,7 @@ export class ClusterCollector {
     return root;
   }
 
-  private add(location: ClusterLocation): string {
+  private add(location: ClusterLocation, structuralKey: string): string {
     const key = locationKey(location);
     if (!this.parents.has(key)) {
       this.parents.set(key, key);
@@ -59,6 +73,9 @@ export class ClusterCollector {
       if (existing && location.nodes > existing.nodes) {
         this.locationsByKey.set(key, location);
       }
+    }
+    if (structuralKey !== "" && !this.structuralKeysByLocation.has(key)) {
+      this.structuralKeysByLocation.set(key, structuralKey);
     }
     return this.find(key);
   }
@@ -108,7 +125,7 @@ function mergeScores(left: ScoreRange | undefined, right: ScoreRange | undefined
   };
 }
 
-function locationKey(location: Location): string {
+export function locationKey(location: Location): string {
   return `${location.file}:${location.startLine}-${location.endLine}`;
 }
 

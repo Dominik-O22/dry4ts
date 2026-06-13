@@ -12,12 +12,17 @@ import {
   Options,
   printText,
   toEdn,
+  toGithub,
+  toGitlab,
   toJson,
   USAGE,
   TypeScriptDuplicateFinder,
   TypeScriptNormalizer,
   type Cluster,
+  type ReportedCluster,
+  type ReportedLocation,
 } from "../src/index.js";
+import { createHash } from "node:crypto";
 import { canonicalPath, ChangedRegions, parseUnifiedDiff } from "../src/index.js";
 import { ClusterCollector } from "../src/Clusters.js";
 import { FileScanner } from "../src/FileScanner.js";
@@ -177,6 +182,12 @@ test("parses command line options and paths", () => {
   assert.equal(options.minLocations, 4);
   assert.equal(options.format, "json");
   assert.equal(options.failOnDuplicates, true);
+});
+
+test("accepts github and gitlab formats and still rejects unknown ones", () => {
+  assert.equal(Options.parse("--format", "github").format, "github");
+  assert.equal(Options.parse("--format", "gitlab").format, "gitlab");
+  assert.throws(() => Options.parse("--format", "xml"), /Unknown format: xml/);
 });
 
 test("defaults to src when no paths are provided", () => {
@@ -519,6 +530,149 @@ test("prints json clusters for agents and ci integrations", () => {
       ],
     }],
   });
+});
+
+// ---------------------------------------------------------------------------
+// PR-grade reporting (--format github / gitlab)
+// ---------------------------------------------------------------------------
+
+function rloc(
+  overrides: Partial<ReportedLocation> & Pick<ReportedLocation, "path" | "startLine" | "endLine">,
+): ReportedLocation {
+  const intersects = overrides.intersectsChangedScope ?? false;
+  return {
+    file: overrides.file ?? overrides.path,
+    path: overrides.path,
+    startLine: overrides.startLine,
+    endLine: overrides.endLine,
+    nodes: overrides.nodes ?? 40,
+    intersectsChangedScope: intersects,
+    annotationLine: overrides.annotationLine ?? (intersects ? overrides.startLine : null),
+    structuralKey: overrides.structuralKey ?? `key-${overrides.path}`,
+  };
+}
+
+function rcluster(status: ReportedCluster["status"], locations: readonly ReportedLocation[]): ReportedCluster {
+  return { score: { min: 0.9, max: 0.95 }, status, locations };
+}
+
+test("toGithub emits one error per changed location, anchored at the changed line, naming counterparts", () => {
+  const cluster = rcluster("new", [
+    rloc({ path: "src/a.ts", startLine: 10, endLine: 20, intersectsChangedScope: true, annotationLine: 14 }),
+    rloc({ path: "src/b.ts", startLine: 30, endLine: 40 }),
+    rloc({ path: "src/c.ts", startLine: 50, endLine: 60 }),
+  ]);
+  const lines = toGithub([cluster]).split("\n").filter(Boolean);
+  assert.equal(lines.length, 1, lines.join("\n"));
+  // title is a property value: its colon is escaped to %3A (GitHub decodes it).
+  assert.match(lines[0], /^::error file=src\/a\.ts,line=14,title=dry-ts%3A duplicate code::/);
+  assert.ok(lines[0].includes("lines 10-20"), lines[0]);
+  assert.ok(lines[0].includes("src/b.ts:30-40"), lines[0]);
+  assert.ok(lines[0].includes("src/c.ts:50-60"), lines[0]);
+});
+
+test("toGithub ignores known and unscoped clusters and returns nothing actionable", () => {
+  const known = rcluster("known", [rloc({ path: "a.ts", startLine: 1, endLine: 5 })]);
+  const unscoped = rcluster("unscoped", [rloc({ path: "b.ts", startLine: 1, endLine: 5 })]);
+  assert.equal(toGithub([known, unscoped]), "");
+  assert.equal(toGithub([]), "");
+});
+
+test("toGithub escapes commas and colons in properties and newlines in the message", () => {
+  const cluster = rcluster("new", [
+    rloc({ path: "src/a,b.ts", startLine: 1, endLine: 9, intersectsChangedScope: true, annotationLine: 1 }),
+    rloc({ path: "src/c.ts", startLine: 5, endLine: 7, structuralKey: "k\nx%y" }),
+  ]);
+  const line = toGithub([cluster]).split("\n").filter(Boolean)[0];
+  // property value: comma and colon escaped so the file= property is not truncated.
+  assert.ok(line.startsWith("::error file=src/a%2Cb.ts,line=1,"), line);
+  // the data segment keeps ":" literal (escaping it would render %3A in text).
+  const data = line.slice(line.indexOf("::", 2) + 2);
+  assert.ok(data.includes("src/c.ts:5-7"), data);
+  assert.ok(!data.includes("\n"), "raw newline must be escaped in data");
+});
+
+// N new clusters, each with one changed copy and one counterpart, for cap tests.
+function manyNewClusters(count: number): ReportedCluster[] {
+  return Array.from({ length: count }, (_, i) =>
+    rcluster("new", [
+      rloc({ path: `src/f${i}.ts`, startLine: 1, endLine: 5, intersectsChangedScope: true, annotationLine: 1 }),
+      rloc({ path: `src/g${i}.ts`, startLine: 1, endLine: 5 }),
+    ]),
+  );
+}
+
+test("toGithub caps at 10 errors and appends a notice summarizing the overflow", () => {
+  const lines = toGithub(manyNewClusters(12)).split("\n").filter(Boolean);
+  const errors = lines.filter((l) => l.startsWith("::error"));
+  const notices = lines.filter((l) => l.startsWith("::notice"));
+  assert.equal(errors.length, 10);
+  assert.equal(notices.length, 1);
+  assert.ok(notices[0].includes("2 more"), notices[0]);
+});
+
+test("toGithub degrades to no counterpart list when every copy changed", () => {
+  const cluster = rcluster("new", [
+    rloc({ path: "a.ts", startLine: 1, endLine: 5, intersectsChangedScope: true, annotationLine: 1 }),
+    rloc({ path: "b.ts", startLine: 1, endLine: 5, intersectsChangedScope: true, annotationLine: 1 }),
+  ]);
+  const lines = toGithub([cluster]).split("\n").filter(Boolean);
+  assert.equal(lines.length, 2);
+  for (const line of lines) {
+    assert.ok(line.includes("duplicates code elsewhere in this change"), line);
+    assert.ok(!line.includes("Candidate counterparts"), line);
+  }
+});
+
+test("toGitlab emits a CodeClimate entry per changed location with begin at the anchor line", () => {
+  const cluster = rcluster("new", [
+    rloc({ path: "src/a.ts", startLine: 10, endLine: 20, intersectsChangedScope: true, annotationLine: 14 }),
+    rloc({ path: "src/b.ts", startLine: 30, endLine: 40 }),
+  ]);
+  const entries = JSON.parse(toGitlab([cluster]));
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].check_name, "dry-ts/duplicate-code");
+  assert.equal(entries[0].severity, "major");
+  assert.equal(entries[0].location.path, "src/a.ts");
+  assert.equal(entries[0].location.lines.begin, 14);
+  assert.match(entries[0].fingerprint, /^[0-9a-f]{64}$/);
+  assert.ok(entries[0].description.includes("src/b.ts:30-40"));
+});
+
+test("toGitlab returns a valid empty array when there is nothing actionable", () => {
+  assert.equal(toGitlab([]), "[]");
+  assert.equal(toGitlab([rcluster("known", [rloc({ path: "a.ts", startLine: 1, endLine: 5 })])]), "[]");
+});
+
+test("toGitlab fingerprint is line-independent and matches an independent sha256", () => {
+  const atLine = (start: number) =>
+    rcluster("new", [
+      rloc({ path: "a.ts", startLine: start, endLine: start + 9, intersectsChangedScope: true, annotationLine: start, structuralKey: "STABLE" }),
+      rloc({ path: "b.ts", startLine: 100, endLine: 109 }),
+    ]);
+  const first = JSON.parse(toGitlab([atLine(10)]))[0].fingerprint;
+  const drifted = JSON.parse(toGitlab([atLine(42)]))[0].fingerprint;
+  assert.equal(first, drifted, "line drift must not change the fingerprint");
+  assert.equal(first, createHash("sha256").update("v1:a.ts:STABLE").digest("hex"));
+});
+
+test("toGitlab gives distinct fingerprints to two changed copies of the same cluster", () => {
+  // Two copies in one cluster share structuralKey (that is what makes them
+  // duplicates). GitLab keys issues by fingerprint, so identical fingerprints
+  // would collapse the two findings into one. The path must discriminate them.
+  const cluster = rcluster("new", [
+    rloc({ path: "src/a.ts", startLine: 1, endLine: 10, intersectsChangedScope: true, annotationLine: 1, structuralKey: "SHARED" }),
+    rloc({ path: "src/b.ts", startLine: 1, endLine: 10, intersectsChangedScope: true, annotationLine: 1, structuralKey: "SHARED" }),
+  ]);
+  const entries = JSON.parse(toGitlab([cluster]));
+  assert.equal(entries.length, 2);
+  assert.notEqual(entries[0].fingerprint, entries[1].fingerprint, "distinct copies need distinct fingerprints");
+});
+
+test("toGitlab caps at 50 entries, stays valid JSON, and notes truncation in a description", () => {
+  const entries = JSON.parse(toGitlab(manyNewClusters(55)));
+  assert.equal(entries.length, 50);
+  assert.ok(entries[49].description.includes("5 further finding(s) truncated"), entries[49].description);
 });
 
 const duplicateBody = `
@@ -1750,4 +1904,69 @@ test("--explain-changed without any changed scope reports no scope active", asyn
   assert.equal(result.exitCode, 0, result.stderr);
   assert.ok(result.stderr.includes("Changed regions (--explain-changed):"), result.stderr);
   assert.ok(result.stderr.includes("(no changed scope active)"), result.stderr);
+});
+
+// End-to-end PR-grade reporting: exercises finder structural-key threading,
+// the report layer, and the formatter together through the real CLI.
+
+test("--format github annotates the changed copy of a new cluster and exits 1 under the gate", async () => {
+  const dir = await gitRepo({ "lib.ts": uniqueBody });
+  await writeFile(path.join(dir, "copy.ts"), uniqueBodyCopy);
+
+  const result = runCli([...gateFlags, "--format", "github", "--fail-on-duplicates", "--changed-from", "HEAD", "."], dir);
+  assert.equal(result.exitCode, 1, result.stderr);
+  const errors = result.stdout.split("\n").filter((l) => l.startsWith("::error"));
+  assert.equal(errors.length, 1, result.stdout);
+  assert.ok(errors[0].includes("file=copy.ts"), errors[0]);
+  // counterpart is the old code we copied from
+  assert.ok(errors[0].includes("lib.ts:"), errors[0]);
+});
+
+test("--format gitlab emits a CodeClimate report for the changed copy of a new cluster", async () => {
+  const dir = await gitRepo({ "lib.ts": uniqueBody });
+  await writeFile(path.join(dir, "copy.ts"), uniqueBodyCopy);
+
+  const result = runCli([...gateFlags, "--format", "gitlab", "--fail-on-duplicates", "--changed-from", "HEAD", "."], dir);
+  assert.equal(result.exitCode, 1, result.stderr);
+  const entries = JSON.parse(result.stdout);
+  assert.equal(entries.length, 1, result.stdout);
+  assert.equal(entries[0].location.path, "copy.ts");
+  assert.equal(entries[0].check_name, "dry-ts/duplicate-code");
+  assert.match(entries[0].fingerprint, /^[0-9a-f]{64}$/);
+});
+
+test("--format gitlab fingerprint is stable across processes for the same structure", async () => {
+  const run = async () => {
+    const dir = await gitRepo({ "lib.ts": uniqueBody });
+    await writeFile(path.join(dir, "copy.ts"), uniqueBodyCopy);
+    const result = runCli([...gateFlags, "--format", "gitlab", "--changed-from", "HEAD", "."], dir);
+    return JSON.parse(result.stdout)[0].fingerprint;
+  };
+  assert.equal(await run(), await run());
+});
+
+test("--format github anchors the annotation at the first changed line inside the block", async () => {
+  // A multi-line duplicated block where only one interior line is edited: the
+  // annotation must point at that line, not the block's startLine.
+  const dir = await gitRepo({ "a.ts": uniqueBody, "b.ts": uniqueBodyCopy });
+  // Edit one interior line of a.ts's function without breaking its structure.
+  const edited = uniqueBody.replace('throw new Error("missing " + key);', 'throw new Error("absent: " + key);');
+  await writeFile(path.join(dir, "a.ts"), edited);
+
+  const result = runCli([...gateFlags, "--format", "github", "--changed-from", "HEAD", "."], dir);
+  const error = result.stdout.split("\n").find((l) => l.startsWith("::error") && l.includes("file=a.ts"));
+  assert.ok(error, result.stdout);
+  const line = Number(/line=(\d+)/.exec(error)![1]);
+  // uniqueBody: line 1 is blank, function spans lines 2-7, the throw is line 4.
+  assert.equal(line, 4, error);
+});
+
+test("--format github/gitlab emit nothing actionable without an active changed scope", async () => {
+  const { dir } = await writeFixture({ "one.ts": duplicateBody, "two.ts": duplicateBody });
+  const gh = runCli([...gateFlags, "--format", "github", "."], dir);
+  assert.equal(gh.exitCode, 0, gh.stderr);
+  assert.ok(!gh.stdout.includes("::error"), gh.stdout);
+  const gl = runCli([...gateFlags, "--format", "gitlab", "."], dir);
+  assert.equal(gl.exitCode, 0, gl.stderr);
+  assert.equal(gl.stdout.trim(), "[]", gl.stdout);
 });
