@@ -18,6 +18,7 @@ import {
   TypeScriptNormalizer,
   type Cluster,
 } from "../src/index.js";
+import { canonicalPath, ChangedRegions, parseUnifiedDiff } from "../src/index.js";
 import { ClusterCollector } from "../src/Clusters.js";
 import { FileScanner } from "../src/FileScanner.js";
 import { FingerprintInterner, type NormalizedNode } from "../src/NormalizedNode.js";
@@ -242,7 +243,7 @@ test("formats clusters with score range, location count, and node size", () => {
 
   assert.equal(
     formatCluster(clusters[0], 1),
-    "CLUSTER 1 score=0.85-0.90 locations=3\n  a.ts:10-14 nodes=50\n  b.ts:10-14 nodes=50\n  c.ts:10-14 nodes=50",
+    "CLUSTER 1 score=0.85-0.90 locations=3 status=unscoped\n  a.ts:10-14 nodes=50\n  b.ts:10-14 nodes=50\n  c.ts:10-14 nodes=50",
   );
 });
 
@@ -259,7 +260,7 @@ test("does not expose complete pairwise match counts in cluster output", () => {
   const [cluster] = collector.clusters();
 
   assert.equal(cluster.locations.length, 5);
-  assert.equal(formatCluster(cluster, 1).split("\n")[0], "CLUSTER 1 score=1.00 locations=5");
+  assert.equal(formatCluster(cluster, 1).split("\n")[0], "CLUSTER 1 score=1.00 locations=5 status=unscoped");
 });
 
 test("finds duplicate clusters directly", async () => {
@@ -494,7 +495,7 @@ test("prints edn clusters instead of every candidate pair", () => {
 
   assert.equal(
     toEdn(clusters),
-    '{:clusters\n [{:score-min 0.875\n   :score-max 0.875\n   :location-count 2\n   :locations [{:file "a.ts", :start-line 10, :end-line 14, :nodes 50}\n               {:file "b.ts", :start-line 10, :end-line 14, :nodes 50}]}]}',
+    '{:clusters\n [{:score-min 0.875\n   :score-max 0.875\n   :status :unscoped\n   :location-count 2\n   :locations [{:file "a.ts", :start-line 10, :end-line 14, :nodes 50}\n               {:file "b.ts", :start-line 10, :end-line 14, :nodes 50}]}]}',
   );
 });
 
@@ -509,6 +510,7 @@ test("prints json clusters for agents and ci integrations", () => {
   assert.deepEqual(JSON.parse(toJson(clusters)), {
     clusters: [{
       score: { min: 0.875, max: 0.925 },
+      status: "unscoped",
       locationCount: 3,
       locations: [
         { file: "a.ts", startLine: 10, endLine: 14, nodes: 50 },
@@ -1244,4 +1246,508 @@ test("FingerprintInterner.idFor returns consistent hashes for same tag and child
   assert.notEqual(id1, id3, "Different tags should produce different hashes");
   assert.ok(id1 >= 0, "Hash should be non-negative");
   assert.ok(id1 < 2 ** 53, "Hash should fit in 53 bits");
+});
+
+// ---------------------------------------------------------------------------
+// Incremental duplicate gating (--changed-from / --changed)
+// ---------------------------------------------------------------------------
+
+const uniqueBody = `
+export function lookup(table: Map<string, number>, key: string): string {
+  if (!table.has(key)) {
+    throw new Error("missing " + key);
+  }
+  return key + "=" + String(table.get(key));
+}
+`;
+
+// Same structure as uniqueBody with renamed identifiers: clusters with it.
+const uniqueBodyCopy = `
+export function fetchEntry(store: Map<string, number>, name: string): string {
+  if (!store.has(name)) {
+    throw new Error("absent " + name);
+  }
+  return name + "=" + String(store.get(name));
+}
+`;
+
+const gateFlags = ["--threshold", "0.5", "--min-lines", "3", "--min-nodes", "8"];
+
+const hermeticGitEnv = {
+  ...process.env,
+  GIT_CONFIG_GLOBAL: "/dev/null",
+  GIT_CONFIG_SYSTEM: "/dev/null",
+};
+
+function runCli(
+  args: readonly string[],
+  cwd: string,
+): { exitCode: number; stdout: string; stderr: string } {
+  const result = Bun.spawnSync(["bun", "run", path.join(repoRoot, "src/bin/dry-ts.ts"), ...args], {
+    cwd,
+    env: hermeticGitEnv,
+  });
+  return { exitCode: result.exitCode, stdout: result.stdout.toString(), stderr: result.stderr.toString() };
+}
+
+function git(dir: string, ...args: string[]): void {
+  const result = Bun.spawnSync(
+    ["git", "-c", "user.name=dry-ts", "-c", "user.email=dry-ts@test", "-c", "commit.gpgsign=false", ...args],
+    { cwd: dir, env: hermeticGitEnv },
+  );
+  if (result.exitCode !== 0) {
+    throw new Error(`git ${args.join(" ")} failed: ${result.stderr.toString()}`);
+  }
+}
+
+async function writeTree(dir: string, sources: Record<string, string>): Promise<void> {
+  for (const [name, text] of Object.entries(sources)) {
+    const file = path.join(dir, name);
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, text);
+  }
+}
+
+// Hermetic git fixture: explicit identity, no gpg, explicit initial branch,
+// global/system config masked, so runner-global git config can never flake
+// the suite.
+async function gitRepo(sources: Record<string, string>): Promise<string> {
+  const dir = await mkdtemp(path.join(tmpdir(), "dry-ts-git-"));
+  await writeTree(dir, sources);
+  git(dir, "init", "-b", "main");
+  git(dir, "add", "-A");
+  git(dir, "commit", "-m", "base");
+  return dir;
+}
+
+function statusByFile(stdout: string): Map<string, string> {
+  const byFile = new Map<string, string>();
+  for (const cluster of JSON.parse(stdout).clusters) {
+    for (const location of cluster.locations) {
+      byFile.set(location.file.split(path.sep).join("/"), cluster.status);
+    }
+  }
+  return byFile;
+}
+
+const parseDiffCases: Array<{
+  name: string;
+  diff: string[];
+  expect: Array<{ file: string; start: number; end: number }>;
+}> = [
+  {
+    name: "modification hunk yields post-image range",
+    diff: [
+      "diff --git a/a.ts b/a.ts",
+      "index 1111111..2222222 100644",
+      "--- a/a.ts",
+      "+++ b/a.ts",
+      "@@ -3,2 +3,3 @@ export function f() {",
+      "-old",
+      "-old",
+      "+new",
+      "+new",
+      "+new",
+    ],
+    expect: [{ file: "a.ts", start: 3, end: 5 }],
+  },
+  {
+    name: "omitted counts default to 1",
+    diff: ["diff --git a/a.ts b/a.ts", "--- a/a.ts", "+++ b/a.ts", "@@ -3 +4 @@", "-x", "+y"],
+    expect: [{ file: "a.ts", start: 4, end: 4 }],
+  },
+  {
+    name: "deletion-only hunk marks the post-image boundary line",
+    diff: ["diff --git a/a.ts b/a.ts", "--- a/a.ts", "+++ b/a.ts", "@@ -10,2 +9,0 @@", "-x", "-y"],
+    expect: [{ file: "a.ts", start: 9, end: 9 }],
+  },
+  {
+    name: "deletion at top of file marks line 1",
+    diff: ["diff --git a/a.ts b/a.ts", "--- a/a.ts", "+++ b/a.ts", "@@ -1,2 +0,0 @@", "-x", "-y"],
+    expect: [{ file: "a.ts", start: 1, end: 1 }],
+  },
+  {
+    name: "new file marks added lines",
+    diff: [
+      "diff --git a/n.ts b/n.ts",
+      "new file mode 100644",
+      "index 0000000..2222222",
+      "--- /dev/null",
+      "+++ b/n.ts",
+      "@@ -0,0 +1,2 @@",
+      "+a",
+      "+b",
+    ],
+    expect: [{ file: "n.ts", start: 1, end: 2 }],
+  },
+  {
+    name: "deleted file marks nothing (no post-image)",
+    diff: [
+      "diff --git a/d.ts b/d.ts",
+      "deleted file mode 100644",
+      "--- a/d.ts",
+      "+++ /dev/null",
+      "@@ -1,2 +0,0 @@",
+      "-a",
+      "-b",
+    ],
+    expect: [],
+  },
+  {
+    name: "binary file marker is skipped",
+    diff: ["diff --git a/x.png b/x.png", "index 1111111..2222222 100644", "Binary files a/x.png and b/x.png differ"],
+    expect: [],
+  },
+  {
+    name: "rename headers are skipped and ranges land on the new path",
+    diff: [
+      "diff --git a/old.ts b/new.ts",
+      "similarity index 90%",
+      "rename from old.ts",
+      "rename to new.ts",
+      "index 1111111..2222222 100644",
+      "--- a/old.ts",
+      "+++ b/new.ts",
+      "@@ -5,1 +5,1 @@",
+      "-x",
+      "+y",
+    ],
+    expect: [{ file: "new.ts", start: 5, end: 5 }],
+  },
+  {
+    name: "mode-change-only block is skipped",
+    diff: ["diff --git a/a.ts b/a.ts", "old mode 100644", "new mode 100755"],
+    expect: [],
+  },
+  {
+    name: "no-newline marker inside a hunk is skipped",
+    diff: ["diff --git a/a.ts b/a.ts", "--- a/a.ts", "+++ b/a.ts", "@@ -1,1 +1,1 @@", "-x", "\\ No newline at end of file", "+y", "\\ No newline at end of file"],
+    expect: [{ file: "a.ts", start: 1, end: 1 }],
+  },
+  {
+    name: "submodule log line is skipped",
+    diff: ["Submodule lib 1111111..2222222:"],
+    expect: [],
+  },
+];
+
+for (const { name, diff, expect } of parseDiffCases) {
+  test(`parseUnifiedDiff: ${name}`, () => {
+    const regions = parseUnifiedDiff(`${diff.join("\n")}\n`);
+    const actual = regions
+      .entries()
+      .flatMap(({ file, ranges }) => ranges.map((range) => ({ file, start: range.start, end: range.end })));
+    assert.deepEqual(actual, expect);
+  });
+}
+
+const parseDiffErrorCases: Array<{ name: string; diff: string[] }> = [
+  { name: "unrecognized line", diff: ["this is not a diff"] },
+  { name: "truncated hunk", diff: ["diff --git a/a.ts b/a.ts", "--- a/a.ts", "+++ b/a.ts", "@@ -1,2 +1,2 @@", "-x", "+y"] },
+  { name: "hunk before any file header", diff: ["@@ -1,1 +1,1 @@", "-x", "+y"] },
+  { name: "context line inside a -U0 hunk", diff: ["diff --git a/a.ts b/a.ts", "--- a/a.ts", "+++ b/a.ts", "@@ -1,1 +1,1 @@", " context"] },
+];
+
+for (const { name, diff } of parseDiffErrorCases) {
+  test(`parseUnifiedDiff rejects ${name}`, () => {
+    assert.throws(() => parseUnifiedDiff(`${diff.join("\n")}\n`));
+  });
+}
+
+test("ChangedRegions intersection is inclusive on boundary lines", () => {
+  const regions = new ChangedRegions();
+  regions.addRange("a.ts", 10, 12, "hunk");
+  assert.equal(regions.intersectsLocation("a.ts", 12, 20), true);
+  assert.equal(regions.intersectsLocation("a.ts", 1, 10), true);
+  assert.equal(regions.intersectsLocation("a.ts", 13, 20), false);
+  assert.equal(regions.intersectsLocation("b.ts", 10, 12), false);
+  regions.addWholeFile("b.ts", "untracked");
+  assert.equal(regions.intersectsLocation("b.ts", 5000, 5001), true);
+});
+
+test("canonicalPath produces root-relative forward-slash keys", () => {
+  assert.equal(canonicalPath("/repo", "/repo/src/a.ts"), "src/a.ts");
+  const cwdRelative = canonicalPath(process.cwd(), path.join("src", "DryTs.ts"));
+  assert.equal(cwdRelative, "src/DryTs.ts");
+});
+
+test("--changed-from marks a copied function as new and pre-existing duplication as known", async () => {
+  const dir = await gitRepo({
+    "known1.ts": duplicateBody,
+    "known2.ts": duplicateBody,
+    "lib.ts": uniqueBody,
+  });
+  await writeFile(path.join(dir, "known1.ts"), duplicateBody + uniqueBodyCopy);
+
+  const json = runCli([...gateFlags, "--json", "--changed-from", "HEAD", "."], dir);
+  assert.equal(json.exitCode, 0);
+  const statuses = statusByFile(json.stdout);
+  assert.equal(statuses.get("lib.ts"), "new", json.stdout);
+  assert.equal(statuses.get("known2.ts"), "known", json.stdout);
+
+  const gated = runCli([...gateFlags, "--fail-on-duplicates", "--changed-from", "HEAD", "."], dir);
+  assert.equal(gated.exitCode, 1, gated.stderr);
+});
+
+test("--changed-from with a clean tree reports everything known and exits 0 under the gate", async () => {
+  const dir = await gitRepo({ "known1.ts": duplicateBody, "known2.ts": duplicateBody });
+  const result = runCli([...gateFlags, "--json", "--fail-on-duplicates", "--changed-from", "HEAD", "."], dir);
+  assert.equal(result.exitCode, 0, result.stderr);
+  const statuses = [...statusByFile(result.stdout).values()];
+  assert.ok(statuses.length > 0 && statuses.every((status) => status === "known"), result.stdout);
+});
+
+test("--changed-from counts an untracked duplicate file as fully changed", async () => {
+  const dir = await gitRepo({ "lib.ts": uniqueBody });
+  await writeFile(path.join(dir, "copy.ts"), uniqueBodyCopy);
+
+  const result = runCli([...gateFlags, "--json", "--fail-on-duplicates", "--changed-from", "HEAD", "."], dir);
+  assert.equal(result.exitCode, 1, result.stderr);
+  assert.equal(statusByFile(result.stdout).get("copy.ts"), "new", result.stdout);
+});
+
+test("--changed-from gates a scanned file hidden from git by a nested .gitignore", async () => {
+  // The scanner honors only the cwd .gitignore; git's ignore stack also reads
+  // nested ones. The untracked rule is index-based, so the divergence cannot
+  // open a bypass: the scanned-but-ignored file still counts as changed.
+  const dir = await gitRepo({ "lib.ts": uniqueBody });
+  await writeTree(dir, { "deep/.gitignore": "copy.ts\n", "deep/copy.ts": uniqueBodyCopy });
+
+  const result = runCli([...gateFlags, "--json", "--fail-on-duplicates", "--changed-from", "HEAD", "."], dir);
+  assert.equal(result.exitCode, 1, result.stderr);
+  assert.equal(statusByFile(result.stdout).get("deep/copy.ts"), "new", result.stdout);
+});
+
+test("--changed-from follows renames and only edited hunks count as changed", async () => {
+  const dir = await gitRepo({
+    "pair.ts": duplicateBody + uniqueBody,
+    "pair2.ts": duplicateBody,
+  });
+  git(dir, "mv", "pair.ts", "moved.ts");
+  // Edit only the lookup() region of the renamed file; the duplicate process()
+  // region at the top is untouched, so its cluster must stay known.
+  const moved = (await readFile(path.join(dir, "moved.ts"), "utf8")).replace(
+    'throw new Error("missing " + key);',
+    'console.warn(key);\n    throw new Error("missing " + key);',
+  );
+  await writeFile(path.join(dir, "moved.ts"), moved);
+
+  const result = runCli([...gateFlags, "--json", "--fail-on-duplicates", "--changed-from", "HEAD", "."], dir);
+  assert.equal(result.exitCode, 0, `${result.stdout}\n${result.stderr}`);
+  assert.equal(statusByFile(result.stdout).get("moved.ts"), "known", result.stdout);
+});
+
+test("--changed-from diffs from merge-base, not literally from the ref", async () => {
+  // A branch behind its base must not see base-side changes pollute the
+  // changed set: a literal diff against main would mark the duplicate region
+  // changed and fail the gate with a false "new".
+  const dir = await gitRepo({ "known1.ts": duplicateBody, "known2.ts": duplicateBody });
+  git(dir, "checkout", "-b", "feature");
+  git(dir, "checkout", "main");
+  await writeFile(path.join(dir, "known1.ts"), uniqueBody);
+  git(dir, "commit", "-am", "rewrite known1 on main");
+  git(dir, "checkout", "feature");
+
+  const result = runCli([...gateFlags, "--json", "--fail-on-duplicates", "--changed-from", "main", "."], dir);
+  assert.equal(result.exitCode, 0, `${result.stdout}\n${result.stderr}`);
+  const statuses = [...statusByFile(result.stdout).values()];
+  assert.ok(statuses.every((status) => status === "known"), result.stdout);
+});
+
+test("--changed-from sees edits in a tracked file whose name contains a space", async () => {
+  // git diff appends a trailing TAB to the +++ header when the path has a
+  // space; if the parser keeps it, the region keys under "a file.ts\t" and
+  // never matches the scanner's "a file.ts" key, waving the new dup through.
+  const dir = await gitRepo({ "a file.ts": uniqueBody });
+  await writeFile(path.join(dir, "a file.ts"), uniqueBody + uniqueBodyCopy);
+
+  const result = runCli([...gateFlags, "--json", "--fail-on-duplicates", "--changed-from", "HEAD", "."], dir);
+  assert.equal(result.exitCode, 1, `${result.stdout}\n${result.stderr}`);
+  assert.equal(statusByFile(result.stdout).get("a file.ts"), "new", result.stdout);
+});
+
+test("--changed-from does not misflag a clean tracked file whose name contains a tab", async () => {
+  // git ls-files C-quotes "a\tb.ts" while the scanner reads the literal tab;
+  // comparing without -z would mark the clean tracked file untracked -> new
+  // -> a false exit 1 on a tree nobody changed.
+  const tab = "a\tb.ts";
+  const dir = await gitRepo({ [tab]: duplicateBody, "plain.ts": duplicateBody });
+  const result = runCli([...gateFlags, "--json", "--fail-on-duplicates", "--changed-from", "HEAD", "."], dir);
+  assert.equal(result.exitCode, 0, `${result.stdout}\n${result.stderr}`);
+  const statuses = [...statusByFile(result.stdout).values()];
+  assert.ok(statuses.length > 0 && statuses.every((status) => status === "known"), result.stdout);
+});
+
+test("--changed-from sees edits in a tracked file whose name contains a tab", async () => {
+  // git quotes the +++ header for control-char names ("b/a\tb.ts"); if the
+  // parser keeps the escapes the region keys under a path the scanner never
+  // produces, silently waving the new dup through as known.
+  const tab = "a\tb.ts";
+  const dir = await gitRepo({ [tab]: uniqueBody });
+  await writeFile(path.join(dir, tab), uniqueBody + uniqueBodyCopy);
+  const result = runCli([...gateFlags, "--json", "--fail-on-duplicates", "--changed-from", "HEAD", "."], dir);
+  assert.equal(result.exitCode, 1, `${result.stdout}\n${result.stderr}`);
+  assert.equal(statusByFile(result.stdout).get(tab), "new", result.stdout);
+});
+
+test("--changed-from canonicalizes paths when cwd is not the repo root", async () => {
+  const dir = await gitRepo({ "pkg/src/lib.ts": uniqueBody, "pkg/src/other.ts": duplicateBody });
+  await writeFile(path.join(dir, "pkg/src/lib.ts"), uniqueBody + uniqueBodyCopy);
+
+  const result = runCli(
+    [...gateFlags, "--json", "--fail-on-duplicates", "--changed-from", "HEAD", "src"],
+    path.join(dir, "pkg"),
+  );
+  assert.equal(result.exitCode, 1, `${result.stdout}\n${result.stderr}`);
+  assert.equal(statusByFile(result.stdout).get("src/lib.ts"), "new", result.stdout);
+});
+
+test("--changed scopes the whole listed file and leaves other clusters known", async () => {
+  const { dir } = await writeFixture({
+    "edited.ts": uniqueBody + uniqueBodyCopy,
+    "known1.ts": duplicateBody,
+    "known2.ts": duplicateBody,
+  });
+  const result = runCli([...gateFlags, "--json", "--changed", "edited.ts", "."], dir);
+  assert.equal(result.exitCode, 0, result.stderr);
+  const statuses = statusByFile(result.stdout);
+  assert.equal(statuses.get("edited.ts"), "new", result.stdout);
+  assert.equal(statuses.get("known1.ts"), "known", result.stdout);
+
+  const gated = runCli([...gateFlags, "--fail-on-duplicates", "--changed", "edited.ts", "."], dir);
+  assert.equal(gated.exitCode, 1, gated.stderr);
+});
+
+test("--changed is repeatable and scopes every listed file independently", async () => {
+  // Three independent clusters. Two --changed flags target one file in each of
+  // the first two; the third cluster is never listed. A single global "any
+  // --changed -> all new" bug would wrongly flip the third to new.
+  const thirdBody = `
+export function classify(score: number): string {
+  if (score > 90) {
+    return "high";
+  }
+  return score > 50 ? "mid" : "low";
+}
+`;
+  const { dir } = await writeFixture({
+    "look1.ts": uniqueBody,
+    "look2.ts": uniqueBodyCopy,
+    "proc1.ts": duplicateBody,
+    "proc2.ts": duplicateBody,
+    "cls1.ts": thirdBody,
+    "cls2.ts": thirdBody,
+  });
+  const result = runCli([...gateFlags, "--json", "--changed", "look1.ts", "--changed", "proc1.ts", "."], dir);
+  assert.equal(result.exitCode, 0, result.stderr);
+  const statuses = statusByFile(result.stdout);
+  assert.equal(statuses.get("look2.ts"), "new", result.stdout);
+  assert.equal(statuses.get("proc2.ts"), "new", result.stdout);
+  assert.equal(statuses.get("cls2.ts"), "known", result.stdout);
+});
+
+async function twoDuplicateFiles(): Promise<string> {
+  const { dir } = await writeFixture({ "one.ts": duplicateBody, "two.ts": duplicateBody });
+  return dir;
+}
+
+test("status appears in every output format", async () => {
+  const dir = await twoDuplicateFiles();
+  const text = runCli([...gateFlags, "--changed", "one.ts", "."], dir);
+  assert.ok(text.stdout.includes("status=new (intersects your change)"), text.stdout);
+  const edn = runCli([...gateFlags, "--edn", "--changed", "one.ts", "."], dir);
+  assert.ok(edn.stdout.includes(":status :new"), edn.stdout);
+  const unscoped = runCli([...gateFlags, "--json", "."], dir);
+  assert.ok(unscoped.stdout.includes('"status": "unscoped"'), unscoped.stdout);
+});
+
+test("--explain-changed dumps the resolved changed-region map to stderr", async () => {
+  const result = runCli([...gateFlags, "--explain-changed", "--changed", "one.ts", "."], await twoDuplicateFiles());
+  assert.ok(result.stderr.includes("Changed regions (--explain-changed):"), result.stderr);
+  assert.ok(result.stderr.includes("one.ts (entire file, listed)"), result.stderr);
+});
+
+test("ungateable --changed files warn without the gate and exit 2 under it", async () => {
+  const { dir } = await writeFixture({ "one.ts": duplicateBody });
+  await writeTree(dir, { "sub/two.ts": uniqueBody });
+  await mkdir(path.join(dir, "emptydir"), { recursive: true });
+  const cases = ["missing.ts", "emptydir", path.join("sub", "two.ts")];
+  for (const changed of cases) {
+    const warned = runCli([...gateFlags, "--changed", changed, "one.ts"], dir);
+    assert.equal(warned.exitCode, 0, `${changed}: ${warned.stderr}`);
+    assert.ok(warned.stderr.includes("warning:"), `${changed}: ${warned.stderr}`);
+    const gated = runCli([...gateFlags, "--fail-on-duplicates", "--changed", changed, "one.ts"], dir);
+    assert.equal(gated.exitCode, 2, `${changed}: ${gated.stderr}`);
+  }
+});
+
+test("usage and environment errors exit 2", async () => {
+  const { dir } = await writeFixture({ "one.ts": duplicateBody });
+  const gitDir = await gitRepo({ "lib.ts": uniqueBody });
+  const cases: Array<{ args: string[]; cwd: string; stderrIncludes: string }> = [
+    { args: ["--changed-from", "HEAD", "--changed", "one.ts", "."], cwd: dir, stderrIncludes: "cannot be combined" },
+    { args: ["--changed-from", "HEAD", "."], cwd: dir, stderrIncludes: "not a git repository" },
+    { args: ["--changed-from", "no-such-ref", "."], cwd: gitDir, stderrIncludes: "no-such-ref" },
+    { args: ["--changed-from", "-output=x", "."], cwd: gitDir, stderrIncludes: "must not start with" },
+    { args: ["--changed-frm", "HEAD", "."], cwd: dir, stderrIncludes: "Unknown option: --changed-frm" },
+  ];
+  for (const { args, cwd, stderrIncludes } of cases) {
+    const result = runCli(args, cwd);
+    assert.equal(result.exitCode, 2, `${args.join(" ")}: exited ${result.exitCode}\n${result.stderr}`);
+    assert.ok(result.stderr.includes(stderrIncludes), `${args.join(" ")}: ${result.stderr}`);
+  }
+});
+
+test("--changed-from rejects a ref that resolves to a non-commit object", async () => {
+  // verifyRef appends ^{commit} precisely to reject tree/blob targets; a plain
+  // rev-parse --verify would accept a tree sha and then merge-base would fail
+  // with a murkier error. Point it at HEAD's tree and assert the clean exit 2.
+  const dir = await gitRepo({ "lib.ts": uniqueBody });
+  const tree = Bun.spawnSync(["git", "rev-parse", "HEAD^{tree}"], { cwd: dir, env: hermeticGitEnv })
+    .stdout.toString()
+    .trim();
+  const result = runCli([...gateFlags, "--changed-from", tree, "."], dir);
+  assert.equal(result.exitCode, 2, `tree=${tree}: exited ${result.exitCode}\n${result.stderr}`);
+});
+
+test("zero files scanned under --fail-on-duplicates exits 2", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "dry-ts-empty-"));
+  const gated = runCli(["--fail-on-duplicates", "."], dir);
+  assert.equal(gated.exitCode, 2, gated.stderr);
+  assert.ok(gated.stderr.includes("No files were scanned"), gated.stderr);
+  const ungated = runCli(["."], dir);
+  assert.equal(ungated.exitCode, 0, ungated.stderr);
+});
+
+test("scanner errors under gating exit 2, never 1", async () => {
+  const { dir } = await writeFixture({ "bad.ts": "let 123 = ;\n", "one.ts": duplicateBody });
+  const result = runCli([...gateFlags, "--fail-on-duplicates", "--changed", "one.ts", "."], dir);
+  assert.equal(result.exitCode, 2, `${result.stdout}\n${result.stderr}`);
+  assert.ok(result.stderr.includes("bad.ts"), result.stderr);
+});
+
+test("unscoped --fail-on-duplicates still exits 1 while clusters report status unscoped", async () => {
+  const { dir } = await writeFixture({ "one.ts": duplicateBody, "two.ts": duplicateBody });
+  const result = runCli([...gateFlags, "--json", "--fail-on-duplicates", "."], dir);
+  assert.equal(result.exitCode, 1, result.stderr);
+  const statuses = [...statusByFile(result.stdout).values()];
+  assert.ok(statuses.length > 0 && statuses.every((status) => status === "unscoped"), result.stdout);
+});
+
+test("ChangedRegions.describe reports empty, line-range, and whole-file entries", () => {
+  const empty = new ChangedRegions();
+  assert.equal(empty.describe(), "  (no changed regions)");
+
+  const regions = new ChangedRegions();
+  regions.addRange("a.ts", 3, 5, "hunk");
+  regions.addWholeFile("b.ts", "listed");
+  assert.equal(regions.describe(), "  a.ts:3-5 (hunk)\n  b.ts (entire file, listed)");
+});
+
+test("--explain-changed without any changed scope reports no scope active", async () => {
+  const { dir } = await writeFixture({ "one.ts": duplicateBody, "two.ts": duplicateBody });
+  const result = runCli([...gateFlags, "--explain-changed", "."], dir);
+  assert.equal(result.exitCode, 0, result.stderr);
+  assert.ok(result.stderr.includes("Changed regions (--explain-changed):"), result.stderr);
+  assert.ok(result.stderr.includes("(no changed scope active)"), result.stderr);
 });

@@ -2,6 +2,51 @@
 
 Known deferred work. Performance plans live in `plans/README.md`.
 
+- [ ] Pathspec-bound the `--changed-from` diff (P3, S with CC): `GitProvider.diffSince`
+  runs `git diff <base> --` over the whole repo, not the scan paths. A large or
+  parser-hostile change outside the scanned corpus can overflow `maxBuffer`
+  (256 MiB) or trip the strict hunk parser, turning a valid `--changed-from src`
+  gate into exit 2. Fails closed (loud), so deferred. Fix: pass the canonical
+  scan pathspecs after `--` in `diffSince`, mirroring `indexedFiles`; watch the
+  interaction with `-M` rename detection across the pathspec boundary. (From
+  Codex adversarial review of incremental-gating, 2026-06-13.)
+- [ ] Baseline-file provider for incremental gating (P3, M→S with CC): a
+  checked-in fingerprint baseline as an alternative changed-region provider,
+  enabling "debt only shrinks" ratchet workflows and repos without useful git
+  refs. Plug-in point is the `ChangedRegions` provider seam from the
+  incremental-gating plan. Fingerprints are deterministic content hashes
+  (src/NormalizedNode.ts), but normalization changes between versions
+  invalidate stored baselines — baseline file needs a version field and a
+  clear "regenerate" error. Costs that deferred it: stateful file, merge
+  conflicts, pre-snapshot step for agents. (Deferred from incremental-gating
+  CEO review, 2026-06-13.)
+- [ ] PR-grade reporting (P3, S): `--format github` emitting `::error
+  file=...` annotations on finding locations, plus findings-first text
+  output. The `status` field from the incremental-gating plan provides all
+  data; only formatters needed. (Deferred from incremental-gating CEO
+  review, 2026-06-13.)
+- [ ] Pair-level counterpart provenance in output (P3, M→S/M with CC):
+  clusters are transitive components, so cluster-level `status` doesn't tell
+  an agent which counterpart a "new" location actually matches. Expose
+  direct pair edges (or per-location nearest counterpart) in JSON for
+  sharper fix targeting. Caveat: pair provenance is currently discarded in
+  src/TypeScriptDuplicateFinder.ts (perf rework); retention has memory/perf
+  cost — profile against .bench corpora first, retain only on the scoped
+  path. (From Codex outside-voice review of incremental-gating plan,
+  2026-06-13.)
+
+- [ ] Line-range syntax for `--changed` (P3, S): optional `:start-end` suffix
+  (`--changed foo.ts:10-42`) giving non-git callers line-level gating
+  precision. Today `--changed` is whole-file granularity, so pre-existing
+  duplication elsewhere in a touched file gates as "new" (documented trap;
+  eng review 2026-06-13 chose docs + `--changed-from HEAD` steering over
+  mechanism, decision 2B). Plug-in point: Options.ts parsing + the
+  ChangedRegions provider seam from the incremental-gating plan; the
+  intersection engine already works on line ranges. Cons that deferred it:
+  CLI surface growth for a consumer (non-git agents tracking exact edit
+  ranges) that may never materialize. Blocked by: incremental-gating plan
+  shipping first. (Deferred from incremental-gating eng review, 2026-06-13.)
+
 - [ ] Per-file parse-error tolerance: a single unparseable source file currently
   aborts the whole scan (`scanFile` throws). Skip the file with a warning on
   stderr instead, and add a `--strict` flag to restore fail-fast behavior.

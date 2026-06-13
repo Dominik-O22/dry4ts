@@ -5,6 +5,48 @@ All notable changes to dry-ts are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-06-13
+
+### Added
+
+- Incremental duplicate gating: gate a build only on duplication a change
+  introduces, instead of failing on every duplicate in the codebase.
+  - `--changed-from <ref>` marks clusters that intersect code changed since
+    `merge-base(<ref>, HEAD)` as `status: "new"`. Untracked scanned files count
+    as fully changed. Use `--changed-from origin/main` in CI for correct PR
+    semantics; pair with `fetch-depth: 0` so the shallow checkout doesn't break
+    merge-base.
+  - `--changed <file>` (repeatable) marks clusters intersecting a named file as
+    new — file-level granularity, for agents and non-git callers.
+  - `--explain-changed` dumps the resolved changed-region map to stderr so a
+    surprising gate result is diagnosable in one rerun.
+- Every cluster now reports a `status` (`"new" | "known" | "unscoped"`) in all
+  CLI output formats (JSON, EDN, and text). `--fail-on-duplicates` under a
+  changed-scope exits 1 only on `new` clusters; with no scope it stays
+  zero-tolerance and every cluster reports `unscoped`. (Status is assigned by
+  the CLI; the `TypeScriptDuplicateFinder` library returns clusters with
+  `status` unset.)
+
+### Changed
+
+- `OutputFormat` is now the closed union `"text" | "edn" | "json"`, and `status`
+  is an additive field on the exported `Cluster` / `ClusterReport` types. It is
+  optional on `Cluster` and populated by the CLI; library callers using
+  `findClusters()` get clusters with `status` unset.
+- The gate fails closed: a missing git binary, a bad ref, unparseable diff
+  output, an unreadable source file, or zero files scanned under
+  `--fail-on-duplicates` all exit 2 — never a silent green or a 1 that reads as
+  "findings". Unknown `-`-prefixed flags are rejected (exit 2) instead of being
+  treated as scan paths.
+
+### Fixed
+
+- Filenames containing spaces or control characters (tab, newline, quote,
+  backslash) are now handled correctly under `--changed-from`: git appends a tab
+  to `+++` headers for spaced names and C-quotes control-char names, which
+  previously made a region key mismatch the scanner's path — silently passing a
+  new duplicate as `known`, or falsely flagging a clean tracked file as changed.
+
 ## [0.3.0] - 2026-06-13
 
 ### Changed

@@ -10,6 +10,9 @@ export interface OptionsInput {
   readonly help?: boolean;
   readonly failOnDuplicates?: boolean;
   readonly respectGitignore?: boolean;
+  readonly changedFrom?: string;
+  readonly changed?: readonly string[];
+  readonly explainChanged?: boolean;
 }
 
 export class Options {
@@ -23,6 +26,9 @@ export class Options {
     public readonly failOnDuplicates: boolean,
     public readonly respectGitignore: boolean,
     public readonly minLocations: number = 2,
+    public readonly changedFrom: string | undefined = undefined,
+    public readonly changed: readonly string[] = [],
+    public readonly explainChanged: boolean = false,
   ) {
     if (!(threshold > 0 && threshold <= 1)) {
       throw new Error(`threshold must be greater than 0 and at most 1, got ${threshold}`);
@@ -35,6 +41,9 @@ export class Options {
     }
     if (minLocations < 2) {
       throw new Error(`minLocations must be at least 2, got ${minLocations}`);
+    }
+    if (changedFrom !== undefined && changed.length > 0) {
+      throw new Error("--changed-from and --changed cannot be combined");
     }
   }
 
@@ -55,6 +64,9 @@ export class Options {
       input.failOnDuplicates ?? defaults.failOnDuplicates,
       input.respectGitignore ?? defaults.respectGitignore,
       input.minLocations ?? defaults.minLocations,
+      input.changedFrom,
+      input.changed ?? [],
+      input.explainChanged ?? defaults.explainChanged,
     );
   }
 
@@ -68,6 +80,9 @@ export class Options {
     let help = false;
     let failOnDuplicates = false;
     let respectGitignore = true;
+    let changedFrom: string | undefined;
+    const changed: string[] = [];
+    let explainChanged = false;
 
     for (let i = 0; i < args.length; i += 1) {
       const arg = args[i];
@@ -85,7 +100,16 @@ export class Options {
           minLocations = integerValue(args, ++i, arg);
           break;
         case "--format":
-          format = valueFor(args, ++i, arg);
+          format = formatValue(args, ++i, arg);
+          break;
+        case "--changed-from":
+          changedFrom = valueFor(args, ++i, arg);
+          break;
+        case "--changed":
+          changed.push(valueFor(args, ++i, arg));
+          break;
+        case "--explain-changed":
+          explainChanged = true;
           break;
         case "--edn":
           format = "edn";
@@ -107,6 +131,11 @@ export class Options {
           help = true;
           break;
         default:
+          // A typo'd flag silently becoming a scan path would scan nothing
+          // and exit 0 — a silent gate bypass.
+          if (arg.startsWith("-")) {
+            throw new Error(`Unknown option: ${arg}`);
+          }
           paths.push(arg);
       }
     }
@@ -114,7 +143,20 @@ export class Options {
     if (paths.length === 0) {
       paths.push("src");
     }
-    return new Options(paths, threshold, minLines, minNodes, format, help, failOnDuplicates, respectGitignore, minLocations);
+    return new Options(
+      paths,
+      threshold,
+      minLines,
+      minNodes,
+      format,
+      help,
+      failOnDuplicates,
+      respectGitignore,
+      minLocations,
+      changedFrom,
+      changed,
+      explainChanged,
+    );
   }
 }
 
@@ -123,6 +165,14 @@ function valueFor(args: readonly string[], index: number, option: string): strin
     throw new Error(`Missing value for ${option}`);
   }
   return args[index];
+}
+
+function formatValue(args: readonly string[], index: number, option: string): OutputFormat {
+  const value = valueFor(args, index, option);
+  if (value !== "text" && value !== "edn" && value !== "json") {
+    throw new Error(`Unknown format: ${value}`);
+  }
+  return value;
 }
 
 function numberValue(args: readonly string[], index: number, option: string): number {
