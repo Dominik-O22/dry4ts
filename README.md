@@ -60,7 +60,24 @@ Options:
                 Exit 1 on findings. With --changed-from/--changed, only
                 clusters with status "new" gate; otherwise any cluster does.
 --no-gitignore  Include files and directories ignored by .gitignore
+--exclude-kinds KIND[,KIND...]
+                Drop candidate declarations of the given SyntaxKinds before
+                matching. Comma-separated and repeatable. Opt-in only: with no
+                flag, output is unchanged. Useful for suppressing boilerplate
+                false positives such as dep-only DI constructors
+                (--exclude-kinds Constructor) or port/interface member
+                signatures (--exclude-kinds PropertySignature,MethodSignature).
+                An unknown or non-candidate kind name is a hard error.
 ```
+
+Valid `--exclude-kinds` names (the candidate root kinds): `ClassDeclaration`,
+`InterfaceDeclaration`, `TypeAliasDeclaration`, `EnumDeclaration`,
+`ModuleDeclaration`, `FunctionDeclaration`, `MethodDeclaration`, `Constructor`,
+`GetAccessor`, `SetAccessor`, `PropertyDeclaration`, `PropertySignature`,
+`MethodSignature`, `CallSignature`, `ConstructSignature`, `IndexSignature`,
+`VariableStatement`, `EnumMember`, `ArrowFunction`, `FunctionExpression`.
+Excluding a kind never hides a longer child candidate — children are always
+visited regardless.
 
 ### Incremental gating
 

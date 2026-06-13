@@ -14,7 +14,7 @@ starting, honor its STOP conditions, and update the plan row when done.
 | [004](004-intern-structural-fingerprints.md) | Intern structural fingerprints | P2 | M | 003 | DONE (merged to main via PR #8, `f66e35c`; deep-nesting benchmark ~916ms → <4ms; compiler corpus 13.2s → 6.4s avg, clusters unchanged at 246) |
 | [005](005-prune-candidate-pairs.md) | Prune candidate pairs before exact similarity | P2 | L | 004 | DONE (executed 2026-06-12, approved at `1dbe7f0` on branch `advisor/005-prune-candidate-pairs`; test/check/bench passed) |
 | [006](006-only-new-output-filter.md) | `--only-new` output filter (#24) | P1 | XS | - | DONE (branch `advisor/006-only-new`; Options.onlyNew + DryTs output filter, 4 tests, gate green at 103 pass) |
-| [007](007-exclude-candidate-kinds.md) | Exclude boilerplate candidate kinds (#19) | P1 | S | - | TODO |
+| [007](007-exclude-candidate-kinds.md) | Exclude boilerplate candidate kinds (#19) | P1 | S | - | DONE (stacked on 006, 2026-06-14; opt-in `--exclude-kinds`, no default exclusions, 6 tests; gate green, no perf regression on sentry/compiler corpora) |
 | [008](008-kind-diversity-floor.md) | Kind-diversity (entropy) floor (#20) | P2 | S-M | 007 | TODO |
 | [009](009-dry-ignore-directive.md) | Inline `// dry-ignore` directive (#22) | P2 | S | - | TODO |
 | [010](010-type-aware-normalization.md) | Optional type-aware normalization (#21) | P3 | M | 007,008 (soft) | TODO |

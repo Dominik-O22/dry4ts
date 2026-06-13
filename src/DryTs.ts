@@ -34,6 +34,16 @@ export const USAGE = [
   "                  Exit 1 on findings: with --changed-from/--changed only",
   "                  clusters with status new; otherwise any cluster",
   "  --no-gitignore  Include files and directories ignored by .gitignore",
+  "  --exclude-kinds KIND[,KIND...]",
+  "                  Drop candidate declarations of these SyntaxKinds; comma-",
+  "                  separated, repeatable. Opt-in only (no default exclusions).",
+  "                  Valid kinds: ClassDeclaration, InterfaceDeclaration,",
+  "                  TypeAliasDeclaration, EnumDeclaration, ModuleDeclaration,",
+  "                  FunctionDeclaration, MethodDeclaration, Constructor,",
+  "                  GetAccessor, SetAccessor, PropertyDeclaration,",
+  "                  PropertySignature, MethodSignature, CallSignature,",
+  "                  ConstructSignature, IndexSignature, VariableStatement,",
+  "                  EnumMember, ArrowFunction, FunctionExpression",
 ].join("\n");
 
 export function main(args: readonly string[] = process.argv.slice(2)): void {
