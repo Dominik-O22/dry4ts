@@ -21,15 +21,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `--explain-changed` dumps the resolved changed-region map to stderr so a
     surprising gate result is diagnosable in one rerun.
 - Every cluster now reports a `status` (`"new" | "known" | "unscoped"`) in all
-  output formats (JSON, EDN, and text). `--fail-on-duplicates` under a
+  CLI output formats (JSON, EDN, and text). `--fail-on-duplicates` under a
   changed-scope exits 1 only on `new` clusters; with no scope it stays
-  zero-tolerance and every cluster reports `unscoped`.
+  zero-tolerance and every cluster reports `unscoped`. (Status is assigned by
+  the CLI; the `TypeScriptDuplicateFinder` library returns clusters with
+  `status` unset.)
 
 ### Changed
 
 - `OutputFormat` is now the closed union `"text" | "edn" | "json"`, and `status`
-  is an additive field on the exported `Cluster` / `ClusterReport` types. Library
-  callers without a changed-scope see `"unscoped"`.
+  is an additive field on the exported `Cluster` / `ClusterReport` types. It is
+  optional on `Cluster` and populated by the CLI; library callers using
+  `findClusters()` get clusters with `status` unset.
 - The gate fails closed: a missing git binary, a bad ref, unparseable diff
   output, an unreadable source file, or zero files scanned under
   `--fail-on-duplicates` all exit 2 — never a silent green or a 1 that reads as

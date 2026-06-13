@@ -141,6 +141,11 @@ const clusters = new TypeScriptDuplicateFinder().findClusters({
 });
 ```
 
+`findClusters()` returns raw clusters with `status` unset. The changed-scope
+flags (`--changed-from`, `--changed`) and the `status` field
+(`"new" | "known" | "unscoped"`) are assigned by the CLI, not the library
+finder.
+
 ## CI
 
 Gate a PR only when it introduces *new* duplication, tolerating known debt, with
