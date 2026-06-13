@@ -1,10 +1,10 @@
 ---
 name: scan-code-for-duplicate-candidates
 description: >
-  Run dry-ts locally or from code to find fuzzy structural duplicate clusters. Load when choosing paths, interpreting score and line-range output, tuning --threshold, --min-lines, --min-nodes, or using TypeScriptDuplicateFinder.findClusters.
+  Run dry-ts locally or from code to find fuzzy structural duplicate clusters. Load when choosing paths, interpreting score, status, and line-range output, tuning --threshold, --min-lines, --min-nodes, or using TypeScriptDuplicateFinder.findClusters.
 type: core
 library: dry-ts
-library_version: "0.2.0"
+library_version: "0.4.0"
 sources:
   - "dry-ts:README.md"
   - "dry-ts:src/TypeScriptDuplicateFinder.ts"
@@ -55,12 +55,20 @@ Lower `--threshold`, `--min-lines`, and `--min-nodes` only when intentionally lo
 ### Read cluster locations before refactoring
 
 ```text
-CLUSTER 1 score=0.89 locations=2
+CLUSTER 1 score=0.89 locations=2 status=unscoped
   src/invoice.ts:12-25 nodes=88
   src/receipt.ts:30-44 nodes=91
 ```
 
-The score is structural similarity, and the line ranges identify related duplicate regions for review. `nodes` is the normalized syntax node count for that duplicated block.
+The score is structural similarity, and the line ranges identify related duplicate regions for review. `nodes` is the normalized syntax node count for that duplicated block. `status` is `unscoped` for a plain scan; under a changed-scope flag it becomes `new` (marked `status=new (intersects your change)`) or `known`.
+
+### Diagnose a surprising changed-scope result
+
+```bash
+bunx dry-ts --explain-changed --changed-from HEAD src
+```
+
+`--explain-changed` dumps the resolved changed-region map (file → line ranges, with source: hunk / untracked / listed) to stderr, so a confusing `new`/`known` verdict — usually a path-normalization mismatch — is diagnosable in one rerun.
 
 ### Use the API from custom tooling
 
@@ -81,6 +89,10 @@ for (const cluster of clusters) {
   }
 }
 ```
+
+`findClusters` returns clusters with `status` unset — the `new`/`known`/`unscoped`
+labels and the `--changed-from`/`--changed` scope are CLI behavior, not library
+behavior.
 
 ## Common Mistakes
 

@@ -1,10 +1,10 @@
 ---
 name: adopt-dry-ts-in-agent-workflow
 description: >
-  Run dry-ts after AI-generated edits to catch structural duplication before it accumulates. Load when building autonomous review loops, triaging duplicate clusters, using JSON output after generated changes, or deciding when local duplicate checks should become CI gates.
+  Run dry-ts after AI-generated edits to catch structural duplication before it accumulates. Load when building autonomous review loops, gating only on duplication an edit introduced with --changed/--changed-from, triaging duplicate clusters by status, using JSON output after generated changes, or deciding when local duplicate checks should become CI gates.
 type: core
 library: dry-ts
-library_version: "0.2.0"
+library_version: "0.4.0"
 sources:
   - "dry-ts:README.md"
   - "dry-ts:AGENTS.md"
@@ -25,13 +25,29 @@ Run this after generated edits to produce machine-readable duplicate clusters fo
 
 ## Core Patterns
 
+### Self-correct on duplication your edit introduced
+
+```bash
+# After editing foo.ts and bar.ts, gate only on duplication the edit added:
+bunx dry-ts --format json --fail-on-duplicates --changed foo.ts --changed bar.ts src
+# git-aware agents get line-level precision from uncommitted edits instead:
+bunx dry-ts --format json --fail-on-duplicates --changed-from HEAD src
+```
+
+Exit `1` means a cluster with `status: "new"` intersects your change. Refactor
+those clusters (extract a shared helper) and re-run until it exits `0`. `--changed
+<file>` scopes the *whole file*, so a `new` finding can point at pre-existing code
+you copied; the wording is "intersects your change", never "you created this".
+This keeps the loop honest without a full-codebase zero-tolerance gate.
+
 ### Run a local guard after generated edits
 
 ```bash
 bunx dry-ts --format json src test
 ```
 
-Use JSON when another agent, script, or review tool will consume the clustered result.
+Use JSON when another agent, script, or review tool will consume the clustered
+result. With no changed-scope flag every cluster reports `status: "unscoped"`.
 
 ### Keep cluster triage separate from refactoring
 
@@ -59,10 +75,12 @@ Cluster output should drive a review decision before any abstraction is extracte
 ### Escalate repeated local checks into CI
 
 ```bash
-bunx dry-ts --format json --fail-on-duplicates src test
+bunx dry-ts --format json --fail-on-duplicates --changed-from origin/main src test
 ```
 
-Use the failing form only when the team wants duplicate clusters to block a pipeline.
+For a PR gate, pair `--fail-on-duplicates` with `--changed-from` so only *new*
+duplication blocks the pipeline; known debt stays reported but green. Drop
+`--changed-from` for a zero-tolerance gate. See `wire-duplicate-checks-into-ci`.
 
 ## Common Mistakes
 
