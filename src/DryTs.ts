@@ -27,6 +27,9 @@ export const USAGE = [
   "                  repeatable, cannot be combined with --changed-from",
   "  --explain-changed",
   "                  Dump the resolved changed-region map to stderr",
+  "  --only-new      Restrict reported clusters to status new; requires",
+  "                  --changed-from/--changed. Output filter only; exit code",
+  "                  is unchanged. Totals go to stderr.",
   "  --fail-on-duplicates",
   "                  Exit 1 on findings: with --changed-from/--changed only",
   "                  clusters with status new; otherwise any cluster",
@@ -74,15 +77,23 @@ function run(options: Options): void {
     status: scope ? statusFor(cluster, scope) : "unscoped",
   }));
 
+  // --only-new scopes the OUTPUT only; the exit code below still considers the
+  // full set. onlyNew is unreachable without a scope (Options guards it), so
+  // every reported status here is new/known, never unscoped.
+  const visible = options.onlyNew ? reported.filter((cluster) => cluster.status === "new") : reported;
+  if (options.onlyNew) {
+    console.error(`showing ${visible.length} new (${reported.length - visible.length} known hidden)`);
+  }
+
   switch (options.format) {
     case "edn":
-      console.log(toEdn(reported));
+      console.log(toEdn(visible));
       break;
     case "json":
-      console.log(toJson(reported));
+      console.log(toJson(visible));
       break;
     case "text":
-      printText(reported);
+      printText(visible);
       break;
   }
 

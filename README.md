@@ -52,6 +52,10 @@ Options:
                 Cannot be combined with --changed-from.
 --explain-changed
                 Dump the resolved changed-region map to stderr for debugging.
+--only-new      Restrict reported clusters to status "new". Output filter only:
+                the exit code is unchanged (still governed by
+                --fail-on-duplicates). Requires --changed-from/--changed.
+                Totals print to stderr, e.g. "showing 6 new (73 known hidden)".
 --fail-on-duplicates
                 Exit 1 on findings. With --changed-from/--changed, only
                 clusters with status "new" gate; otherwise any cluster does.
@@ -74,6 +78,12 @@ Every cluster carries a `status`:
   never gates.
 - `unscoped` — emitted for every cluster when no changed-scope flag is active
   (the tool cannot know what is "known" without a scope).
+
+In a CI gate the actionable `new` clusters are easily buried under pre-existing
+`known` ones. `--only-new` filters the *report* down to `new` clusters across
+all formats (text/json/edn); the exit code still reflects the full set, so the
+gate behaves identically while the log stays readable. It requires a
+changed-scope flag (there is no `new` status without one).
 
 `--changed-from` resolves `merge-base(REF, HEAD)` and diffs from there, so a
 branch behind its base does not see base-side changes pollute the result. Write

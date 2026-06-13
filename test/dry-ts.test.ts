@@ -1661,6 +1661,65 @@ test("status appears in every output format", async () => {
   assert.ok(unscoped.stdout.includes('"status": "unscoped"'), unscoped.stdout);
 });
 
+// edited.ts is a new duplicate (scoped via --changed edited.ts); known1/known2
+// are a pre-existing cluster that stays known. The shared helper keeps the
+// --only-new tests from duplicating each other (the self-scan gate enforces it).
+async function newAndKnownFixture(): Promise<string> {
+  const { dir } = await writeFixture({
+    "edited.ts": uniqueBody + uniqueBodyCopy,
+    "known1.ts": duplicateBody,
+    "known2.ts": duplicateBody,
+  });
+  return dir;
+}
+
+test("--only-new hides known clusters from output but keeps the new ones", async () => {
+  const result = runCli([...gateFlags, "--json", "--only-new", "--changed", "edited.ts", "."], await newAndKnownFixture());
+  assert.equal(result.exitCode, 0, result.stderr);
+  const statuses = statusByFile(result.stdout);
+  assert.equal(statuses.get("edited.ts"), "new", result.stdout);
+  assert.equal(statuses.has("known1.ts"), false, result.stdout);
+  assert.equal(statuses.has("known2.ts"), false, result.stdout);
+  // Summary line conveys totals so the suppression is visible.
+  assert.ok(/showing 1 new \(\d+ known hidden\)/.test(result.stderr), result.stderr);
+});
+
+test("--only-new is honored across text and edn formats", async () => {
+  const dir = await newAndKnownFixture();
+  const text = runCli([...gateFlags, "--only-new", "--changed", "edited.ts", "."], dir);
+  assert.ok(text.stdout.includes("status=new"), text.stdout);
+  assert.ok(!text.stdout.includes("status=known"), text.stdout);
+  const edn = runCli([...gateFlags, "--edn", "--only-new", "--changed", "edited.ts", "."], dir);
+  assert.ok(edn.stdout.includes(":status :new"), edn.stdout);
+  assert.ok(!edn.stdout.includes(":status :known"), edn.stdout);
+});
+
+test("--only-new leaves the exit code governed by --fail-on-duplicates", async () => {
+  // A new cluster is present: the gate still fails even though output is scoped.
+  const gated = runCli(
+    [...gateFlags, "--fail-on-duplicates", "--only-new", "--changed", "edited.ts", "."],
+    await newAndKnownFixture(),
+  );
+  assert.equal(gated.exitCode, 1, gated.stderr);
+
+  // Purely-known run (clean tree under --changed-from): nothing new, gate
+  // passes with exit 0 and the scoped output is empty.
+  const cleanDir = await gitRepo({ "known1.ts": duplicateBody, "known2.ts": duplicateBody });
+  const passed = runCli(
+    [...gateFlags, "--json", "--fail-on-duplicates", "--only-new", "--changed-from", "HEAD", "."],
+    cleanDir,
+  );
+  assert.equal(passed.exitCode, 0, passed.stderr);
+  assert.deepEqual(JSON.parse(passed.stdout).clusters, [], passed.stdout);
+  assert.ok(/showing 0 new \(\d+ known hidden\)/.test(passed.stderr), passed.stderr);
+});
+
+test("--only-new without a change scope errors and exits 2", async () => {
+  const result = runCli([...gateFlags, "--only-new", "."], await twoDuplicateFiles());
+  assert.equal(result.exitCode, 2, result.stdout);
+  assert.ok(result.stderr.includes("--only-new requires --changed-from or --changed"), result.stderr);
+});
+
 test("--explain-changed dumps the resolved changed-region map to stderr", async () => {
   const result = runCli([...gateFlags, "--explain-changed", "--changed", "one.ts", "."], await twoDuplicateFiles());
   assert.ok(result.stderr.includes("Changed regions (--explain-changed):"), result.stderr);

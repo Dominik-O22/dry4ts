@@ -13,6 +13,7 @@ export interface OptionsInput {
   readonly changedFrom?: string;
   readonly changed?: readonly string[];
   readonly explainChanged?: boolean;
+  readonly onlyNew?: boolean;
 }
 
 export class Options {
@@ -29,6 +30,7 @@ export class Options {
     public readonly changedFrom: string | undefined = undefined,
     public readonly changed: readonly string[] = [],
     public readonly explainChanged: boolean = false,
+    public readonly onlyNew: boolean = false,
   ) {
     if (!(threshold > 0 && threshold <= 1)) {
       throw new Error(`threshold must be greater than 0 and at most 1, got ${threshold}`);
@@ -44,6 +46,9 @@ export class Options {
     }
     if (changedFrom !== undefined && changed.length > 0) {
       throw new Error("--changed-from and --changed cannot be combined");
+    }
+    if (onlyNew && changedFrom === undefined && changed.length === 0) {
+      throw new Error("--only-new requires --changed-from or --changed");
     }
   }
 
@@ -67,6 +72,7 @@ export class Options {
       input.changedFrom,
       input.changed ?? [],
       input.explainChanged ?? defaults.explainChanged,
+      input.onlyNew ?? defaults.onlyNew,
     );
   }
 
@@ -83,6 +89,7 @@ export class Options {
     let changedFrom: string | undefined;
     const changed: string[] = [];
     let explainChanged = false;
+    let onlyNew = false;
 
     for (let i = 0; i < args.length; i += 1) {
       const arg = args[i];
@@ -110,6 +117,9 @@ export class Options {
           break;
         case "--explain-changed":
           explainChanged = true;
+          break;
+        case "--only-new":
+          onlyNew = true;
           break;
         case "--edn":
           format = "edn";
@@ -156,6 +166,7 @@ export class Options {
       changedFrom,
       changed,
       explainChanged,
+      onlyNew,
     );
   }
 }
