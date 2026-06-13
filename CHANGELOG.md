@@ -5,6 +5,31 @@ All notable changes to dry-ts are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-06-14
+
+### Added
+
+- PR-grade reporting: two new output formats that surface *new* duplication
+  inline on a pull/merge request diff.
+  - `--format github` emits `::error` GitHub Actions workflow commands on
+    stdout, one per changed copy of a `status: "new"` cluster, anchored at the
+    first changed line inside the duplicated block so the annotation lands in
+    the rendered diff hunk. Counterpart copies are named in the message text.
+    Capped at GitHub's 10-annotations-per-step limit with a `::notice` overflow
+    summary.
+  - `--format gitlab` emits a CodeClimate-format JSON array (one entry per
+    changed copy) for GitLab's Code Quality report. Each entry carries a
+    versioned, line-independent `fingerprint` (`sha256("v1:" + path + ":" +
+    structural key)`), so a comment inserted above a block shifts the reported
+    line but does not re-flag the backlog, while each changed copy of a cluster
+    still gets a distinct issue. Empty scope emits a valid `[]`.
+  - Both formats annotate only changed copies of `new` clusters — pre-existing
+    debt is never annotated — so pair them with `--changed-from`. See the
+    README "PR-grade annotations" recipes (GitHub Actions and GitLab CI). These
+    produce CI annotations, not threaded review comments; GitLab inline
+    Changes-view annotations require the Ultimate tier.
+- `OutputFormat` gains `"github"` and `"gitlab"` members (additive).
+
 ## [0.4.0] - 2026-06-13
 
 ### Added

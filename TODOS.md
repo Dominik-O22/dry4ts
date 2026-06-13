@@ -20,11 +20,6 @@ Known deferred work. Performance plans live in `plans/README.md`.
   clear "regenerate" error. Costs that deferred it: stateful file, merge
   conflicts, pre-snapshot step for agents. (Deferred from incremental-gating
   CEO review, 2026-06-13.)
-- [ ] PR-grade reporting (P3, S): `--format github` emitting `::error
-  file=...` annotations on finding locations, plus findings-first text
-  output. The `status` field from the incremental-gating plan provides all
-  data; only formatters needed. (Deferred from incremental-gating CEO
-  review, 2026-06-13.)
 - [ ] Pair-level counterpart provenance in output (P3, M→S/M with CC):
   clusters are transitive components, so cluster-level `status` doesn't tell
   an agent which counterpart a "new" location actually matches. Expose
