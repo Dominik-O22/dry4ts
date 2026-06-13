@@ -144,7 +144,11 @@ function listedScope(options: Options, files: readonly string[]): ChangedScope {
     }
     const canonical = canonicalPath(root, arg);
     if (!scanned.has(canonical)) {
+      // Out-of-scope: its canonical can never equal a scanned cluster
+      // location, so registering a region would be dead. Skip like the
+      // other ungateable branches above.
       problems.push(`--changed file is outside the scanned paths: ${arg}`);
+      continue;
     }
     regions.addWholeFile(canonical, "listed");
   }

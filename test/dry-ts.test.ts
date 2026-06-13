@@ -1554,6 +1554,42 @@ test("--changed-from diffs from merge-base, not literally from the ref", async (
   assert.ok(statuses.every((status) => status === "known"), result.stdout);
 });
 
+test("--changed-from sees edits in a tracked file whose name contains a space", async () => {
+  // git diff appends a trailing TAB to the +++ header when the path has a
+  // space; if the parser keeps it, the region keys under "a file.ts\t" and
+  // never matches the scanner's "a file.ts" key, waving the new dup through.
+  const dir = await gitRepo({ "a file.ts": uniqueBody });
+  await writeFile(path.join(dir, "a file.ts"), uniqueBody + uniqueBodyCopy);
+
+  const result = runCli([...gateFlags, "--json", "--fail-on-duplicates", "--changed-from", "HEAD", "."], dir);
+  assert.equal(result.exitCode, 1, `${result.stdout}\n${result.stderr}`);
+  assert.equal(statusByFile(result.stdout).get("a file.ts"), "new", result.stdout);
+});
+
+test("--changed-from does not misflag a clean tracked file whose name contains a tab", async () => {
+  // git ls-files C-quotes "a\tb.ts" while the scanner reads the literal tab;
+  // comparing without -z would mark the clean tracked file untracked -> new
+  // -> a false exit 1 on a tree nobody changed.
+  const tab = "a\tb.ts";
+  const dir = await gitRepo({ [tab]: duplicateBody, "plain.ts": duplicateBody });
+  const result = runCli([...gateFlags, "--json", "--fail-on-duplicates", "--changed-from", "HEAD", "."], dir);
+  assert.equal(result.exitCode, 0, `${result.stdout}\n${result.stderr}`);
+  const statuses = [...statusByFile(result.stdout).values()];
+  assert.ok(statuses.length > 0 && statuses.every((status) => status === "known"), result.stdout);
+});
+
+test("--changed-from sees edits in a tracked file whose name contains a tab", async () => {
+  // git quotes the +++ header for control-char names ("b/a\tb.ts"); if the
+  // parser keeps the escapes the region keys under a path the scanner never
+  // produces, silently waving the new dup through as known.
+  const tab = "a\tb.ts";
+  const dir = await gitRepo({ [tab]: uniqueBody });
+  await writeFile(path.join(dir, tab), uniqueBody + uniqueBodyCopy);
+  const result = runCli([...gateFlags, "--json", "--fail-on-duplicates", "--changed-from", "HEAD", "."], dir);
+  assert.equal(result.exitCode, 1, `${result.stdout}\n${result.stderr}`);
+  assert.equal(statusByFile(result.stdout).get(tab), "new", result.stdout);
+});
+
 test("--changed-from canonicalizes paths when cwd is not the repo root", async () => {
   const dir = await gitRepo({ "pkg/src/lib.ts": uniqueBody, "pkg/src/other.ts": duplicateBody });
   await writeFile(path.join(dir, "pkg/src/lib.ts"), uniqueBody + uniqueBodyCopy);
@@ -1580,6 +1616,34 @@ test("--changed scopes the whole listed file and leaves other clusters known", a
 
   const gated = runCli([...gateFlags, "--fail-on-duplicates", "--changed", "edited.ts", "."], dir);
   assert.equal(gated.exitCode, 1, gated.stderr);
+});
+
+test("--changed is repeatable and scopes every listed file independently", async () => {
+  // Three independent clusters. Two --changed flags target one file in each of
+  // the first two; the third cluster is never listed. A single global "any
+  // --changed -> all new" bug would wrongly flip the third to new.
+  const thirdBody = `
+export function classify(score: number): string {
+  if (score > 90) {
+    return "high";
+  }
+  return score > 50 ? "mid" : "low";
+}
+`;
+  const { dir } = await writeFixture({
+    "look1.ts": uniqueBody,
+    "look2.ts": uniqueBodyCopy,
+    "proc1.ts": duplicateBody,
+    "proc2.ts": duplicateBody,
+    "cls1.ts": thirdBody,
+    "cls2.ts": thirdBody,
+  });
+  const result = runCli([...gateFlags, "--json", "--changed", "look1.ts", "--changed", "proc1.ts", "."], dir);
+  assert.equal(result.exitCode, 0, result.stderr);
+  const statuses = statusByFile(result.stdout);
+  assert.equal(statuses.get("look2.ts"), "new", result.stdout);
+  assert.equal(statuses.get("proc2.ts"), "new", result.stdout);
+  assert.equal(statuses.get("cls2.ts"), "known", result.stdout);
 });
 
 async function twoDuplicateFiles(): Promise<string> {
@@ -1634,6 +1698,18 @@ test("usage and environment errors exit 2", async () => {
   }
 });
 
+test("--changed-from rejects a ref that resolves to a non-commit object", async () => {
+  // verifyRef appends ^{commit} precisely to reject tree/blob targets; a plain
+  // rev-parse --verify would accept a tree sha and then merge-base would fail
+  // with a murkier error. Point it at HEAD's tree and assert the clean exit 2.
+  const dir = await gitRepo({ "lib.ts": uniqueBody });
+  const tree = Bun.spawnSync(["git", "rev-parse", "HEAD^{tree}"], { cwd: dir, env: hermeticGitEnv })
+    .stdout.toString()
+    .trim();
+  const result = runCli([...gateFlags, "--changed-from", tree, "."], dir);
+  assert.equal(result.exitCode, 2, `tree=${tree}: exited ${result.exitCode}\n${result.stderr}`);
+});
+
 test("zero files scanned under --fail-on-duplicates exits 2", async () => {
   const dir = await mkdtemp(path.join(tmpdir(), "dry-ts-empty-"));
   const gated = runCli(["--fail-on-duplicates", "."], dir);
@@ -1656,4 +1732,22 @@ test("unscoped --fail-on-duplicates still exits 1 while clusters report status u
   assert.equal(result.exitCode, 1, result.stderr);
   const statuses = [...statusByFile(result.stdout).values()];
   assert.ok(statuses.length > 0 && statuses.every((status) => status === "unscoped"), result.stdout);
+});
+
+test("ChangedRegions.describe reports empty, line-range, and whole-file entries", () => {
+  const empty = new ChangedRegions();
+  assert.equal(empty.describe(), "  (no changed regions)");
+
+  const regions = new ChangedRegions();
+  regions.addRange("a.ts", 3, 5, "hunk");
+  regions.addWholeFile("b.ts", "listed");
+  assert.equal(regions.describe(), "  a.ts:3-5 (hunk)\n  b.ts (entire file, listed)");
+});
+
+test("--explain-changed without any changed scope reports no scope active", async () => {
+  const { dir } = await writeFixture({ "one.ts": duplicateBody, "two.ts": duplicateBody });
+  const result = runCli([...gateFlags, "--explain-changed", "."], dir);
+  assert.equal(result.exitCode, 0, result.stderr);
+  assert.ok(result.stderr.includes("Changed regions (--explain-changed):"), result.stderr);
+  assert.ok(result.stderr.includes("(no changed scope active)"), result.stderr);
 });

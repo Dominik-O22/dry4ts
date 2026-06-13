@@ -47,10 +47,6 @@ export class Options {
     }
   }
 
-  get hasChangedScope(): boolean {
-    return this.changedFrom !== undefined || this.changed.length > 0;
-  }
-
   static defaults(): Options {
     return new Options(["src"], 0.82, 4, 20, "text", false, false, true, 2);
   }

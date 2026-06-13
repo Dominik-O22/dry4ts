@@ -120,7 +120,7 @@ export function parseUnifiedDiff(diffText: string): ChangedRegions {
       continue;
     }
     if (line.startsWith("+++ ")) {
-      const target = line.slice("+++ ".length);
+      const target = parseDiffTarget(line.slice("+++ ".length));
       currentFile = target === "/dev/null" ? null : stripPathPrefix(target);
       inFileBlock = true;
       continue;
@@ -157,6 +157,53 @@ export function parseUnifiedDiff(diffText: string): ChangedRegions {
     throw new Error("Truncated diff: hunk ended before all content lines were seen");
   }
   return regions;
+}
+
+// Resolve the real post-image path from a `+++ ` header value. Two forms:
+//   - Quoted: a path with a tab/newline/quote/backslash is wrapped in
+//     double quotes with C-escapes (even under core.quotePath=false), e.g.
+//     "b/a\tb.ts". Decode the escapes.
+//   - Unquoted: a path with a space gets a TAB separator appended by git,
+//     e.g. b/a file.ts\t. The first tab is git's separator (a literal tab
+//     would have forced the quoted form), so cut there.
+// Either way the wrong handling keys a region under a path the scanner never
+// produces, so the cluster gates "known" and waves the dup through green.
+function parseDiffTarget(raw: string): string {
+  return raw.startsWith('"') ? unquoteCPath(raw) : raw.split("\t", 1)[0];
+}
+
+// Decode git's C-style path quoting through the matching closing quote.
+// core.quotePath=false leaves UTF-8 literal, so only control bytes and the
+// \t \n \r \" \\ escapes (plus octal \NNN for other control bytes) appear.
+function unquoteCPath(raw: string): string {
+  let out = "";
+  for (let i = 1; i < raw.length; ) {
+    const ch = raw[i];
+    if (ch === '"') {
+      break;
+    }
+    if (ch !== "\\") {
+      out += ch;
+      i += 1;
+      continue;
+    }
+    const next = raw[i + 1];
+    const simple: Record<string, string> = { t: "\t", n: "\n", r: "\r", '"': '"', "\\": "\\" };
+    if (next in simple) {
+      out += simple[next];
+      i += 2;
+      continue;
+    }
+    const octal = raw.slice(i + 1, i + 4);
+    if (/^[0-7]{3}$/.test(octal)) {
+      out += String.fromCharCode(Number.parseInt(octal, 8));
+      i += 4;
+      continue;
+    }
+    out += next;
+    i += 2;
+  }
+  return out;
 }
 
 // Git emits "b/<path>" with default prefixes; --no-ext-diff keeps it that way.

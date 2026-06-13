@@ -47,8 +47,12 @@ export class GitProvider {
   // bounded to the given pathspecs. A scanned file absent from this set is
   // untracked and counts as fully changed.
   indexedFiles(pathspecs: readonly string[]): Set<string> {
-    const output = this.run(["ls-files", "--", ...pathspecs]);
-    return new Set(output.split("\n").filter((line) => line !== ""));
+    // -z: NUL-delimited, never C-quoted. Plain `ls-files` quotes any path with
+    // a tab/newline/quote/backslash (even under core.quotePath=false), which
+    // would not match the scanner's literal path and falsely mark a clean
+    // tracked file untracked. NUL output sidesteps quoting entirely.
+    const output = this.run(["ls-files", "-z", "--", ...pathspecs]);
+    return new Set(output.split("\0").filter((entry) => entry !== ""));
   }
 
   private run(args: readonly string[]): string {
