@@ -20,6 +20,7 @@ starting, honor its STOP conditions, and update the plan row when done.
 | [010](010-type-aware-normalization.md) | Optional type-aware normalization (#21) | P3 | M | 007,008 (soft) | TODO |
 | [011](011-dryrc-config-file.md) | `.dryrc` config + per-path overrides (#23) | P3 | L | 007,008 | TODO |
 | [012](012-explain-flag.md) | `--explain` match-explanation output (#29) | P2 | M | 008, PR #38 | TODO |
+| [013](013-exclude-tests-preset.md) | `--exclude-tests` test-path preset | P1 | XS-S | - | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale).
