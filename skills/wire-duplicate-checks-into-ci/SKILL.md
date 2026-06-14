@@ -4,11 +4,12 @@ description: >
   Use dry-ts as a CI or automated review gate with --format json and --fail-on-duplicates. Load when writing GitHub Actions, gating a PR only on new duplication with --changed-from, parsing cluster JSON status, or handling dry-ts exit codes 0, 1, and 2.
 type: core
 library: dry-ts
-library_version: "0.4.0"
+library_version: "0.5.0"
 sources:
   - "dry-ts:README.md"
   - "dry-ts:AGENTS.md"
   - "dry-ts:src/DryTs.ts"
+  - "dry-ts:src/Options.ts"
   - "dry-ts:.github/workflows/ci.yml"
 ---
 
@@ -62,6 +63,18 @@ bunx dry-ts --format json --fail-on-duplicates src test
 With no changed-scope flag, `--fail-on-duplicates` turns *any* cluster into exit
 code `1` and every cluster reports `status: "unscoped"`. Read the exit code, not
 `status`, in this mode.
+
+### Report only new clusters in PR output
+
+```bash
+bunx dry-ts --format json --fail-on-duplicates --changed-from origin/main --only-new src test
+```
+
+`--only-new` filters the *report* down to `status: "new"` clusters, so a PR
+comment or annotation shows only the duplication the change introduced, not the
+full known-debt list. It requires `--changed-from`/`--changed` and is an output
+filter only: the exit code is unchanged (still `1` when new clusters exist), and
+the suppressed-cluster totals go to stderr so nothing is silently lost.
 
 ### Emit JSON for agent consumers
 
