@@ -25,13 +25,6 @@ Known deferred work. Performance plans live in `plans/README.md`.
   output. The `status` field from the incremental-gating plan provides all
   data; only formatters needed. (Deferred from incremental-gating CEO
   review, 2026-06-13.)
-- [ ] Internal Options object/builder (P3, M): `Options` now carries 19 positional
-  constructor params, including three adjacent transposable booleans
-  (`excludeTaggedTemplates`/`excludeTests`/`counterparts`) that `tsc` cannot tell
-  apart on transposition. The plan-014 Step-6 ordering-pin test mitigates, but the
-  real fix is an internal options object/builder so new flags stop appending
-  positionals. (Filed from plan 014 "Accepted debt", 2026-06-14.)
-
 - [ ] Line-range syntax for `--changed` (P3, S): optional `:start-end` suffix
   (`--changed foo.ts:10-42`) giving non-git callers line-level gating
   precision. Today `--changed` is whole-file granularity, so pre-existing
@@ -66,6 +59,13 @@ Known deferred work. Performance plans live in `plans/README.md`.
   (Deferred from feat/respect-gitignore review, 2026-06-12.)
 
 ## Completed
+
+- [x] Internal Options object/builder. **Completed:** v0.11.0 (2026-06-14) —
+  the `Options` constructor now takes a single named `ResolvedOptions` object
+  instead of 19 positional params, so a transposed field is a compile error and
+  new flags no longer append positionals. `--profile` (which resolves before
+  construction) drove the cleanup. Construction sites: `defaults`/`from`/`parse`
+  only; no external/test callers used the positional form.
 
 - [x] Pair-level counterpart provenance in output. **Completed:** v0.10.0
   (2026-06-14) — `--counterparts` exposes each location's nearest matching

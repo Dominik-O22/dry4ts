@@ -9,7 +9,7 @@ export { crossFileSharedNames, hasCrossFileSharedName, maxScore, minScore } from
 export { formatCluster, main, noiseSummary, printText, toEdn, toJson, USAGE } from "./DryTs.js";
 export { GitProvider } from "./GitProvider.js";
 export { NormalizedNode } from "./NormalizedNode.js";
-export { Options, type OptionsInput } from "./Options.js";
+export { Options, type OptionsInput, PROFILE_NAMES, type ResolvedOptions } from "./Options.js";
 export { isTestFile, type ScanResult, TypeScriptDuplicateFinder } from "./TypeScriptDuplicateFinder.js";
 export { TypeScriptNormalizer } from "./TypeScriptNormalizer.js";
 export type {

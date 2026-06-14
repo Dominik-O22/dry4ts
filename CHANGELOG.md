@@ -5,10 +5,22 @@ All notable changes to dry-ts are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.11.0] - 2026-06-14
 
 ### Added
 
+- **`--profile NAME` curated presets** (`pr`, `src`, `audit`, `tests`). Seeds a
+  bundle of flag defaults so the right combination no longer has to be discovered
+  by trial and error; explicit flags override the profile (precedence: explicit
+  flag > profile > built-in default, with list flags like `--exclude-kinds`
+  unioning rather than replacing). `pr` is the recommended PR gate
+  (`--exclude-tests --min-nodes 50 --exclude-kinds ArrowFunction,VariableStatement
+  --only-new --fail-on-duplicates`) and deliberately requires `--changed-from` /
+  `--changed` — it sets `--only-new`, which errors without an active scope, so it
+  fails loud rather than gating against the wrong base. `src` is source-only,
+  `audit` is a broad low-floor exploratory scan, `tests` targets
+  test-infrastructure duplication (not anonymous test bodies). New exported
+  `PROFILE_NAMES`. The curation footer now also points at the presets.
 - **Same-name cross-file ranking.** Clusters where one declaration name recurs
   across two or more distinct files now sort to the top of the report — the
   strongest, near-zero-false-positive "real, copy-pasted duplicate" signal — and
@@ -31,6 +43,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cluster ordinals (and the first-listed cluster) in text/JSON/EDN output can
   differ from prior versions for the same scan. Scores, locations, statuses, and
   exit codes are unchanged.
+- The `Options` constructor now takes a single named `ResolvedOptions` object
+  instead of 19 positional parameters — a transposed field is a compile error,
+  and new flags no longer append positionals. `Options.from` /
+  `Options.parse` / `Options.defaults` are unchanged; only direct
+  `new Options(...)` positional callers are affected (none in the codebase). New
+  exported type `ResolvedOptions`.
 
 ### Documentation
 

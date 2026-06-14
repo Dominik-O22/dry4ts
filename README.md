@@ -9,9 +9,10 @@ dry-ts finds candidate duplicate TypeScript code across files and directories. I
 bunx dry-ts src
 
 # PR gate — fail only if THIS change adds duplication (the recommended workflow)
-bunx dry-ts --changed-from origin/main --only-new --fail-on-duplicates \
-  --exclude-tests --min-nodes 50 --exclude-kinds ArrowFunction,VariableStatement src
+bunx dry-ts --profile pr --changed-from origin/main src
 ```
+
+`--profile pr` is a curated preset; it expands to `--exclude-tests --min-nodes 50 --exclude-kinds ArrowFunction,VariableStatement --only-new --fail-on-duplicates`. See [Curating results](#curating-results) for the other profiles.
 
 **What it is:** a TypeScript-first *structural* duplicate-**candidate** detector, built for PR gates and AI/agent consumers. It catches Type-2/Type-3 clones — same shape, renamed identifiers, reordered or slightly varied statements — that token and line matchers miss.
 
@@ -216,6 +217,25 @@ The levers themselves, roughly in order of leverage on a frontend codebase:
 `--exclude-tagged-templates` (CSS-in-JS), `--exclude '<glob>'` (whole paths:
 generated code, fixtures, stories), `--min-nodes N` (raise the size floor), and
 the kind filters below.
+
+#### Profiles: `--profile NAME`
+
+Rather than rediscover the right flag combination per run, start from a curated
+preset. `--profile NAME` seeds a bundle of defaults; any explicit flag you pass
+overrides it. Precedence is **explicit flag > profile > built-in default**, and
+list flags (`--exclude-kinds`) **union** the profile's entries with yours rather
+than replacing them — so `--profile pr --exclude-kinds Constructor` excludes
+`ArrowFunction`, `VariableStatement`, *and* `Constructor`.
+
+| Profile | Expands to | For |
+| --- | --- | --- |
+| `pr` | `--exclude-tests --min-nodes 50 --exclude-kinds ArrowFunction,VariableStatement --only-new --fail-on-duplicates` | PR gate, highest signal. **Requires** `--changed-from`/`--changed` (it sets `--only-new`, which errors without a scope — so it fails loud rather than gating against the wrong base). |
+| `src` | `--exclude-tests` | Source-only scan with test scaffolding dropped. |
+| `audit` | `--min-nodes 12` | Broad exploratory scan — lower the floor to surface near-misses the default filters out. |
+| `tests` | `--exclude-kinds ArrowFunction --min-nodes 40` | Test-*infrastructure* duplication (shared setup/fixtures/builders), explicitly **not** the anonymous arrow bodies that dominate a raw test scan. Point it at your test directories. |
+
+A profile only ever *turns things on* (there is no negation flag to switch one
+back off), so each stays at the high-signal defaults its name implies.
 
 ### Dropping near-uniform candidates: `--min-distinct-kinds`
 

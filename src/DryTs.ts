@@ -4,7 +4,7 @@ import { ChangedRegions, canonicalPath, parseUnifiedDiff } from "./ChangedRegion
 import { crossFileSharedNames, maxScore, minScore } from "./Clusters.js";
 import { candidateKindNames } from "./FileScanner.js";
 import { GitProvider } from "./GitProvider.js";
-import { Options } from "./Options.js";
+import { Options, PROFILE_NAMES } from "./Options.js";
 import { isTestFile, TypeScriptDuplicateFinder } from "./TypeScriptDuplicateFinder.js";
 import type { Cluster, ClusterLocation, ClusterReport, ClusterStatus, Location, Nearest } from "./types.js";
 
@@ -31,6 +31,14 @@ export const USAGE = [
   "Usage: dry-ts [options] [file-or-directory ...]",
   "",
   "Options:",
+  `  --profile NAME  Start from a curated flag preset (${PROFILE_NAMES.join(", ")}), then`,
+  "                  apply any explicit flags on top (explicit flag > profile >",
+  "                  default; list flags union). pr: PR gate — exclude-tests,",
+  "                  min-nodes 50, exclude-kinds ArrowFunction,VariableStatement,",
+  "                  only-new, fail-on-duplicates (needs --changed-from). src:",
+  "                  source-only (exclude-tests). audit: broad (min-nodes 12).",
+  "                  tests: test-infra dup, not bodies (exclude ArrowFunction,",
+  "                  min-nodes 40).",
   "  --threshold N   Minimum structural similarity score, default 0.82",
   "  --min-lines N   Minimum source lines in a candidate declaration, default 4",
   "  --min-nodes N   Minimum normalized syntax nodes, default 20",
@@ -296,6 +304,7 @@ export function noiseSummary(clusters: readonly Cluster[], options: Options): st
     );
   }
   bullets.push(`--min-nodes N raises the size floor (currently ${options.minNodes}); --exclude '<glob>' drops paths`);
+  bullets.push(`or start from a preset: --profile ${PROFILE_NAMES.join("|")} (see README "Curating results")`);
 
   return [
     `${clusters.length} clusters. Curation levers (see README "Curating results"):`,

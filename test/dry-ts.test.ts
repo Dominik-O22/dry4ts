@@ -19,6 +19,7 @@ import {
   noiseSummary,
   Options,
   type OptionsInput,
+  PROFILE_NAMES,
   parseUnifiedDiff,
   printText,
   TypeScriptDuplicateFinder,
@@ -197,6 +198,67 @@ test("respects gitignore by default", () => {
 
 test("disables gitignore with --no-gitignore", () => {
   assert.equal(Options.parse("--no-gitignore", ".").respectGitignore, false);
+});
+
+test("--profile pr expands to the curated PR-gate bundle", () => {
+  // pr sets --only-new, which requires a scope, so pass --changed-from too.
+  const options = Options.parse("--profile", "pr", "--changed-from", "origin/main", "src");
+  assert.equal(options.excludeTests, true);
+  assert.equal(options.minNodes, 50);
+  assert.deepEqual(options.excludeKinds, ["ArrowFunction", "VariableStatement"]);
+  assert.equal(options.onlyNew, true);
+  assert.equal(options.failOnDuplicates, true);
+});
+
+test("--profile src, audit, and tests expand to their presets", () => {
+  assert.equal(Options.parse("--profile", "src", "src").excludeTests, true);
+
+  const audit = Options.parse("--profile", "audit", "src");
+  assert.equal(audit.minNodes, 12);
+  assert.equal(audit.excludeTests, false);
+
+  const tests = Options.parse("--profile", "tests", "test");
+  assert.equal(tests.minNodes, 40);
+  assert.deepEqual(tests.excludeKinds, ["ArrowFunction"]);
+  assert.equal(tests.excludeTests, false);
+});
+
+test("an explicit flag overrides the profile's value", () => {
+  const options = Options.parse("--profile", "pr", "--changed-from", "HEAD", "--min-nodes", "10", "src");
+  assert.equal(options.minNodes, 10, "explicit --min-nodes wins over the profile's 50");
+});
+
+test("--exclude-kinds unions with the profile's kinds instead of replacing them", () => {
+  const options = Options.parse("--profile", "pr", "--changed-from", "HEAD", "--exclude-kinds", "Constructor", "src");
+  assert.deepEqual(options.excludeKinds, ["ArrowFunction", "VariableStatement", "Constructor"]);
+});
+
+test("an unknown profile is a hard error listing the valid names", () => {
+  assert.throws(
+    () => Options.parse("--profile", "bogus", "src"),
+    /Unknown profile: bogus \(valid: pr, src, audit, tests\)/,
+  );
+});
+
+test("--profile pr without a changed scope fails loud (never gates against the wrong base)", () => {
+  assert.throws(() => Options.parse("--profile", "pr", "src"), /--only-new requires --changed-from or --changed/);
+});
+
+test("a profile leaves unrelated defaults untouched", () => {
+  const options = Options.parse("--profile", "src", "src");
+  assert.equal(options.threshold, 0.82);
+  assert.equal(options.minLocations, 2);
+  assert.equal(options.format, "text");
+});
+
+test("PROFILE_NAMES lists the available presets", () => {
+  assert.deepEqual([...PROFILE_NAMES].sort(), ["audit", "pr", "src", "tests"]);
+});
+
+test("--help short-circuits profile validation (a bad profile never masks --help)", () => {
+  // `dry-ts --help --profile bogus` should print usage, not fail on the typo.
+  const options = Options.parse("--help", "--profile", "bogus");
+  assert.equal(options.help, true);
 });
 
 test("creates options from partial objects", () => {
@@ -384,6 +446,7 @@ test("noiseSummary estimates the --exclude-tests reduction and names other lever
   assert.ok(summary?.includes("≈4 left"), summary ?? "");
   assert.ok(summary?.includes("--exclude-tagged-templates"), summary ?? "");
   assert.ok(summary?.includes("--min-nodes N raises the size floor (currently 20)"), summary ?? "");
+  assert.ok(summary?.includes("--profile pr|src|audit|tests"), summary ?? "");
 });
 
 test("noiseSummary stays silent below the firehose threshold", () => {

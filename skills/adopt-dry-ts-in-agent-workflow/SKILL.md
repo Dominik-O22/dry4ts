@@ -4,7 +4,7 @@ description: >
   Run dry-ts after AI-generated edits to catch structural duplication before it accumulates. Load when building autonomous review loops, gating only on duplication an edit introduced with --changed/--changed-from, triaging duplicate clusters by status, using JSON output after generated changes, or deciding when local duplicate checks should become CI gates.
 type: core
 library: dry-ts
-library_version: "0.10.0"
+library_version: "0.11.0"
 sources:
   - "dry-ts:README.md"
   - "dry-ts:AGENTS.md"
