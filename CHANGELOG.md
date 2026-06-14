@@ -5,6 +5,23 @@ All notable changes to dry-ts are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-06-14
+
+### Added
+
+- **`--format sarif` (alias `--sarif`)** emitting SARIF 2.1.0, the lingua franca
+  for GitHub code scanning and most CI quality dashboards (#47). One `result` per
+  cluster under the rule `dry-ts/structural-duplicate`; each location becomes a
+  `physicalLocation`, named declarations also carry a `logicalLocation`, and the
+  scanner's diagnostic facts (`nodes`, `kind`, `name`, `changed`) ride in each
+  location's `properties`. `--counterparts` nearest data maps to
+  `relatedLocations`, joined back to its origin location by a `relevant`
+  relationship. A cluster's `level` follows its status: `new` → `warning`,
+  `known`/`unscoped` → `note`. Score range and the same-name ranking signal land
+  in result `properties`. Findings keep "candidate" framing — these are
+  structural candidates, not confirmed duplicates. New exported `toSarif`. The
+  scan/gate pipeline is untouched.
+
 ## [0.11.0] - 2026-06-14
 
 ### Added

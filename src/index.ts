@@ -6,7 +6,7 @@ export {
   type RegionSource,
 } from "./ChangedRegions.js";
 export { crossFileSharedNames, hasCrossFileSharedName, maxScore, minScore } from "./Clusters.js";
-export { formatCluster, main, noiseSummary, printText, toEdn, toJson, USAGE } from "./DryTs.js";
+export { formatCluster, main, noiseSummary, printText, toEdn, toJson, toSarif, USAGE } from "./DryTs.js";
 export { GitProvider } from "./GitProvider.js";
 export { NormalizedNode } from "./NormalizedNode.js";
 export { Options, type OptionsInput, PROFILE_NAMES, type ResolvedOptions } from "./Options.js";

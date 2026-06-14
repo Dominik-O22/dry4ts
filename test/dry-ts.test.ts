@@ -26,6 +26,7 @@ import {
   TypeScriptNormalizer,
   toEdn,
   toJson,
+  toSarif,
   USAGE,
 } from "../src/index.js";
 import { FingerprintInterner, type NormalizedNode } from "../src/NormalizedNode.js";
@@ -889,6 +890,106 @@ test("emits null for an anonymous candidate name in json", () => {
     kind: "ArrowFunction",
     name: null,
   });
+});
+
+test("toSarif emits a SARIF 2.1.0 skeleton with the structural-duplicate rule and empty results", () => {
+  const sarif = JSON.parse(toSarif([], "9.9.9"));
+  assert.equal(sarif.version, "2.1.0");
+  assert.equal(sarif.$schema, "https://json.schemastore.org/sarif-2.1.0.json");
+  assert.equal(sarif.runs.length, 1);
+  const driver = sarif.runs[0].tool.driver;
+  assert.equal(driver.name, "dry-ts");
+  assert.equal(driver.version, "9.9.9");
+  assert.equal(driver.rules[0].id, "dry-ts/structural-duplicate");
+  assert.equal(driver.rules[0].defaultConfiguration.level, "note");
+  // "candidate" framing stays in the rule prose (issue #47).
+  assert.match(driver.rules[0].fullDescription.text, /candidates/);
+  assert.deepEqual(sarif.runs[0].results, []);
+});
+
+test("toSarif maps one cluster to one result with a SARIF location per ClusterLocation", () => {
+  const collector = new ClusterCollector();
+  const loc = (file: string) => ({
+    file,
+    startLine: 10,
+    endLine: 14,
+    nodes: 50,
+    kind: "ClassDeclaration",
+    name: "Widget",
+  });
+  collector.addMatch(loc("a.ts"), loc("b.ts"), 0.875);
+  collector.addMatch(loc("b.ts"), loc("c.ts"), 0.925);
+
+  const [result] = JSON.parse(toSarif(collector.clusters(), "9.9.9")).runs[0].results;
+  assert.equal(result.ruleId, "dry-ts/structural-duplicate");
+  assert.equal(result.ruleIndex, 0);
+  assert.equal(result.level, "note"); // unscoped
+  assert.equal(result.locations.length, 3);
+  assert.deepEqual(result.locations[0].physicalLocation, {
+    artifactLocation: { uri: "a.ts" },
+    region: { startLine: 10, endLine: 14 },
+  });
+  assert.deepEqual(result.locations[0].properties, { nodes: 50, kind: "ClassDeclaration", name: "Widget" });
+  assert.deepEqual(result.locations[0].logicalLocations, [{ name: "Widget" }]);
+  // "Widget" recurs across files → the same-name ranking signal rides in properties.
+  assert.deepEqual(result.properties, {
+    status: "unscoped",
+    scoreMin: 0.875,
+    scoreMax: 0.925,
+    locationCount: 3,
+    sameName: ["Widget"],
+  });
+  // No counterparts → no relatedLocations key at all.
+  assert.ok(!Object.hasOwn(result, "relatedLocations"));
+});
+
+test("toSarif level follows status: new -> warning, known/unscoped -> note", () => {
+  const cluster = (status: "new" | "known" | "unscoped"): Cluster => ({
+    score: { min: 0.9, max: 0.9 },
+    status,
+    locations: [
+      { file: "a.ts", startLine: 1, endLine: 5, nodes: 30 },
+      { file: "b.ts", startLine: 1, endLine: 5, nodes: 30 },
+    ],
+  });
+  const levelOf = (status: "new" | "known" | "unscoped") =>
+    JSON.parse(toSarif([cluster(status)], "9.9.9")).runs[0].results[0].level;
+  assert.equal(levelOf("new"), "warning");
+  assert.equal(levelOf("known"), "note");
+  assert.equal(levelOf("unscoped"), "note");
+});
+
+test("toSarif renders a null name and no logicalLocation for an anonymous candidate", () => {
+  const collector = new ClusterCollector();
+  const loc = (file: string) => ({ file, startLine: 1, endLine: 5, nodes: 30, kind: "ArrowFunction", name: null });
+  collector.addMatch(loc("a.ts"), loc("b.ts"), 0.9);
+
+  const [result] = JSON.parse(toSarif(collector.clusters(), "9.9.9")).runs[0].results;
+  assert.equal(result.locations[0].properties.name, null);
+  assert.ok(!Object.hasOwn(result.locations[0], "logicalLocations"));
+});
+
+test("toSarif maps --counterparts nearest data to relatedLocations joined by a relevant relationship", async () => {
+  const { dir } = await writeFixture({ "a.ts": counterpartFn("aa", "items"), "b.ts": counterpartFn("bb", "values") });
+  const [cluster] = new TypeScriptDuplicateFinder().findClusters({ paths: [dir], ...counterpartScan });
+  const rendered = renderedNewCluster(cluster);
+
+  const [result] = JSON.parse(toSarif([rendered], "9.9.9")).runs[0].results;
+  assert.equal(result.level, "warning");
+  assert.equal(result.relatedLocations.length, result.locations.length);
+  for (const location of result.locations) {
+    const relationship = location.relationships[0];
+    assert.equal(relationship.kinds[0], "relevant");
+    // target indexes into relatedLocations (SARIF §3.33.3), not the related id.
+    assert.match(result.relatedLocations[relationship.target].message.text, /nearest counterpart \(\d+\/\d+, score=/);
+  }
+  assert.equal(result.locations[0].properties.changed, true);
+});
+
+test("toSarif defaults its tool version to package.json", async () => {
+  const pkg = JSON.parse(await readFile(path.join(repoRoot, "package.json"), "utf8"));
+  const sarif = JSON.parse(toSarif([]));
+  assert.equal(sarif.runs[0].tool.driver.version, pkg.version);
 });
 
 const duplicateBody = `
@@ -2246,6 +2347,29 @@ test("status appears in every output format", async () => {
   assert.ok(edn.stdout.includes(":status :new"), edn.stdout);
   const unscoped = runCli([...gateFlags, "--json", "."], dir);
   assert.ok(unscoped.stdout.includes('"status": "unscoped"'), unscoped.stdout);
+  const sarif = runCli([...gateFlags, "--sarif", "--changed", "one.ts", "."], dir);
+  const results = JSON.parse(sarif.stdout).runs[0].results;
+  assert.ok(
+    results.some((result: { level: string }) => result.level === "warning"),
+    sarif.stdout,
+  );
+});
+
+test("--format sarif and --sarif both emit parseable SARIF 2.1.0 via the CLI", async () => {
+  const dir = await twoDuplicateFiles();
+  for (const flag of [["--format", "sarif"], ["--sarif"]]) {
+    const result = runCli([...gateFlags, ...flag, "."], dir);
+    assert.equal(result.exitCode, 0, result.stderr);
+    const sarif = JSON.parse(result.stdout);
+    assert.equal(sarif.version, "2.1.0");
+    assert.equal(sarif.runs[0].tool.driver.rules[0].id, "dry-ts/structural-duplicate");
+    assert.ok(sarif.runs[0].results.length > 0, result.stdout);
+  }
+});
+
+test("Options accepts sarif as a format via --format and --sarif", () => {
+  assert.equal(Options.parse("--format", "sarif").format, "sarif");
+  assert.equal(Options.parse("--sarif").format, "sarif");
 });
 
 // edited.ts is a new duplicate (scoped via --changed edited.ts); known1/known2
@@ -2837,6 +2961,18 @@ export function ${name}(${variable}: number[]): number {
 
 const counterpartScan = { threshold: 0.4, minLines: 3, minNodes: 8, counterparts: true } as const;
 
+// Attach status + per-location `changed` the way run() does under an active
+// scope, so a formatter test exercises the on-scope render path. Shared by the
+// text/edn and sarif counterpart tests (a lone inline copy in each would itself
+// trip the self-scan duplicate gate).
+function renderedNewCluster(cluster: Cluster): Cluster {
+  return {
+    ...cluster,
+    status: "new",
+    locations: cluster.locations.map((location) => ({ ...location, changed: true })),
+  };
+}
+
 test("--counterparts: a two-member exact-dup pair points each location at the other", async () => {
   const { dir } = await writeFixture({ "a.ts": counterpartFn("aa", "items"), "b.ts": counterpartFn("bb", "values") });
   const [cluster] = new TypeScriptDuplicateFinder().findClusters({ paths: [dir], ...counterpartScan });
@@ -3072,14 +3208,9 @@ test("--counterparts parses as a boolean flag and does not transpose the adjacen
 test("--counterparts: text and edn render the counterpart (and changed) on the location's own line", async () => {
   const { dir } = await writeFixture({ "a.ts": counterpartFn("aa", "items"), "b.ts": counterpartFn("bb", "values") });
   const [cluster] = new TypeScriptDuplicateFinder().findClusters({ paths: [dir], ...counterpartScan });
-  // Attach per-location changed the way run() does under an active scope, so the
-  // render exercises changedSuffix/nearestSuffix (text) and nearestEdn (edn) —
-  // the formatters whose only prior coverage is the off-path "must NOT appear".
-  const rendered = {
-    ...cluster,
-    status: "new" as const,
-    locations: cluster.locations.map((location) => ({ ...location, changed: true })),
-  };
+  // Exercises changedSuffix/nearestSuffix (text) and nearestEdn (edn) — the
+  // formatters whose only prior coverage is the off-path "must NOT appear".
+  const rendered = renderedNewCluster(cluster);
   // text: one line per location, with `changed=` and `→ nearest <ref> (shared/total)` appended.
   const text = formatCluster(rendered, 1);
   assert.match(text, /changed=true → nearest .+:\d+-\d+ \(\d+\/\d+\)/);

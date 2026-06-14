@@ -95,10 +95,11 @@ Options:
                 so raising this speeds scans
 --min-locations N
                 Minimum locations in a reported cluster, default 2
---format F      text, json, or edn, default text
+--format F      text, json, edn, or sarif, default text
 --edn           Same as --format edn
 --json          Same as --format json
 --text          Same as --format text
+--sarif         Same as --format sarif (SARIF 2.1.0 for GitHub code scanning)
 --changed-from REF
                 Incremental gating: mark clusters that intersect code changed
                 since merge-base(REF, HEAD) as status "new". Untracked scanned
@@ -466,6 +467,29 @@ To gate on *all* duplication (zero-tolerance) instead, drop `--changed-from`:
 `bunx dry-ts --format json --fail-on-duplicates src`.
 
 For this repository, `bun run ci` builds, tests, and runs dry-ts against `src test`.
+
+### SARIF / GitHub code scanning
+
+`--format sarif` (or `--sarif`) emits SARIF 2.1.0, the lingua franca for GitHub
+code scanning and most CI quality dashboards. One `result` per cluster under the
+rule `dry-ts/structural-duplicate`; each location maps to a `physicalLocation`,
+and `--counterparts` nearest data maps to `relatedLocations` joined back by a
+`relevant` relationship. A cluster's `level` follows its status: `new` (intersects
+the change) → `warning`, `known`/`unscoped` → `note`. Findings are framed as
+structural *candidates*, not confirmed duplicates.
+
+Upload the report so findings surface inline on the PR:
+
+```yaml
+      - run: bunx dry-ts --sarif --changed-from origin/${{ github.base_ref || 'main' }} src > dry-ts.sarif
+      - uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: dry-ts.sarif
+```
+
+Pair with `--counterparts` to enrich each finding with its nearest counterpart.
+Run without `--fail-on-duplicates` if you want the annotations without failing
+the build.
 
 ## AI Agents
 
