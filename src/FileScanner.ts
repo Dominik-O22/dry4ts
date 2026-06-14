@@ -304,17 +304,21 @@ function lineRangeFor(sourceFile: ts.SourceFile, node: ts.Node): { startLine: nu
 }
 
 // A constructor has no name node, so label it by keyword; a VariableStatement is
-// named after its first binding (`const foo = ...` -> "foo"); everything else
-// defers to TypeScript's name resolver (null for anonymous arrows, unnamed
-// function expressions, call/index signatures). getText needs the sourceFile
-// passed because the AST is parsed without parent pointers (setParentNodes=false).
+// named after its first binding (`const foo = ...` -> "foo"), but only when that
+// binding is a plain identifier — a destructuring pattern (`const {a, b} = ...`)
+// has no single identifier name, and its getText() would be the whole pattern
+// (often multi-line, which breaks the single-line text format), so report null.
+// Everything else defers to TypeScript's name resolver (null for anonymous
+// arrows, unnamed function expressions, call/index signatures). getText needs the
+// sourceFile passed because the AST is parsed without parent pointers
+// (setParentNodes=false).
 function declarationName(node: ts.Node, sourceFile: ts.SourceFile): string | null {
   if (ts.isConstructorDeclaration(node)) {
     return "constructor";
   }
   if (ts.isVariableStatement(node)) {
     const first = node.declarationList.declarations[0];
-    return first ? first.name.getText(sourceFile) : null;
+    return first && ts.isIdentifier(first.name) ? first.name.getText(sourceFile) : null;
   }
   const nameNode = ts.getNameOfDeclaration(node as ts.Declaration);
   return nameNode ? nameNode.getText(sourceFile) : null;

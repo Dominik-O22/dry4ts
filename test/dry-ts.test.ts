@@ -334,6 +334,42 @@ export const handler = (event: string): string => event.toUpperCase();
   assert.ok(labelled.some((entry) => entry.kind === "ArrowFunction" && entry.name === null));
 });
 
+test("a destructuring VariableStatement reports name null, not the binding pattern text", async () => {
+  // `const { a, b } = ...` / `const [x] = ...` have no single identifier name.
+  // getText() on the binding would be the whole pattern (and multi-line patterns
+  // would break the single-line text format), so the name must be null.
+  const { files } = await writeFixture({
+    "destructure.ts": `
+export const config = useConfig(input, defaults, fallback, override);
+const {
+  alpha,
+  beta,
+  gamma,
+} = useThing(first, second, third, fourth);
+const [head] = parseList(rawInput, parserOptions, extraArgument);
+`,
+  });
+
+  const entries = new FileScanner().scanFile(files["destructure.ts"], 1, 1);
+  const variableEntries = entries.filter((entry) => entry.kind === "VariableStatement");
+
+  // The plain identifier binding keeps its name.
+  assert.ok(variableEntries.some((entry) => entry.name === "config"), "identifier binding keeps its name");
+  // No reported name is a destructuring pattern, and none contains a newline.
+  for (const entry of variableEntries) {
+    if (entry.name !== null) {
+      assert.ok(!/^[{[]/.test(entry.name), `destructuring binding should be null, got ${JSON.stringify(entry.name)}`);
+      assert.ok(!entry.name.includes("\n"), `name must be single-line, got ${JSON.stringify(entry.name)}`);
+    }
+  }
+  // The two destructuring statements specifically report null.
+  assert.equal(
+    variableEntries.filter((entry) => entry.name === null).length,
+    2,
+    "both the object- and array-destructuring statements report null",
+  );
+});
+
 test("cluster locations expose kind and name from a real scan", async () => {
   const { files, dir } = await writeFixture({
     "one.ts": `
