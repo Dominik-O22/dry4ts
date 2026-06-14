@@ -12,6 +12,20 @@ type MatchingPair = readonly [Entry, Entry, number];
 
 type IgnoreMatcher = (filePath: string, isDirectory: boolean) => boolean;
 
+// Preset expanded by --exclude-tests, merged into the --exclude glob list. High-
+// precision test markers only: filename suffixes plus the conventional test
+// directories. Bare `test/` / `tests/` / `e2e/` are intentionally omitted — too
+// many projects use those for non-test code; callers add them via --exclude.
+// gitignore syntax (no brace expansion): `*` covers every extension after the
+// marker (e.g. `*.test.*` catches .test.ts/.test.tsx/.test.mts).
+export const TEST_EXCLUDE_GLOBS: readonly string[] = [
+  "**/*.test.*",
+  "**/*.spec.*",
+  "**/*.e2e-spec.*",
+  "**/__tests__/**",
+  "**/__mocks__/**",
+];
+
 export interface ScanResult {
   readonly files: readonly string[];
   readonly clusters: readonly Cluster[];
@@ -118,9 +132,11 @@ export class TypeScriptDuplicateFinder {
     // .gitignore (when respected) and the user's --exclude globs. A path is
     // skipped if either matches. --exclude applies regardless of
     // respectGitignore — it is an explicit instruction, not repo config.
+    // --exclude-tests appends the curated test-path preset to that same list.
+    const excludeGlobs = options.excludeTests ? [...options.exclude, ...TEST_EXCLUDE_GLOBS] : options.exclude;
     const matchers = [
       options.respectGitignore ? this.gitignoreMatcher() : null,
-      options.exclude.length > 0 ? this.globMatcher(options.exclude) : null,
+      excludeGlobs.length > 0 ? this.globMatcher(excludeGlobs) : null,
     ].filter((matcher): matcher is IgnoreMatcher => matcher !== null);
     const isIgnored: IgnoreMatcher | null =
       matchers.length === 0 ? null : (filePath, isDirectory) => matchers.some((m) => m(filePath, isDirectory));

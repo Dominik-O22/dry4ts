@@ -908,6 +908,86 @@ test("--exclude parses as a repeatable single-value flag (no comma split, trimme
   assert.deepEqual(options.exclude, ["**/*.spec.*", "dist/**"]);
 });
 
+// --- --exclude-tests (curated test-path preset over --exclude) --------------
+
+// Real src twin (a.ts/b.ts) plus duplicate copies under each test convention the
+// preset targets, so we can assert the preset drops all test copies but keeps
+// the real one. All share duplicateBody so they cluster at the loose threshold.
+async function excludeTestsFixture(): Promise<string> {
+  const projectDir = await mkdtemp(path.join(tmpdir(), "dry-ts-exclude-tests-"));
+  await writeFile(path.join(projectDir, "a.ts"), duplicateBody);
+  await writeFile(path.join(projectDir, "b.ts"), duplicateBody);
+  await writeFile(path.join(projectDir, "a.test.ts"), duplicateBody);
+  await writeFile(path.join(projectDir, "a.spec.ts"), duplicateBody);
+  await mkdir(path.join(projectDir, "__tests__"), { recursive: true });
+  await writeFile(path.join(projectDir, "__tests__", "c.ts"), duplicateBody);
+  return projectDir;
+}
+
+const isTestPath = (f: string) =>
+  f.endsWith(".test.ts") || f.endsWith(".spec.ts") || f.split(path.sep).includes("__tests__");
+
+test("--exclude-tests drops test files but keeps the real src duplicate", async () => {
+  const projectDir = await excludeTestsFixture();
+  const files = scanWith(projectDir, { excludeTests: true }).flatMap((c) => c.locations.map((loc) => loc.file));
+  assert.ok(files.length > 0, "the real a.ts/b.ts duplicate should still cluster");
+  assert.ok(
+    files.every((f) => !isTestPath(f)),
+    `all test-file copies should be excluded, got: ${JSON.stringify(files)}`,
+  );
+});
+
+test("--exclude-tests composes with an explicit --exclude glob", async () => {
+  const projectDir = await excludeTestsFixture();
+  await writeFile(path.join(projectDir, "b.stories.ts"), duplicateBody);
+  // dry-ignore — intentional twin of the --exclude scanWith(...).flatMap scaffold
+  const files = scanWith(projectDir, {
+    excludeTests: true,
+    exclude: ["**/*.stories.*"],
+  }).flatMap((c) => c.locations.map((loc) => loc.file));
+  assert.ok(
+    files.every((f) => !isTestPath(f) && !f.endsWith(".stories.ts")),
+    `preset and --exclude glob should both apply, got: ${JSON.stringify(files)}`,
+  );
+});
+
+test("test-file duplicates are reported when --exclude-tests is off (default unchanged)", async () => {
+  const projectDir = await excludeTestsFixture();
+  const files = scanWith(projectDir, {}).flatMap((c) => c.locations.map((loc) => loc.file));
+  assert.ok(
+    files.some((f) => isTestPath(f)),
+    `without the flag, test-file duplicates should still be reported, got: ${JSON.stringify(files)}`,
+  );
+});
+
+test("--exclude-tests does not affect an explicitly passed test-file argument", async () => {
+  const projectDir = await excludeTestsFixture();
+  const originalCwd = process.cwd();
+  try {
+    process.chdir(projectDir);
+    const files = new TypeScriptDuplicateFinder()
+      .findClusters({
+        paths: ["a.test.ts", "a.ts"],
+        threshold: 0.2,
+        minLines: 3,
+        minNodes: 8,
+        excludeTests: true,
+      })
+      .flatMap((c) => c.locations.map((loc) => loc.file));
+    assert.ok(
+      files.some((f) => f.endsWith("a.test.ts")),
+      `explicit file arg should scan despite --exclude-tests, got: ${JSON.stringify(files)}`,
+    );
+  } finally {
+    process.chdir(originalCwd);
+  }
+});
+
+test("--exclude-tests parses as a boolean flag, default off", () => {
+  assert.equal(Options.parse("--exclude-tests").excludeTests, true);
+  assert.equal(Options.parse().excludeTests, false);
+});
+
 test("scans without error when cwd has no .gitignore", async () => {
   const projectDir = await mkdtemp(path.join(tmpdir(), "dry-ts-no-ignore-file-"));
   await writeFile(path.join(projectDir, "a.ts"), duplicateBody);
