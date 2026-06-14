@@ -6,11 +6,13 @@ import { spawnSync } from "node:child_process";
 // a PINNED tag on purpose, not automatically. microsoft/TypeScript's tag tracks
 // the installed typescript dependency. Sentry adds a large, messy real-world
 // TS/TSX frontend where there is still headroom to surface a regression (the
-// TypeScript src/compiler scan is already pushed quite low).
+// TypeScript src/compiler scan is already pushed quite low). n8n is the
+// server-side counterweight: a large real-world Node/TS backend so the corpus
+// is not hyper-indexed on frontend code.
 //
 // Usage: node scripts/bench-setup.mjs [name ...]   (default: all corpora)
-//   names: typescript | sentry
-import { existsSync } from "node:fs";
+//   names: typescript | sentry | n8n
+import { existsSync, rmSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
@@ -31,6 +33,22 @@ const CORPORA = {
     // Sparse + blobless keeps the checkout to the app tree instead of GBs.
     sparse: ["static/app"],
     scanSubpath: path.join("static", "app"),
+  },
+  n8n: {
+    repo: "https://github.com/n8n-io/n8n.git",
+    tag: "n8n@2.25.7",
+    targetDir: path.join(".bench", "n8n"),
+    // Large TS Node backend, counterweight to the sentry frontend so the corpus
+    // is not hyper-indexed on frontend code. Two complementary scan targets are
+    // checked out (sparse + blobless, so only these subtrees are fetched):
+    //   - packages/nodes-base/nodes (~3.7k files): declarative integration nodes
+    //     with real near-duplicate boilerplate — volume + recall/pair-comparison
+    //     stress. This is the primary scanSubpath / documented baseline.
+    //   - packages/cli/src (~1.9k files): the server itself (controllers,
+    //     services, entities, queue, auth) — representative imperative backend
+    //     app logic. Scan it explicitly: bun run bench -- .bench/n8n/packages/cli/src
+    sparse: ["packages/nodes-base/nodes", "packages/cli/src"],
+    scanSubpath: path.join("packages", "nodes-base", "nodes"),
   },
 };
 
@@ -110,5 +128,5 @@ function run(command, commandArgs) {
 }
 
 function removeDir(dir) {
-  fs.rmSync(dir, { recursive: true, force: true });
+  rmSync(dir, { recursive: true, force: true });
 }

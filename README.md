@@ -354,7 +354,7 @@ Three corpus tiers, all scanned with `bun run bench -- <paths>`:
 1. **Real mid-size project** — any ~30k LOC repository you have locally.
    Use it as a regression check: cluster output should stay identical across
    performance changes, and timing should not regress.
-2. **Pinned large repositories** — `bun run bench:setup` fetches two pinned
+2. **Pinned large repositories** — `bun run bench:setup` fetches three pinned
    real-world corpora into `.bench/` (gitignored). Pass a name
    (`bun run bench:setup sentry`) to fetch just one.
    - `microsoft/TypeScript` at a statically pinned tag (`v5.9.3`, chosen by
@@ -367,6 +367,15 @@ Three corpus tiers, all scanned with `bun run bench -- <paths>`:
      `.bench/sentry/static/app` — a large, messy real-world TS/TSX frontend
      (~6.8k files, ~2.6k clusters). Wider and more varied than the compiler
      subtree, so it surfaces hot-path regressions the compiler scan would miss.
+   - `n8n-io/n8n` (sparse blobless clone of two subtrees). A large real-world
+     Node/TS backend that keeps the corpus from hyper-indexing on frontend code.
+     Two complementary scan targets, both checked out by `bench:setup n8n`:
+     - `.bench/n8n/packages/nodes-base/nodes` (~3.7k files, ~20 MB) — declarative
+       integration nodes with real near-duplicate boilerplate; volume + recall
+       and pair-comparison stress. This is the documented default baseline.
+     - `.bench/n8n/packages/cli/src` (~1.9k files, ~14 MB) — the server itself
+       (controllers, services, entities, queue, auth), representative imperative
+       backend app logic. Scan it explicitly with `bun run bench -- <path>`.
 3. **Synthetic regimes** — `bun run bench:corpus <regime>` generates a
    deterministic corpus into `.bench/corpus/<regime>`:
    - `identical` (default 800 functions): dense identical structures,
@@ -395,3 +404,5 @@ must not regress across changes):
 - TypeScript v5.9.3 `src/compiler`: ~1.5s, 246 clusters (since v0.3.0).
 - Sentry 25.10.0 `static/app`: ~5.3s, 2574 clusters (since v0.5.0,
   `--exclude-kinds` hot-path change measured against it).
+- n8n 2.25.7 `packages/nodes-base/nodes`: ~3.3s, 1720 clusters (since v0.8.0).
+- n8n 2.25.7 `packages/cli/src`: ~2.9s, 1650 clusters (since v0.8.0).
