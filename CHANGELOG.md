@@ -5,6 +5,28 @@ All notable changes to dry-ts are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-06-15
+
+### Added
+
+- **`--profile agent` preset** for after-edit agent loops: the `pr` gate plus
+  `--counterparts` and `--format json`, so an agent reads each new finding's
+  nearest existing match and routes the fix (reuse existing code, or refactor the
+  duplicated new code). Inherits `pr`'s `--only-new`, so it too requires a
+  `--changed-from`/`--changed` scope and fails loud without one. Profiles can now
+  seed `format` and `counterparts` (the `ProfileFlags` surface grew those two
+  fields); explicit `--format`/`--counterparts` still override the preset.
+
+### Changed
+
+- **README restructured** to lead with the high-signal path (install, PR gate,
+  agent loop, SARIF) and demote the clone taxonomy / benchmarks to a lower "How
+  it works" section. Documented `--changed-from` change-scope semantics
+  explicitly (working tree = committed + staged + unstaged; untracked files count
+  as fully changed), added a copy-paste agent loop, and added an **Output
+  stability** policy: any change that can move findings is at least a MINOR bump,
+  called out in this changelog, so a pinned CI gate stays reproducible.
+
 ## [0.12.0] - 2026-06-14
 
 ### Added

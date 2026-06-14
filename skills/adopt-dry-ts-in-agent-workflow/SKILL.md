@@ -4,7 +4,7 @@ description: >
   Run dry-ts after AI-generated edits to catch structural duplication before it accumulates. Load when building autonomous review loops, gating only on duplication an edit introduced with --changed/--changed-from, triaging duplicate clusters by status, using JSON output after generated changes, or deciding when local duplicate checks should become CI gates.
 type: core
 library: dry-ts
-library_version: "0.12.0"
+library_version: "0.13.0"
 sources:
   - "dry-ts:README.md"
   - "dry-ts:AGENTS.md"
@@ -25,6 +25,22 @@ bunx dry-ts --format json src test
 Run this after generated edits to produce machine-readable duplicate clusters for review.
 
 ## Core Patterns
+
+### The one-line agent loop: `--profile agent`
+
+```bash
+# After edits: gate on NEW duplication and emit routed JSON in one preset.
+bunx dry-ts --profile agent --changed-from HEAD src test
+```
+
+`--profile agent` bundles the after-edit loop: `--only-new --counterparts
+--fail-on-duplicates --format json` over the `pr` floors (`--exclude-tests
+--min-nodes 50 --exclude-kinds ArrowFunction,VariableStatement`). It inherits
+`pr`'s `--only-new`, so it requires a `--changed-from`/`--changed` scope and
+fails loud without one. Exit `1` emits the JSON below on stdout; exit `2` is an
+infra/config failure (never read it as findings). Explicit flags still override
+the preset (e.g. add `--text` to eyeball a run). The patterns below show the
+underlying flags when you need to tune them.
 
 ### Self-correct on duplication your edit introduced
 

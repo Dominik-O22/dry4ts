@@ -13,20 +13,24 @@ interface ProfileFlags {
   readonly excludeKinds?: readonly string[];
   readonly onlyNew?: boolean;
   readonly failOnDuplicates?: boolean;
+  readonly format?: OutputFormat;
+  readonly counterparts?: boolean;
 }
 
+// PR gate, highest signal. Deliberately requires an explicit --changed-from /
+// --changed: `onlyNew` without an active scope is a hard error in the Options
+// constructor, so `--profile pr` alone fails loud rather than silently gating
+// against the wrong base. Named so `agent` can extend it without re-listing.
+const PR_PROFILE: ProfileFlags = {
+  excludeTests: true,
+  minNodes: 50,
+  excludeKinds: ["ArrowFunction", "VariableStatement"],
+  onlyNew: true,
+  failOnDuplicates: true,
+};
+
 const PROFILES: Record<string, ProfileFlags> = {
-  // PR gate, highest signal. Deliberately requires an explicit --changed-from /
-  // --changed: `onlyNew` without an active scope is a hard error in the Options
-  // constructor, so `--profile pr` alone fails loud rather than silently gating
-  // against the wrong base.
-  pr: {
-    excludeTests: true,
-    minNodes: 50,
-    excludeKinds: ["ArrowFunction", "VariableStatement"],
-    onlyNew: true,
-    failOnDuplicates: true,
-  },
+  pr: PR_PROFILE,
   // Source-only sane defaults: drop test scaffolding, keep the standard floors.
   src: { excludeTests: true },
   // Broad exploratory scan: lower the size floor to surface near-misses the
@@ -36,6 +40,11 @@ const PROFILES: Record<string, ProfileFlags> = {
   // anonymous arrow bodies (the dominant test-scan noise) and raise the floor.
   // Point it at your test directories.
   tests: { excludeKinds: ["ArrowFunction"], minNodes: 40 },
+  // After-edit agent loop: the PR gate plus per-location counterpart routing and
+  // JSON output, so an agent reads each new finding's nearest existing match and
+  // either reuses it or justifies the duplication. Inherits pr's onlyNew, so it
+  // too fails loud without a --changed-from/--changed scope.
+  agent: { ...PR_PROFILE, counterparts: true, format: "json" },
 };
 
 // The profile names a user can pass, for validation and help/docs.
@@ -343,7 +352,7 @@ export class Options {
       threshold: pick(threshold, undefined, 0.82),
       minLines: pick(minLines, undefined, 4),
       minNodes: pick(minNodes, profile.minNodes, 20),
-      format: pick(format, undefined, "text"),
+      format: pick(format, profile.format, "text"),
       help: help ?? false,
       failOnDuplicates: pick(failOnDuplicates, profile.failOnDuplicates, false),
       respectGitignore: pick(respectGitignore, undefined, true),
@@ -357,7 +366,7 @@ export class Options {
       exclude,
       excludeTaggedTemplates: pick(excludeTaggedTemplates, undefined, false),
       excludeTests: pick(excludeTests, profile.excludeTests, false),
-      counterparts: pick(counterparts, undefined, false),
+      counterparts: pick(counterparts, profile.counterparts, false),
     });
   }
 }

@@ -4,7 +4,7 @@ description: >
   Use dry-ts as a CI or automated review gate with --format json and --fail-on-duplicates. Load when writing GitHub Actions, gating a PR only on new duplication with --changed-from, parsing cluster JSON status, or handling dry-ts exit codes 0, 1, and 2.
 type: core
 library: dry-ts
-library_version: "0.12.0"
+library_version: "0.13.0"
 sources:
   - "dry-ts:README.md"
   - "dry-ts:AGENTS.md"

@@ -229,6 +229,30 @@ test("an explicit flag overrides the profile's value", () => {
   assert.equal(options.minNodes, 10, "explicit --min-nodes wins over the profile's 50");
 });
 
+test("--profile agent is the pr gate plus counterparts and json output", () => {
+  const options = Options.parse("--profile", "agent", "--changed-from", "origin/main", "src");
+  // Inherits the pr bundle...
+  assert.equal(options.excludeTests, true);
+  assert.equal(options.minNodes, 50);
+  assert.deepEqual(options.excludeKinds, ["ArrowFunction", "VariableStatement"]);
+  assert.equal(options.onlyNew, true);
+  assert.equal(options.failOnDuplicates, true);
+  // ...and adds the two agent-loop fields the profile mechanism now carries.
+  assert.equal(options.counterparts, true);
+  assert.equal(options.format, "json");
+});
+
+test("--profile agent without a changed scope fails loud (inherits pr's only-new)", () => {
+  assert.throws(() => Options.parse("--profile", "agent", "src"), /--only-new requires --changed-from or --changed/);
+});
+
+test("explicit --format and --text override the agent profile's json", () => {
+  const text = Options.parse("--profile", "agent", "--changed-from", "HEAD", "--text", "src");
+  assert.equal(text.format, "text", "explicit --text wins over the profile's json");
+  const edn = Options.parse("--profile", "agent", "--changed-from", "HEAD", "--format", "edn", "src");
+  assert.equal(edn.format, "edn", "explicit --format wins over the profile's json");
+});
+
 test("--exclude-kinds unions with the profile's kinds instead of replacing them", () => {
   const options = Options.parse("--profile", "pr", "--changed-from", "HEAD", "--exclude-kinds", "Constructor", "src");
   assert.deepEqual(options.excludeKinds, ["ArrowFunction", "VariableStatement", "Constructor"]);
@@ -237,7 +261,7 @@ test("--exclude-kinds unions with the profile's kinds instead of replacing them"
 test("an unknown profile is a hard error listing the valid names", () => {
   assert.throws(
     () => Options.parse("--profile", "bogus", "src"),
-    /Unknown profile: bogus \(valid: pr, src, audit, tests\)/,
+    /Unknown profile: bogus \(valid: pr, src, audit, tests, agent\)/,
   );
 });
 
@@ -253,7 +277,7 @@ test("a profile leaves unrelated defaults untouched", () => {
 });
 
 test("PROFILE_NAMES lists the available presets", () => {
-  assert.deepEqual([...PROFILE_NAMES].sort(), ["audit", "pr", "src", "tests"]);
+  assert.deepEqual([...PROFILE_NAMES].sort(), ["agent", "audit", "pr", "src", "tests"]);
 });
 
 test("--help short-circuits profile validation (a bad profile never masks --help)", () => {
@@ -447,7 +471,7 @@ test("noiseSummary estimates the --exclude-tests reduction and names other lever
   assert.ok(summary?.includes("≈4 left"), summary ?? "");
   assert.ok(summary?.includes("--exclude-tagged-templates"), summary ?? "");
   assert.ok(summary?.includes("--min-nodes N raises the size floor (currently 20)"), summary ?? "");
-  assert.ok(summary?.includes("--profile pr|src|audit|tests"), summary ?? "");
+  assert.ok(summary?.includes("--profile pr|src|audit|tests|agent"), summary ?? "");
 });
 
 test("noiseSummary stays silent below the firehose threshold", () => {
