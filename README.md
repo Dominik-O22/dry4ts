@@ -2,6 +2,23 @@
 
 dry-ts finds candidate duplicate TypeScript code across files and directories. It reports fuzzy structural matches as clusters of related filename and line ranges so another mechanism can evaluate and reduce duplication.
 
+## Quickstart
+
+```bash
+# Scan a source tree for candidate duplicates
+bunx dry-ts src
+
+# PR gate — fail only if THIS change adds duplication (the recommended workflow)
+bunx dry-ts --changed-from origin/main --only-new --fail-on-duplicates \
+  --exclude-tests --min-nodes 50 --exclude-kinds ArrowFunction,VariableStatement src
+```
+
+**What it is:** a TypeScript-first *structural* duplicate-**candidate** detector, built for PR gates and AI/agent consumers. It catches Type-2/Type-3 clones — same shape, renamed identifiers, reordered or slightly varied statements — that token and line matchers miss.
+
+**What it is not:** a general-purpose, multi-language copy/paste detector. For broad Type-1 token cloning across many languages with mature CI reporters, reach for [jscpd](https://github.com/kucherenko/jscpd) or PMD CPD. dry-ts reports structural *similarity candidates*, not confirmed semantic duplication — keep that framing when you triage.
+
+**Maturity:** young package — pin the version (`dry-ts@x.y.z`). Normalization can change between releases, so an unpinned bump can shift findings. It has no install hooks and two runtime dependencies (`ignore`, `typescript`); `git` is spawned only for `--changed-from`.
+
 ## Overview
 
 dry-ts parses TypeScript source with the TypeScript compiler API, selects TypeScript declarations and function-like nodes as comparison candidates, normalizes each candidate's AST, and compares sets of structural fingerprints with Jaccard similarity:
@@ -160,6 +177,45 @@ node types dry-ts treats as comparable units. The names are TypeScript
 Excluding a kind never hides a longer child candidate — children are always
 visited regardless.
 
+### Curating results
+
+Out of the box on a large frontend monorepo a scan can report thousands of
+clusters, much of it *expected* duplication — test scaffolding, CSS-in-JS,
+generated code. The raw output is a candidate list, not a ranked verdict. Two
+things cut it down to the findings that matter:
+
+**Ranking.** Clusters where the *same declaration name* recurs across two or
+more distinct files float to the top, tagged `same-name=<name>` in the text
+header. A `validateUser` copied into another module is the strongest "real,
+copy-pasted duplicate" signal there is — near-zero false positive — so it leads
+the report regardless of score. Everything below is ordered strongest score
+first, as before. (A name repeated only *within* one file — overloads, shadowed
+locals — does not count; cross-file is the signal.)
+
+**The curation footer.** On a large run (≥10 clusters) the text format prints a
+short footer to **stderr** that names the levers which would cut the noise and
+estimates the reduction:
+
+```text
+2574 clusters. Curation levers (see README "Curating results"):
+  - 1250 disappear with --exclude-tests (clusters that fall below --min-locations
+    once test files are dropped) → ≈1324 left
+  - --exclude-tagged-templates drops CSS-in-JS / styled-components clusters
+  - --min-nodes N raises the size floor (currently 20); --exclude '<glob>' drops paths
+```
+
+It is a teaching aid, not a finding: it goes to stderr so stdout stays pure
+findings (pipe- and grep-safe), and it shows only on a terminal. The `≈` is
+honest — the `--exclude-tests` count is estimated from the reported clusters,
+not a re-scan, so a removed location that bridged two halves of a cluster can
+split it rather than delete it. JSON/EDN output never prints the footer.
+
+The levers themselves, roughly in order of leverage on a frontend codebase:
+`--exclude-tests` (test scaffolding is typically about half the noise),
+`--exclude-tagged-templates` (CSS-in-JS), `--exclude '<glob>'` (whole paths:
+generated code, fixtures, stories), `--min-nodes N` (raise the size floor), and
+the kind filters below.
+
 ### Dropping near-uniform candidates: `--min-distinct-kinds`
 
 `--min-nodes` filters by raw node count, but a large candidate can still be
@@ -239,9 +295,21 @@ wrapping `const` statement suppresses that `VariableStatement` candidate but doe
 trivia and remains a candidate. Suppressing a parent never hides unrelated child
 candidates inside it.
 
-For file- or glob-level ignores, exclude the path via `.gitignore` (or
-`--no-gitignore` to override); a config-level ignore surface is tracked
-separately.
+**Limitation — `// dry-ignore` is all-or-nothing and global to that
+declaration.** It drops the node as a candidate entirely, including against any
+*future* accidental clone of it. There is deliberately no "this particular pair
+is intentional, but keep watching each member for *other* clones"
+acknowledgment: that would be a stored, fingerprint-keyed baseline, and dry-ts
+is stateless by design (no snapshot to drift or rot). The consequence is honest:
+for an intentional N-member family (say 18 sibling templates) you either
+annotate all N declarations, or — the intended blunt instrument — exclude the
+whole path with `--exclude '<glob>'` (or `.gitignore`), accepting that it also
+hides any real duplicate that later lands there.
+
+For file- or glob-level ignores, exclude the path via `--exclude`/`.gitignore`
+(or `--no-gitignore` to override). Persisting *flags* in config (so you do not
+retype `--exclude-tests --min-nodes 40 …` every run) is a separate, planned
+convenience — config state, not a findings baseline — and does not exist yet.
 
 ### Incremental gating
 
@@ -288,6 +356,9 @@ CLUSTER 1 score=0.89 locations=2 status=unscoped
 ```
 
 Under a changed-scope, findings are marked: `status=new (intersects your change)`.
+A cluster whose declaration name recurs across files carries a trailing
+`same-name=<name>` tag (up to three names, then `(+N)`) and is ranked to the top
+— see [Curating results](#curating-results).
 
 Each location carries two diagnostic facts so a reader can classify a finding
 without opening the file: `kind` (the candidate root SyntaxKind — `Constructor`,

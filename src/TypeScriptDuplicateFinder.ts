@@ -30,6 +30,20 @@ export const TEST_EXCLUDE_GLOBS: readonly string[] = [
   "**/__mocks__/**",
 ];
 
+// Whether a reported location's file would be dropped by --exclude-tests. Built
+// from the SAME TEST_EXCLUDE_GLOBS the scan uses, so the noise-footer estimate
+// (DryTs.noiseSummary) classifies a file exactly as a real --exclude-tests run
+// would. Matched relative to cwd with normalized separators, matching the
+// scanner's globMatcher. Module-level matcher: built once, reused per call.
+const testFileMatcher = ignore().add(TEST_EXCLUDE_GLOBS.join("\n"));
+export function isTestFile(file: string): boolean {
+  const relative = path.relative(process.cwd(), path.resolve(file));
+  if (relative === "" || relative.startsWith("..") || path.isAbsolute(relative)) {
+    return false;
+  }
+  return testFileMatcher.ignores(relative.split(path.sep).join("/"));
+}
+
 export interface ScanResult {
   readonly files: readonly string[];
   readonly clusters: readonly Cluster[];
