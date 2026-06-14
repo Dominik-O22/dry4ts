@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { spawnSync } from "node:child_process";
 // Fetch the pinned large-repo benchmark corpora.
 //
 // Each corpus is pinned to a deliberate tag so numbers stay reproducible; update
@@ -12,7 +13,6 @@
 import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
 
 const CORPORA = {
   typescript: {
@@ -79,16 +79,7 @@ function atPinnedTag(corpus) {
 }
 
 function cloneFull(corpus) {
-  run("git", [
-    "clone",
-    "--depth",
-    "1",
-    "--single-branch",
-    "--branch",
-    corpus.tag,
-    corpus.repo,
-    corpus.targetDir,
-  ]);
+  run("git", ["clone", "--depth", "1", "--single-branch", "--branch", corpus.tag, corpus.repo, corpus.targetDir]);
 }
 
 function cloneSparse(corpus) {

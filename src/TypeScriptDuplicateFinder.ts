@@ -4,7 +4,7 @@ import path from "node:path";
 import ignore from "ignore";
 
 import { ClusterCollector } from "./Clusters.js";
-import { FileScanner, resolveExcludeKinds, type Entry } from "./FileScanner.js";
+import { type Entry, FileScanner, resolveExcludeKinds } from "./FileScanner.js";
 import { Options, type OptionsInput } from "./Options.js";
 import type { Cluster, ClusterLocation } from "./types.js";
 
@@ -124,9 +124,7 @@ export class TypeScriptDuplicateFinder {
     ].filter((matcher): matcher is IgnoreMatcher => matcher !== null);
     const isIgnored: IgnoreMatcher | null =
       matchers.length === 0 ? null : (filePath, isDirectory) => matchers.some((m) => m(filePath, isDirectory));
-    return this.dedupeFiles(
-      options.paths.flatMap((sourcePath) => this.typeScriptFiles(sourcePath, isIgnored)),
-    ).sort();
+    return this.dedupeFiles(options.paths.flatMap((sourcePath) => this.typeScriptFiles(sourcePath, isIgnored))).sort();
   }
 
   private gitignoreMatcher(): IgnoreMatcher | null {

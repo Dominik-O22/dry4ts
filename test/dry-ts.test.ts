@@ -5,23 +5,24 @@ import path from "node:path";
 import test from "node:test";
 
 import ts from "typescript";
-
+import { ClusterCollector } from "../src/Clusters.js";
+import { FileScanner } from "../src/FileScanner.js";
 import {
+  ChangedRegions,
+  type Cluster,
+  canonicalPath,
   formatCluster,
   main,
   Options,
   type OptionsInput,
+  parseUnifiedDiff,
   printText,
+  TypeScriptDuplicateFinder,
+  TypeScriptNormalizer,
   toEdn,
   toJson,
   USAGE,
-  TypeScriptDuplicateFinder,
-  TypeScriptNormalizer,
-  type Cluster,
 } from "../src/index.js";
-import { canonicalPath, ChangedRegions, parseUnifiedDiff } from "../src/index.js";
-import { ClusterCollector } from "../src/Clusters.js";
-import { FileScanner } from "../src/FileScanner.js";
 import { FingerprintInterner, type NormalizedNode } from "../src/NormalizedNode.js";
 
 test("reports structural duplicate candidates with file and line ranges", async () => {
@@ -48,9 +49,10 @@ export class Right {
   );
 
   assert.ok(hasClusterContaining(clusters, "left.ts", "right.ts"));
-  const cluster = clusters.find((c) =>
-    c.locations.some((loc) => loc.file === files["left.ts"]) &&
-    c.locations.some((loc) => loc.file === files["right.ts"]),
+  const cluster = clusters.find(
+    (c) =>
+      c.locations.some((loc) => loc.file === files["left.ts"]) &&
+      c.locations.some((loc) => loc.file === files["right.ts"]),
   );
   assert.ok(cluster);
   // The cluster groups both class-level and method-level locations; find the method location (startLine 3).
@@ -229,14 +231,24 @@ test("groups transitively connected candidates into clusters", () => {
   assert.equal(clusters.length, 2);
   assert.deepEqual(
     clusters.map((cluster) => cluster.locations.map((location) => location.file)),
-    [["d.ts", "e.ts"], ["a.ts", "b.ts", "c.ts"]],
+    [
+      ["d.ts", "e.ts"],
+      ["a.ts", "b.ts", "c.ts"],
+    ],
   );
   assert.deepEqual(clusters[1].score, { min: 0.85, max: 0.9 });
 });
 
 test("formats clusters with score range, location count, node size, kind, and name", () => {
   const collector = new ClusterCollector();
-  const loc = (file: string) => ({ file, startLine: 10, endLine: 14, nodes: 50, kind: "MethodDeclaration", name: "run" });
+  const loc = (file: string) => ({
+    file,
+    startLine: 10,
+    endLine: 14,
+    nodes: 50,
+    kind: "MethodDeclaration",
+    name: "run",
+  });
   collector.addMatch(loc("a.ts"), loc("b.ts"), 0.9);
   collector.addMatch(loc("b.ts"), loc("c.ts"), 0.85);
 
@@ -299,7 +311,10 @@ export function two(values: number[]): number {
   });
 
   assert.equal(clusters.length, 1);
-  assert.deepEqual(clusters[0].locations.map((location) => location.file), [files["one.ts"], files["two.ts"]]);
+  assert.deepEqual(
+    clusters[0].locations.map((location) => location.file),
+    [files["one.ts"], files["two.ts"]],
+  );
 });
 
 test("scanner attaches kind and declaration name to every candidate", async () => {
@@ -354,7 +369,10 @@ const [head] = parseList(rawInput, parserOptions, extraArgument);
   const variableEntries = entries.filter((entry) => entry.kind === "VariableStatement");
 
   // The plain identifier binding keeps its name.
-  assert.ok(variableEntries.some((entry) => entry.name === "config"), "identifier binding keeps its name");
+  assert.ok(
+    variableEntries.some((entry) => entry.name === "config"),
+    "identifier binding keeps its name",
+  );
   // No reported name is a destructuring pattern, and none contains a newline.
   for (const entry of variableEntries) {
     if (entry.name !== null) {
@@ -542,9 +560,12 @@ test("connects dense identical fingerprint groups without all pair matches", () 
 
   const collector = new ClusterCollector();
   for (const [left, right, score] of pairs) {
-    collector.addMatch(matchingPairLocation(left), matchingPairLocation(right), score);
+    collector.addMatch(probeLocation(left), probeLocation(right), score);
   }
-  assert.deepEqual(collector.clusters().map((cluster) => cluster.locations.length), [entries.length]);
+  assert.deepEqual(
+    collector.clusters().map((cluster) => cluster.locations.length),
+    [entries.length],
+  );
 });
 
 test("does not emit identical fingerprint group matches for overlapping entries", () => {
@@ -604,7 +625,14 @@ test("prints edn", () => {
 
 test("prints edn clusters instead of every candidate pair", () => {
   const collector = new ClusterCollector();
-  const loc = (file: string) => ({ file, startLine: 10, endLine: 14, nodes: 50, kind: "FunctionDeclaration", name: "handle" });
+  const loc = (file: string) => ({
+    file,
+    startLine: 10,
+    endLine: 14,
+    nodes: 50,
+    kind: "FunctionDeclaration",
+    name: "handle",
+  });
   collector.addMatch(loc("a.ts"), loc("b.ts"), 0.875);
 
   const clusters = collector.clusters();
@@ -628,23 +656,32 @@ test("renders nil for an anonymous candidate name in edn", () => {
 
 test("prints json clusters for agents and ci integrations", () => {
   const collector = new ClusterCollector();
-  const loc = (file: string) => ({ file, startLine: 10, endLine: 14, nodes: 50, kind: "ClassDeclaration", name: "Widget" });
+  const loc = (file: string) => ({
+    file,
+    startLine: 10,
+    endLine: 14,
+    nodes: 50,
+    kind: "ClassDeclaration",
+    name: "Widget",
+  });
   collector.addMatch(loc("a.ts"), loc("b.ts"), 0.875);
   collector.addMatch(loc("b.ts"), loc("c.ts"), 0.925);
 
   const clusters = collector.clusters();
 
   assert.deepEqual(JSON.parse(toJson(clusters)), {
-    clusters: [{
-      score: { min: 0.875, max: 0.925 },
-      status: "unscoped",
-      locationCount: 3,
-      locations: [
-        { file: "a.ts", startLine: 10, endLine: 14, nodes: 50, kind: "ClassDeclaration", name: "Widget" },
-        { file: "b.ts", startLine: 10, endLine: 14, nodes: 50, kind: "ClassDeclaration", name: "Widget" },
-        { file: "c.ts", startLine: 10, endLine: 14, nodes: 50, kind: "ClassDeclaration", name: "Widget" },
-      ],
-    }],
+    clusters: [
+      {
+        score: { min: 0.875, max: 0.925 },
+        status: "unscoped",
+        locationCount: 3,
+        locations: [
+          { file: "a.ts", startLine: 10, endLine: 14, nodes: 50, kind: "ClassDeclaration", name: "Widget" },
+          { file: "b.ts", startLine: 10, endLine: 14, nodes: 50, kind: "ClassDeclaration", name: "Widget" },
+          { file: "c.ts", startLine: 10, endLine: 14, nodes: 50, kind: "ClassDeclaration", name: "Widget" },
+        ],
+      },
+    ],
   });
 });
 
@@ -654,7 +691,14 @@ test("emits null for an anonymous candidate name in json", () => {
   collector.addMatch(loc("a.ts"), loc("b.ts"), 0.9);
 
   const [cluster] = JSON.parse(toJson(collector.clusters())).clusters;
-  assert.deepEqual(cluster.locations[0], { file: "a.ts", startLine: 1, endLine: 5, nodes: 30, kind: "ArrowFunction", name: null });
+  assert.deepEqual(cluster.locations[0], {
+    file: "a.ts",
+    startLine: 1,
+    endLine: 5,
+    nodes: 30,
+    kind: "ArrowFunction",
+    name: null,
+  });
 });
 
 const duplicateBody = `
@@ -800,13 +844,27 @@ function scanWith(projectDir: string, input: OptionsInput) {
   }
 }
 
+// Cluster identity as sorted line-span strings, independent of the tmp dir.
+// Used by the "flag off → output unchanged" tests to compare cluster sets.
+function clusterShape(clusters: readonly Cluster[]): string[] {
+  return clusters
+    .map((cluster) =>
+      cluster.locations
+        .map((loc) => `${loc.startLine}-${loc.endLine}`)
+        .sort()
+        .join(","),
+    )
+    .sort();
+}
+
 test("--exclude glob skips matching files during a directory scan", async () => {
   const projectDir = await excludeFixture();
-  const files = scanWith(projectDir, { exclude: ["**/*.spec.*"] }).flatMap((c) =>
-    c.locations.map((loc) => loc.file),
-  );
+  const files = scanWith(projectDir, { exclude: ["**/*.spec.*"] }).flatMap((c) => c.locations.map((loc) => loc.file));
   assert.ok(files.length > 0, "the real a.ts/b.ts duplicate should still cluster");
-  assert.ok(files.every((f) => !f.endsWith(".spec.ts")), `spec file should be excluded, got: ${JSON.stringify(files)}`);
+  assert.ok(
+    files.every((f) => !f.endsWith(".spec.ts")),
+    `spec file should be excluded, got: ${JSON.stringify(files)}`,
+  );
 });
 
 test("--exclude is repeatable and applies even with --no-gitignore", async () => {
@@ -828,7 +886,13 @@ test("--exclude does not affect an explicitly passed file argument", async () =>
   try {
     process.chdir(projectDir);
     const files = new TypeScriptDuplicateFinder()
-      .findClusters({ paths: ["a.spec.ts", "a.ts"], threshold: 0.2, minLines: 3, minNodes: 8, exclude: ["**/*.spec.*"] })
+      .findClusters({
+        paths: ["a.spec.ts", "a.ts"],
+        threshold: 0.2,
+        minLines: 3,
+        minNodes: 8,
+        exclude: ["**/*.spec.*"],
+      })
       .flatMap((c) => c.locations.map((loc) => loc.file));
     assert.ok(
       files.some((f) => f.endsWith("a.spec.ts")),
@@ -946,7 +1010,7 @@ async function exhaustiveClusters(
       }
       const score = exhaustiveSimilarity(left, right);
       if (score >= options.threshold) {
-        collector.addMatch(exhaustiveLocation(left), exhaustiveLocation(right), score);
+        collector.addMatch(probeLocation(left), probeLocation(right), score);
       }
     }
   }
@@ -1057,7 +1121,14 @@ function exhaustiveLineRangeFor(sourceFile: ts.SourceFile, node: ts.Node): { sta
   };
 }
 
-function exhaustiveLocation(entry: ExhaustiveEntry): { file: string; startLine: number; endLine: number; nodes: number } {
+// Shared by the exhaustive and matching-pair cross-check harnesses (their entry
+// types are the same shape) — one builder so the two never drift or self-cluster.
+function probeLocation(entry: MatchingPairProbeEntry): {
+  file: string;
+  startLine: number;
+  endLine: number;
+  nodes: number;
+} {
   return { file: entry.file, startLine: entry.startLine, endLine: entry.endLine, nodes: entry.nodes };
 }
 
@@ -1139,15 +1210,6 @@ function matchingPairEntry(
   const ids = Float64Array.from(new Set(fingerprints.map(probeFingerprintId)));
   ids.sort();
   return { file, startLine, endLine, nodes: ids.length, fingerprints: ids };
-}
-
-function matchingPairLocation(entry: MatchingPairProbeEntry): {
-  file: string;
-  startLine: number;
-  endLine: number;
-  nodes: number;
-} {
-  return { file: entry.file, startLine: entry.startLine, endLine: entry.endLine, nodes: entry.nodes };
 }
 
 function testEntriesOverlap(left: MatchingPairProbeEntry, right: MatchingPairProbeEntry): boolean {
@@ -1260,7 +1322,10 @@ test("main --help prints USAGE to stdout", async () => {
   } finally {
     console.log = original;
   }
-  assert.ok(lines.some((line) => line.includes("Usage: dry-ts")), `Expected USAGE in stdout, got: ${JSON.stringify(lines)}`);
+  assert.ok(
+    lines.some((line) => line.includes("Usage: dry-ts")),
+    `Expected USAGE in stdout, got: ${JSON.stringify(lines)}`,
+  );
   assert.ok(lines.some((line) => line.includes(USAGE.split("\n")[0])));
 });
 
@@ -1304,7 +1369,19 @@ test("main --fail-on-duplicates with duplicates sets exitCode 1", async () => {
     "beta.ts": duplicateBody,
   });
   const result = Bun.spawnSync(
-    ["bun", "run", "src/bin/dry-ts.ts", "--fail-on-duplicates", "--threshold", "0.2", "--min-lines", "3", "--min-nodes", "8", dir],
+    [
+      "bun",
+      "run",
+      "src/bin/dry-ts.ts",
+      "--fail-on-duplicates",
+      "--threshold",
+      "0.2",
+      "--min-lines",
+      "3",
+      "--min-nodes",
+      "8",
+      dir,
+    ],
     { cwd: repoRoot },
   );
   assert.equal(result.exitCode, 1);
@@ -1314,7 +1391,19 @@ test("main --fail-on-duplicates with no duplicates leaves exitCode 0", async () 
   const dir = await mkdtemp(path.join(tmpdir(), "dry-ts-nodups-"));
   await writeFile(path.join(dir, "solo.ts"), duplicateBody);
   const result = Bun.spawnSync(
-    ["bun", "run", "src/bin/dry-ts.ts", "--fail-on-duplicates", "--threshold", "0.99", "--min-lines", "100", "--min-nodes", "9999", dir],
+    [
+      "bun",
+      "run",
+      "src/bin/dry-ts.ts",
+      "--fail-on-duplicates",
+      "--threshold",
+      "0.99",
+      "--min-lines",
+      "100",
+      "--min-nodes",
+      "9999",
+      dir,
+    ],
     { cwd: repoRoot },
   );
   assert.equal(result.exitCode, 0);
@@ -1488,10 +1577,7 @@ const hermeticGitEnv = {
   GIT_CONFIG_SYSTEM: "/dev/null",
 };
 
-function runCli(
-  args: readonly string[],
-  cwd: string,
-): { exitCode: number; stdout: string; stderr: string } {
+function runCli(args: readonly string[], cwd: string): { exitCode: number; stdout: string; stderr: string } {
   const result = Bun.spawnSync(["bun", "run", path.join(repoRoot, "src/bin/dry-ts.ts"), ...args], {
     cwd,
     env: hermeticGitEnv,
@@ -1630,7 +1716,16 @@ const parseDiffCases: Array<{
   },
   {
     name: "no-newline marker inside a hunk is skipped",
-    diff: ["diff --git a/a.ts b/a.ts", "--- a/a.ts", "+++ b/a.ts", "@@ -1,1 +1,1 @@", "-x", "\\ No newline at end of file", "+y", "\\ No newline at end of file"],
+    diff: [
+      "diff --git a/a.ts b/a.ts",
+      "--- a/a.ts",
+      "+++ b/a.ts",
+      "@@ -1,1 +1,1 @@",
+      "-x",
+      "\\ No newline at end of file",
+      "+y",
+      "\\ No newline at end of file",
+    ],
     expect: [{ file: "a.ts", start: 1, end: 1 }],
   },
   {
@@ -1652,9 +1747,15 @@ for (const { name, diff, expect } of parseDiffCases) {
 
 const parseDiffErrorCases: Array<{ name: string; diff: string[] }> = [
   { name: "unrecognized line", diff: ["this is not a diff"] },
-  { name: "truncated hunk", diff: ["diff --git a/a.ts b/a.ts", "--- a/a.ts", "+++ b/a.ts", "@@ -1,2 +1,2 @@", "-x", "+y"] },
+  {
+    name: "truncated hunk",
+    diff: ["diff --git a/a.ts b/a.ts", "--- a/a.ts", "+++ b/a.ts", "@@ -1,2 +1,2 @@", "-x", "+y"],
+  },
   { name: "hunk before any file header", diff: ["@@ -1,1 +1,1 @@", "-x", "+y"] },
-  { name: "context line inside a -U0 hunk", diff: ["diff --git a/a.ts b/a.ts", "--- a/a.ts", "+++ b/a.ts", "@@ -1,1 +1,1 @@", " context"] },
+  {
+    name: "context line inside a -U0 hunk",
+    diff: ["diff --git a/a.ts b/a.ts", "--- a/a.ts", "+++ b/a.ts", "@@ -1,1 +1,1 @@", " context"],
+  },
 ];
 
 for (const { name, diff } of parseDiffErrorCases) {
@@ -1760,7 +1861,10 @@ test("--changed-from diffs from merge-base, not literally from the ref", async (
   const result = runCli([...gateFlags, "--json", "--fail-on-duplicates", "--changed-from", "main", "."], dir);
   assert.equal(result.exitCode, 0, `${result.stdout}\n${result.stderr}`);
   const statuses = [...statusByFile(result.stdout).values()];
-  assert.ok(statuses.every((status) => status === "known"), result.stdout);
+  assert.ok(
+    statuses.every((status) => status === "known"),
+    result.stdout,
+  );
 });
 
 test("--changed-from sees edits in a tracked file whose name contains a space", async () => {
@@ -1883,7 +1987,10 @@ async function newAndKnownFixture(): Promise<string> {
 }
 
 test("--only-new hides known clusters from output but keeps the new ones", async () => {
-  const result = runCli([...gateFlags, "--json", "--only-new", "--changed", "edited.ts", "."], await newAndKnownFixture());
+  const result = runCli(
+    [...gateFlags, "--json", "--only-new", "--changed", "edited.ts", "."],
+    await newAndKnownFixture(),
+  );
   assert.equal(result.exitCode, 0, result.stderr);
   const statuses = statusByFile(result.stdout);
   assert.equal(statuses.get("edited.ts"), "new", result.stdout);
@@ -2083,9 +2190,7 @@ test("--exclude-kinds Constructor drops the constructor cluster but keeps functi
     excludeKinds: ["Constructor"],
   });
   assert.ok(!hasConstructorCluster(clusters), "constructor cluster should be excluded");
-  const functionCluster = clusters.find((cluster) =>
-    cluster.locations.every((location) => location.startLine >= 18),
-  );
+  const functionCluster = clusters.find((cluster) => cluster.locations.every((location) => location.startLine >= 18));
   assert.ok(functionCluster, "real function duplicate should still cluster");
 });
 
@@ -2124,7 +2229,9 @@ export class ImplB {
     );
   // The class methods share the same body — a real, non-signature duplicate.
   const hasMethodCluster = (clusters: readonly Cluster[]) =>
-    clusters.some((cluster) => cluster.locations.some((location) => location.startLine >= 6 && location.endLine > location.startLine));
+    clusters.some((cluster) =>
+      cluster.locations.some((location) => location.startLine >= 6 && location.endLine > location.startLine),
+    );
 
   const withSignatures = new TypeScriptDuplicateFinder().findClusters(base);
   const withoutSignatures = new TypeScriptDuplicateFinder().findClusters({
@@ -2132,7 +2239,10 @@ export class ImplB {
     excludeKinds: ["PropertySignature"],
   });
   assert.ok(hasMemberSignatureLocation(withSignatures), "member signatures should cluster by default");
-  assert.ok(!hasMemberSignatureLocation(withoutSignatures), "excluding PropertySignature should drop member-signature candidates");
+  assert.ok(
+    !hasMemberSignatureLocation(withoutSignatures),
+    "excluding PropertySignature should drop member-signature candidates",
+  );
   assert.ok(hasMethodCluster(withoutSignatures), "the method-body duplicate should still cluster");
 });
 
@@ -2144,7 +2254,12 @@ test("--exclude-kinds rejects unknown or non-candidate kind names", () => {
 });
 
 test("--exclude-kinds parses comma-separated and repeated values", () => {
-  const options = Options.parse("--exclude-kinds", "Constructor,PropertySignature", "--exclude-kinds", "MethodSignature");
+  const options = Options.parse(
+    "--exclude-kinds",
+    "Constructor,PropertySignature",
+    "--exclude-kinds",
+    "MethodSignature",
+  );
   assert.deepEqual(options.excludeKinds, ["Constructor", "PropertySignature", "MethodSignature"]);
 });
 
@@ -2170,6 +2285,13 @@ function ignoreFn(name: string, lead = ""): string {
 
 const ignoreScan = { threshold: 0.8, minLines: 3, minNodes: 6 };
 
+// Writes the fixture and asserts it yields no clusters under ignoreScan. Shared
+// by the suppression tests so their bodies don't become structurally identical.
+async function assertNoClustersWithIgnore(sources: Record<string, string>, message?: string): Promise<void> {
+  const { dir } = await writeFixture(sources);
+  assert.equal(new TypeScriptDuplicateFinder().findClusters({ paths: [dir], ...ignoreScan }).length, 0, message);
+}
+
 test("without a directive, an identical function clusters across files", async () => {
   const { dir } = await writeFixture({ "a.ts": ignoreFn("alpha"), "b.ts": ignoreFn("beta") });
   const clusters = new TypeScriptDuplicateFinder().findClusters({ paths: [dir], ...ignoreScan });
@@ -2194,22 +2316,15 @@ test("// dry-ignore on both occurrences suppresses the cluster; removing it rest
 });
 
 test("/* dry-ignore */ block-comment form suppresses the candidate", async () => {
-  const { dir } = await writeFixture({
+  await assertNoClustersWithIgnore({
     "a.ts": ignoreFn("alpha", "/* dry-ignore */\n"),
     "b.ts": ignoreFn("beta", "/* dry-ignore */\n"),
   });
-  assert.equal(new TypeScriptDuplicateFinder().findClusters({ paths: [dir], ...ignoreScan }).length, 0);
 });
 
-// dry-ignore — structurally identical to the block-comment test above; this is
-// dry-ts dogfooding its own directive on the duplicate test body.
-test("a directive on only one of two occurrences drops the pair (no surviving partner)",
-  // dry-ignore
-  async () => {
-  const { dir } = await writeFixture({ "a.ts": ignoreFn("alpha", "// dry-ignore\n"), "b.ts": ignoreFn("beta") });
-  assert.equal(
-    new TypeScriptDuplicateFinder().findClusters({ paths: [dir], ...ignoreScan }).length,
-    0,
+test("a directive on only one of two occurrences drops the pair (no surviving partner)", async () => {
+  await assertNoClustersWithIgnore(
+    { "a.ts": ignoreFn("alpha", "// dry-ignore\n"), "b.ts": ignoreFn("beta") },
     "with one occurrence suppressed the other has no partner",
   );
 });
@@ -2323,13 +2438,7 @@ test("--min-distinct-kinds 0 (default) leaves output byte-for-byte unchanged", a
     minDistinctKinds: 0,
   });
   // Compare cluster shape (line spans per file) — the tmp dir differs.
-  const shape = (clusters: readonly Cluster[]) =>
-    clusters
-      .map((cluster) =>
-        cluster.locations.map((loc) => `${loc.startLine}-${loc.endLine}`).sort().join(","),
-      )
-      .sort();
-  assert.deepEqual(shape(withZero), shape(withoutFlag));
+  assert.deepEqual(clusterShape(withZero), clusterShape(withoutFlag));
 });
 
 test("--min-distinct-kinds rejects a negative floor", () => {
@@ -2431,9 +2540,7 @@ test("--exclude-tagged-templates off (default) leaves output byte-for-byte uncha
     ...taggedScan,
     excludeTaggedTemplates: false,
   });
-  const shape = (clusters: readonly Cluster[]) =>
-    clusters.map((cluster) => cluster.locations.map((loc) => `${loc.startLine}-${loc.endLine}`).sort().join(",")).sort();
-  assert.deepEqual(shape(withFalse), shape(withoutFlag));
+  assert.deepEqual(clusterShape(withFalse), clusterShape(withoutFlag));
 });
 
 test("--exclude-tagged-templates parses as a boolean flag", () => {

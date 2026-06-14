@@ -54,9 +54,7 @@ export class ChangedRegions {
     if (entries.length === 0) {
       return "  (no changed regions)";
     }
-    return entries
-      .flatMap(({ file, ranges }) => ranges.map((range) => `  ${describeRange(file, range)}`))
-      .join("\n");
+    return entries.flatMap(({ file, ranges }) => ranges.map((range) => `  ${describeRange(file, range)}`)).join("\n");
   }
 }
 

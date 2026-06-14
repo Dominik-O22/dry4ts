@@ -58,7 +58,7 @@ function generateIdentical(total) {
       const id = fileIndex * FUNCTIONS_PER_FILE + i;
       functions.push(identicalFunction(id));
     }
-    files.push([`identical-${fileIndex}.ts`, functions.join("\n\n") + "\n"]);
+    files.push([`identical-${fileIndex}.ts`, `${functions.join("\n\n")}\n`]);
   }
   return files;
 }
@@ -88,7 +88,7 @@ function generateOneliners(total) {
       const id = fileIndex * ONELINERS_PER_FILE + i;
       lines.push(`export const one${id} = (value: number): number => value + ${id};`);
     }
-    files.push([`oneliners-${fileIndex}.ts`, lines.join("\n") + "\n"]);
+    files.push([`oneliners-${fileIndex}.ts`, `${lines.join("\n")}\n`]);
   }
   return files;
 }
@@ -100,12 +100,9 @@ function generateNested(maxDepth) {
     for (let i = 0; i < depth; i += 1) {
       expression = `(seed + ${expression})`;
     }
-    const content = [
-      `export function nested${depth}(seed: number): number {`,
-      `  return ${expression};`,
-      `}`,
-      "",
-    ].join("\n");
+    const content = [`export function nested${depth}(seed: number): number {`, `  return ${expression};`, `}`, ""].join(
+      "\n",
+    );
     files.push([`nested-${depth}.ts`, content]);
   }
   return files;
@@ -125,5 +122,5 @@ function integerFlag(flag, fallback) {
 
 function stringFlag(flag, fallback) {
   const index = args.indexOf(flag);
-  return index === -1 ? fallback : args[index + 1] ?? fallback;
+  return index === -1 ? fallback : (args[index + 1] ?? fallback);
 }

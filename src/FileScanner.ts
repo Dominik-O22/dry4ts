@@ -174,22 +174,54 @@ function sortedUnique(hashes: readonly number[], start: number): Float64Array {
 // the order shown to users.
 const candidateKinds: readonly { name: string; kind: ts.SyntaxKind; blurb: string }[] = [
   { name: "ClassDeclaration", kind: ts.SyntaxKind.ClassDeclaration, blurb: "a `class Foo {}` declaration" },
-  { name: "InterfaceDeclaration", kind: ts.SyntaxKind.InterfaceDeclaration, blurb: "an `interface Foo {}` declaration" },
+  {
+    name: "InterfaceDeclaration",
+    kind: ts.SyntaxKind.InterfaceDeclaration,
+    blurb: "an `interface Foo {}` declaration",
+  },
   { name: "TypeAliasDeclaration", kind: ts.SyntaxKind.TypeAliasDeclaration, blurb: "a `type Foo = ...` alias" },
   { name: "EnumDeclaration", kind: ts.SyntaxKind.EnumDeclaration, blurb: "an `enum Foo {}` declaration" },
-  { name: "ModuleDeclaration", kind: ts.SyntaxKind.ModuleDeclaration, blurb: "a `namespace Foo {}` / `module Foo {}` block" },
+  {
+    name: "ModuleDeclaration",
+    kind: ts.SyntaxKind.ModuleDeclaration,
+    blurb: "a `namespace Foo {}` / `module Foo {}` block",
+  },
   { name: "FunctionDeclaration", kind: ts.SyntaxKind.FunctionDeclaration, blurb: "a `function foo() {}` declaration" },
-  { name: "MethodDeclaration", kind: ts.SyntaxKind.MethodDeclaration, blurb: "a method body in a class or object literal: `foo() {}`" },
+  {
+    name: "MethodDeclaration",
+    kind: ts.SyntaxKind.MethodDeclaration,
+    blurb: "a method body in a class or object literal: `foo() {}`",
+  },
   { name: "Constructor", kind: ts.SyntaxKind.Constructor, blurb: "a class `constructor() {}`" },
   { name: "GetAccessor", kind: ts.SyntaxKind.GetAccessor, blurb: "a getter: `get foo() {}`" },
   { name: "SetAccessor", kind: ts.SyntaxKind.SetAccessor, blurb: "a setter: `set foo(v) {}`" },
-  { name: "PropertyDeclaration", kind: ts.SyntaxKind.PropertyDeclaration, blurb: "a class field: `foo = ...` / `foo: T`" },
-  { name: "PropertySignature", kind: ts.SyntaxKind.PropertySignature, blurb: "a property in an interface/type: `foo: T`" },
-  { name: "MethodSignature", kind: ts.SyntaxKind.MethodSignature, blurb: "a method signature in an interface/type: `foo(): T`" },
+  {
+    name: "PropertyDeclaration",
+    kind: ts.SyntaxKind.PropertyDeclaration,
+    blurb: "a class field: `foo = ...` / `foo: T`",
+  },
+  {
+    name: "PropertySignature",
+    kind: ts.SyntaxKind.PropertySignature,
+    blurb: "a property in an interface/type: `foo: T`",
+  },
+  {
+    name: "MethodSignature",
+    kind: ts.SyntaxKind.MethodSignature,
+    blurb: "a method signature in an interface/type: `foo(): T`",
+  },
   { name: "CallSignature", kind: ts.SyntaxKind.CallSignature, blurb: "a callable signature in a type: `(arg: T): U`" },
-  { name: "ConstructSignature", kind: ts.SyntaxKind.ConstructSignature, blurb: "a constructable signature in a type: `new (): T`" },
+  {
+    name: "ConstructSignature",
+    kind: ts.SyntaxKind.ConstructSignature,
+    blurb: "a constructable signature in a type: `new (): T`",
+  },
   { name: "IndexSignature", kind: ts.SyntaxKind.IndexSignature, blurb: "an index signature: `[key: string]: T`" },
-  { name: "VariableStatement", kind: ts.SyntaxKind.VariableStatement, blurb: "a `const` / `let` / `var` statement (the whole declaration line)" },
+  {
+    name: "VariableStatement",
+    kind: ts.SyntaxKind.VariableStatement,
+    blurb: "a `const` / `let` / `var` statement (the whole declaration line)",
+  },
   { name: "EnumMember", kind: ts.SyntaxKind.EnumMember, blurb: "a single member inside an enum" },
   { name: "ArrowFunction", kind: ts.SyntaxKind.ArrowFunction, blurb: "an arrow function used as a value: `() => {}`" },
   { name: "FunctionExpression", kind: ts.SyntaxKind.FunctionExpression, blurb: "a `function () {}` used as a value" },
@@ -200,22 +232,19 @@ const candidateRootKinds = new Set<ts.SyntaxKind>(candidateKinds.map((entry) => 
 const EMPTY_KIND_SET: ReadonlySet<ts.SyntaxKind> = new Set();
 
 // Derived from candidateKinds so the two can never drift.
-const candidateKindByName = new Map<string, ts.SyntaxKind>(
-  candidateKinds.map((entry) => [entry.name, entry.kind]),
-);
+const candidateKindByName = new Map<string, ts.SyntaxKind>(candidateKinds.map((entry) => [entry.name, entry.kind]));
 
 // Reverse of candidateKindByName: the canonical name dry-ts reports for a
 // candidate root kind. Lookup is always populated at the call site (guarded by
 // candidateRootKinds), so the get() there is non-null.
-const candidateKindNameByKind = new Map<ts.SyntaxKind, string>(
-  candidateKinds.map((entry) => [entry.kind, entry.name]),
-);
+const candidateKindNameByKind = new Map<ts.SyntaxKind, string>(candidateKinds.map((entry) => [entry.kind, entry.name]));
 
 export const candidateKindNames: readonly string[] = candidateKinds.map((entry) => entry.name);
 
 // For help and README docs.
-export const candidateKindDescriptions: readonly { name: string; blurb: string }[] =
-  candidateKinds.map(({ name, blurb }) => ({ name, blurb }));
+export const candidateKindDescriptions: readonly { name: string; blurb: string }[] = candidateKinds.map(
+  ({ name, blurb }) => ({ name, blurb }),
+);
 
 // Resolves --exclude-kinds names to SyntaxKinds, validating each against the
 // candidate set. An unknown or non-candidate name throws rather than silently
@@ -259,10 +288,7 @@ function hasIgnoreDirective(text: string, node: ts.Node): boolean {
   }
   for (const range of ranges) {
     const raw = text.substring(range.pos, range.end);
-    const body =
-      range.kind === ts.SyntaxKind.MultiLineCommentTrivia
-        ? raw.slice(2, -2)
-        : raw.slice(2);
+    const body = range.kind === ts.SyntaxKind.MultiLineCommentTrivia ? raw.slice(2, -2) : raw.slice(2);
     if (/^\s*dry-ignore(-next-line)?\b/.test(body)) {
       return true;
     }

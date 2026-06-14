@@ -33,7 +33,9 @@
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.json && bun scripts/prepare-bin.mjs",
     "test": "bun test",
-    "check": "bun run build && bun test && bun ./dist/bin/dry-ts.js --fail-on-duplicates src test",
+    "lint": "biome check src test scripts",
+    "format": "biome check --write src test scripts",
+    "check": "bun run lint && bun run build && bun test && bun ./dist/bin/dry-ts.js --fail-on-duplicates src test",
     "ci": "bun run check",
     "bench": "bun run build && bun scripts/benchmark.mjs",
     "bench:corpus": "bun scripts/bench-corpus.mjs",
@@ -56,6 +58,7 @@
     "typescript": "^5.9.3"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.0",
     "@tanstack/intent": "^0.0.42",
     "@types/node": "^22.0.0"
   },

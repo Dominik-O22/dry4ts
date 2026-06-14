@@ -1,6 +1,6 @@
 import fs from "node:fs";
 
-import { canonicalPath, ChangedRegions, parseUnifiedDiff } from "./ChangedRegions.js";
+import { ChangedRegions, canonicalPath, parseUnifiedDiff } from "./ChangedRegions.js";
 import { maxScore, minScore } from "./Clusters.js";
 import { candidateKindNames } from "./FileScanner.js";
 import { GitProvider } from "./GitProvider.js";
@@ -14,9 +14,8 @@ function wrapKinds(names: readonly string[], indent: string, width: number): str
   let current = `${indent}Valid kinds: `;
   for (const [index, name] of names.entries()) {
     const token = index < names.length - 1 ? `${name},` : name;
-    const candidate = current.trimEnd() === indent.trimEnd() || current.endsWith(": ")
-      ? current + token
-      : `${current} ${token}`;
+    const candidate =
+      current.trimEnd() === indent.trimEnd() || current.endsWith(": ") ? current + token : `${current} ${token}`;
     if (candidate.length > width && current.trim() !== "") {
       lines.push(current.trimEnd());
       current = `${indent}${token}`;

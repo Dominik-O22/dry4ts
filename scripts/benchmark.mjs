@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { performance } from "node:perf_hooks";
 import { spawnSync } from "node:child_process";
+import { performance } from "node:perf_hooks";
 
 const args = process.argv.slice(2);
 const runsFlag = args.indexOf("--runs");
@@ -15,11 +15,11 @@ let clusters = 0;
 
 for (let i = 0; i < runs; i += 1) {
   const start = performance.now();
-  const result = spawnSync(
-    "bun",
-    ["./dist/bin/dry-ts.js", "--format", "json", "--no-gitignore", ...scanPaths],
-    { cwd: process.cwd(), encoding: "utf8", maxBuffer: 1024 * 1024 * 256 },
-  );
+  const result = spawnSync("bun", ["./dist/bin/dry-ts.js", "--format", "json", "--no-gitignore", ...scanPaths], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 256,
+  });
   const elapsed = performance.now() - start;
   if (result.status !== 0) {
     process.stderr.write(result.stderr);
@@ -35,11 +35,17 @@ const seconds = timings.map((ms) => ms / 1000);
 const best = Math.min(...seconds);
 const average = seconds.reduce((sum, value) => sum + value, 0) / seconds.length;
 
-console.log(JSON.stringify({
-  paths: scanPaths,
-  runs,
-  clusters,
-  seconds: seconds.map((value) => Number(value.toFixed(3))),
-  bestSeconds: Number(best.toFixed(3)),
-  averageSeconds: Number(average.toFixed(3)),
-}, null, 2));
+console.log(
+  JSON.stringify(
+    {
+      paths: scanPaths,
+      runs,
+      clusters,
+      seconds: seconds.map((value) => Number(value.toFixed(3))),
+      bestSeconds: Number(best.toFixed(3)),
+      averageSeconds: Number(average.toFixed(3)),
+    },
+    null,
+    2,
+  ),
+);
