@@ -60,6 +60,10 @@ Options:
                 Exit 1 on findings. With --changed-from/--changed, only
                 clusters with status "new" gate; otherwise any cluster does.
 --no-gitignore  Include files and directories ignored by .gitignore
+--exclude GLOB  Skip files/directories matching a .gitignore-style glob, e.g.
+                --exclude '**/*.spec.*'. Repeatable. Applies during directory
+                scans regardless of --no-gitignore; explicit file arguments are
+                always scanned.
 --exclude-kinds KIND[,KIND...]
                 Drop candidate declarations of the given SyntaxKinds before
                 matching. Comma-separated and repeatable. Opt-in only: with no
@@ -174,6 +178,8 @@ including any pre-existing duplication inside it; use `--changed-from` for
 line-level precision.
 
 When no paths are provided, dry-ts scans `src`. Directory arguments recursively include `.js`, `.jsx`, `.ts`, `.tsx`, `.mts`, and `.cts` files, excluding TypeScript declaration files. Directory scans respect `.gitignore` from the working directory by default; pass `--no-gitignore` to include ignored paths. Explicit file arguments are always scanned even when they match a `.gitignore` pattern.
+
+`--exclude GLOB` drops files and directories matching a `.gitignore`-style glob, e.g. `--exclude '**/*.spec.*' --exclude '**/*.stories.*'`. It is repeatable and applies during directory scans regardless of `--no-gitignore` (it is an explicit instruction, not repo config); explicit file arguments are still always scanned. This is the highest-leverage way to cut whole categories of expected duplication — on a large frontend codebase, test and story files alone are typically about half of all reported clusters.
 
 Default text output:
 

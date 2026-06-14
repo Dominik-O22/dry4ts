@@ -5,6 +5,19 @@ All notable changes to dry-ts are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-06-14
+
+### Added
+
+- `--exclude GLOB` skips files and directories matching a `.gitignore`-style
+  glob during directory scans, e.g. `--exclude '**/*.spec.*'`. Repeatable, and
+  applies regardless of `--no-gitignore` (it is an explicit instruction, not
+  repo config); explicit file arguments are still always scanned. This is the
+  highest-leverage false-positive filter for real codebases: on a large
+  frontend corpus, test and story files alone account for roughly half of all
+  reported clusters, and a couple of `--exclude` globs remove them in one pass
+  while keeping every real duplicate elsewhere.
+
 ## [0.6.0] - 2026-06-14
 
 ### Added
