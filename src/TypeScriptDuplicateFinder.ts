@@ -6,7 +6,7 @@ import ignore from "ignore";
 import { ClusterCollector } from "./Clusters.js";
 import { FileScanner, resolveExcludeKinds, type Entry } from "./FileScanner.js";
 import { Options, type OptionsInput } from "./Options.js";
-import type { Cluster, Location } from "./types.js";
+import type { Cluster, ClusterLocation } from "./types.js";
 
 type MatchingPair = readonly [Entry, Entry, number];
 
@@ -43,7 +43,7 @@ export class TypeScriptDuplicateFinder {
     // FileScanner already enforces minNodes; entries arrive pre-filtered.
     const collector = new ClusterCollector();
     for (const [left, right, score] of this.matchingPairs(entries, options.threshold)) {
-      collector.addMatch({ ...location(left), nodes: left.nodes }, { ...location(right), nodes: right.nodes }, score);
+      collector.addMatch(clusterLocation(left), clusterLocation(right), score);
     }
     return collector.clusters().filter((cluster) => cluster.locations.length >= options.minLocations);
   }
@@ -214,8 +214,15 @@ function isTypeScriptSource(file: string): boolean {
   );
 }
 
-function location(entry: Entry): Location {
-  return { file: entry.file, startLine: entry.startLine, endLine: entry.endLine };
+function clusterLocation(entry: Entry): ClusterLocation {
+  return {
+    file: entry.file,
+    startLine: entry.startLine,
+    endLine: entry.endLine,
+    nodes: entry.nodes,
+    kind: entry.kind,
+    name: entry.name,
+  };
 }
 
 function overlaps(left: Entry, right: Entry): boolean {

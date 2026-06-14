@@ -19,6 +19,7 @@ starting, honor its STOP conditions, and update the plan row when done.
 | [009](009-dry-ignore-directive.md) | Inline `// dry-ignore` directive (#22) | P2 | S | - | DONE (branch `advisor/009-dry-ignore`, 2026-06-14; leading-trivia `// dry-ignore` / `-next-line` + block form at the candidate gate, node-scoped, no second parse; 6 tests, gate green at 115 pass; README documented; dogfooded on a twin test body) |
 | [010](010-type-aware-normalization.md) | Optional type-aware normalization (#21) | P3 | M | 007,008 (soft) | TODO |
 | [011](011-dryrc-config-file.md) | `.dryrc` config + per-path overrides (#23) | P3 | L | 007,008 | TODO |
+| [012](012-explain-flag.md) | `--explain` match-explanation output (#29) | P2 | M | 008, PR #38 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale).
@@ -63,7 +64,10 @@ Real AST-dup tools also reduce false positives with reducers absent from
   do not match class/property-heavy shapes.
 - #29 — match explainability in output: shared fingerprint count, candidate
   kind, dominant kinds. Shares the per-candidate kind histogram with plan 008,
-  so build them together.
+  so build them together. **Candidate kind per location shipped in PR #38**
+  (`kind`/`name` on each location); dominant-kinds histogram is plan 012
+  (`--explain`, opt-in); shared-fingerprint count deferred to pair-provenance
+  (see TODOS) — marginal value, ill-defined for transitive clusters.
 
 ## Dependency Notes
 

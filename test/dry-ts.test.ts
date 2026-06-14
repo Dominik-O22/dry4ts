@@ -234,9 +234,9 @@ test("groups transitively connected candidates into clusters", () => {
   assert.deepEqual(clusters[1].score, { min: 0.85, max: 0.9 });
 });
 
-test("formats clusters with score range, location count, and node size", () => {
+test("formats clusters with score range, location count, node size, kind, and name", () => {
   const collector = new ClusterCollector();
-  const loc = (file: string) => ({ file, startLine: 10, endLine: 14, nodes: 50 });
+  const loc = (file: string) => ({ file, startLine: 10, endLine: 14, nodes: 50, kind: "MethodDeclaration", name: "run" });
   collector.addMatch(loc("a.ts"), loc("b.ts"), 0.9);
   collector.addMatch(loc("b.ts"), loc("c.ts"), 0.85);
 
@@ -244,7 +244,18 @@ test("formats clusters with score range, location count, and node size", () => {
 
   assert.equal(
     formatCluster(clusters[0], 1),
-    "CLUSTER 1 score=0.85-0.90 locations=3 status=unscoped\n  a.ts:10-14 nodes=50\n  b.ts:10-14 nodes=50\n  c.ts:10-14 nodes=50",
+    "CLUSTER 1 score=0.85-0.90 locations=3 status=unscoped\n  a.ts:10-14 nodes=50 kind=MethodDeclaration name=run\n  b.ts:10-14 nodes=50 kind=MethodDeclaration name=run\n  c.ts:10-14 nodes=50 kind=MethodDeclaration name=run",
+  );
+});
+
+test("omits name in text output for an anonymous candidate, keeps kind", () => {
+  const collector = new ClusterCollector();
+  const loc = (file: string) => ({ file, startLine: 1, endLine: 5, nodes: 30, kind: "ArrowFunction", name: null });
+  collector.addMatch(loc("a.ts"), loc("b.ts"), 0.9);
+
+  assert.equal(
+    formatCluster(collector.clusters()[0], 1),
+    "CLUSTER 1 score=0.90 locations=2 status=unscoped\n  a.ts:1-5 nodes=30 kind=ArrowFunction\n  b.ts:1-5 nodes=30 kind=ArrowFunction",
   );
 });
 
@@ -289,6 +300,110 @@ export function two(values: number[]): number {
 
   assert.equal(clusters.length, 1);
   assert.deepEqual(clusters[0].locations.map((location) => location.file), [files["one.ts"], files["two.ts"]]);
+});
+
+test("scanner attaches kind and declaration name to every candidate", async () => {
+  const { files } = await writeFixture({
+    "svc.ts": `
+export function compute(values: number[]): number {
+  return values.reduce((sum, value) => sum + value, 0);
+}
+
+export class Service {
+  constructor(private readonly repo: Repository) {}
+
+  run(input: string): string {
+    return input.trim();
+  }
+}
+
+export const handler = (event: string): string => event.toUpperCase();
+`,
+  });
+
+  const entries = new FileScanner().scanFile(files["svc.ts"], 1, 1);
+  const labelled = entries.map((entry) => ({ kind: entry.kind, name: entry.name }));
+
+  // Named declarations carry their identifier; a constructor is labelled by
+  // keyword; an arrow value is anonymous (null).
+  assert.ok(labelled.some((entry) => entry.kind === "FunctionDeclaration" && entry.name === "compute"));
+  assert.ok(labelled.some((entry) => entry.kind === "ClassDeclaration" && entry.name === "Service"));
+  assert.ok(labelled.some((entry) => entry.kind === "Constructor" && entry.name === "constructor"));
+  assert.ok(labelled.some((entry) => entry.kind === "MethodDeclaration" && entry.name === "run"));
+  assert.ok(labelled.some((entry) => entry.kind === "VariableStatement" && entry.name === "handler"));
+  assert.ok(labelled.some((entry) => entry.kind === "ArrowFunction" && entry.name === null));
+});
+
+test("a destructuring VariableStatement reports name null, not the binding pattern text", async () => {
+  // `const { a, b } = ...` / `const [x] = ...` have no single identifier name.
+  // getText() on the binding would be the whole pattern (and multi-line patterns
+  // would break the single-line text format), so the name must be null.
+  const { files } = await writeFixture({
+    "destructure.ts": `
+export const config = useConfig(input, defaults, fallback, override);
+const {
+  alpha,
+  beta,
+  gamma,
+} = useThing(first, second, third, fourth);
+const [head] = parseList(rawInput, parserOptions, extraArgument);
+`,
+  });
+
+  const entries = new FileScanner().scanFile(files["destructure.ts"], 1, 1);
+  const variableEntries = entries.filter((entry) => entry.kind === "VariableStatement");
+
+  // The plain identifier binding keeps its name.
+  assert.ok(variableEntries.some((entry) => entry.name === "config"), "identifier binding keeps its name");
+  // No reported name is a destructuring pattern, and none contains a newline.
+  for (const entry of variableEntries) {
+    if (entry.name !== null) {
+      assert.ok(!/^[{[]/.test(entry.name), `destructuring binding should be null, got ${JSON.stringify(entry.name)}`);
+      assert.ok(!entry.name.includes("\n"), `name must be single-line, got ${JSON.stringify(entry.name)}`);
+    }
+  }
+  // The two destructuring statements specifically report null.
+  assert.equal(
+    variableEntries.filter((entry) => entry.name === null).length,
+    2,
+    "both the object- and array-destructuring statements report null",
+  );
+});
+
+test("cluster locations expose kind and name from a real scan", async () => {
+  const { files, dir } = await writeFixture({
+    "one.ts": `
+export function one(items: number[]): number {
+  const selected = items.filter((item) => item > 0);
+  return selected.map((item) => item + 1).reduce((sum, next) => sum + next, 0);
+}
+`,
+    "two.ts": `
+export function two(values: number[]): number {
+  const chosen = values.filter((value) => value < 10);
+  return chosen.map((value) => value - 1).reduce((total, next) => total + next, 0);
+}
+`,
+  });
+
+  const [cluster] = new TypeScriptDuplicateFinder().findClusters({
+    paths: [dir],
+    threshold: 0.2,
+    minLines: 3,
+    minNodes: 8,
+  });
+
+  const byFile = (file: string) => cluster.locations.find((location) => location.file === file);
+  assert.deepEqual(byFile(files["one.ts"]), {
+    file: files["one.ts"],
+    startLine: 2,
+    endLine: 5,
+    nodes: byFile(files["one.ts"])!.nodes,
+    kind: "FunctionDeclaration",
+    name: "one",
+  });
+  assert.equal(byFile(files["two.ts"])!.kind, "FunctionDeclaration");
+  assert.equal(byFile(files["two.ts"])!.name, "two");
 });
 
 const exhaustiveEquivalenceFixtures = [
@@ -489,20 +604,31 @@ test("prints edn", () => {
 
 test("prints edn clusters instead of every candidate pair", () => {
   const collector = new ClusterCollector();
-  const loc = (file: string) => ({ file, startLine: 10, endLine: 14, nodes: 50 });
+  const loc = (file: string) => ({ file, startLine: 10, endLine: 14, nodes: 50, kind: "FunctionDeclaration", name: "handle" });
   collector.addMatch(loc("a.ts"), loc("b.ts"), 0.875);
 
   const clusters = collector.clusters();
 
   assert.equal(
     toEdn(clusters),
-    '{:clusters\n [{:score-min 0.875\n   :score-max 0.875\n   :status :unscoped\n   :location-count 2\n   :locations [{:file "a.ts", :start-line 10, :end-line 14, :nodes 50}\n               {:file "b.ts", :start-line 10, :end-line 14, :nodes 50}]}]}',
+    '{:clusters\n [{:score-min 0.875\n   :score-max 0.875\n   :status :unscoped\n   :location-count 2\n   :locations [{:file "a.ts", :start-line 10, :end-line 14, :nodes 50, :kind "FunctionDeclaration", :name "handle"}\n               {:file "b.ts", :start-line 10, :end-line 14, :nodes 50, :kind "FunctionDeclaration", :name "handle"}]}]}',
+  );
+});
+
+test("renders nil for an anonymous candidate name in edn", () => {
+  const collector = new ClusterCollector();
+  const loc = (file: string) => ({ file, startLine: 1, endLine: 5, nodes: 30, kind: "ArrowFunction", name: null });
+  collector.addMatch(loc("a.ts"), loc("b.ts"), 0.9);
+
+  assert.equal(
+    toEdn(collector.clusters()),
+    '{:clusters\n [{:score-min 0.9\n   :score-max 0.9\n   :status :unscoped\n   :location-count 2\n   :locations [{:file "a.ts", :start-line 1, :end-line 5, :nodes 30, :kind "ArrowFunction", :name nil}\n               {:file "b.ts", :start-line 1, :end-line 5, :nodes 30, :kind "ArrowFunction", :name nil}]}]}',
   );
 });
 
 test("prints json clusters for agents and ci integrations", () => {
   const collector = new ClusterCollector();
-  const loc = (file: string) => ({ file, startLine: 10, endLine: 14, nodes: 50 });
+  const loc = (file: string) => ({ file, startLine: 10, endLine: 14, nodes: 50, kind: "ClassDeclaration", name: "Widget" });
   collector.addMatch(loc("a.ts"), loc("b.ts"), 0.875);
   collector.addMatch(loc("b.ts"), loc("c.ts"), 0.925);
 
@@ -514,12 +640,21 @@ test("prints json clusters for agents and ci integrations", () => {
       status: "unscoped",
       locationCount: 3,
       locations: [
-        { file: "a.ts", startLine: 10, endLine: 14, nodes: 50 },
-        { file: "b.ts", startLine: 10, endLine: 14, nodes: 50 },
-        { file: "c.ts", startLine: 10, endLine: 14, nodes: 50 },
+        { file: "a.ts", startLine: 10, endLine: 14, nodes: 50, kind: "ClassDeclaration", name: "Widget" },
+        { file: "b.ts", startLine: 10, endLine: 14, nodes: 50, kind: "ClassDeclaration", name: "Widget" },
+        { file: "c.ts", startLine: 10, endLine: 14, nodes: 50, kind: "ClassDeclaration", name: "Widget" },
       ],
     }],
   });
+});
+
+test("emits null for an anonymous candidate name in json", () => {
+  const collector = new ClusterCollector();
+  const loc = (file: string) => ({ file, startLine: 1, endLine: 5, nodes: 30, kind: "ArrowFunction", name: null });
+  collector.addMatch(loc("a.ts"), loc("b.ts"), 0.9);
+
+  const [cluster] = JSON.parse(toJson(collector.clusters())).clusters;
+  assert.deepEqual(cluster.locations[0], { file: "a.ts", startLine: 1, endLine: 5, nodes: 30, kind: "ArrowFunction", name: null });
 });
 
 const duplicateBody = `

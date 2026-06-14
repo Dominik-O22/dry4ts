@@ -6,6 +6,12 @@ export interface Location {
 
 export interface ClusterLocation extends Location {
   readonly nodes: number;
+  // The candidate root SyntaxKind name and the declaration identifier (null when
+  // anonymous), so a consumer can classify a finding without opening the file.
+  // Optional only so synthetic locations (tests, the cross-check finder) need not
+  // set them; a scan always populates both.
+  readonly kind?: string;
+  readonly name?: string | null;
 }
 
 export interface ScoreRange {
