@@ -4,7 +4,7 @@ import path from "node:path";
 import ignore from "ignore";
 
 import { ClusterCollector } from "./Clusters.js";
-import { FileScanner, type Entry } from "./FileScanner.js";
+import { FileScanner, resolveExcludeKinds, type Entry } from "./FileScanner.js";
 import { Options, type OptionsInput } from "./Options.js";
 import type { Cluster, Location } from "./types.js";
 
@@ -27,7 +27,13 @@ export class TypeScriptDuplicateFinder {
   scan(options: Options | OptionsInput = Options.defaults()): ScanResult {
     const resolvedOptions = options instanceof Options ? options : Options.from(options);
     const files = this.sourceFiles(resolvedOptions);
-    const entries = new FileScanner().scanFiles(files, resolvedOptions.minLines, resolvedOptions.minNodes);
+    const excludeKinds = resolveExcludeKinds(resolvedOptions.excludeKinds);
+    const entries = new FileScanner().scanFiles(
+      files,
+      resolvedOptions.minLines,
+      resolvedOptions.minNodes,
+      excludeKinds,
+    );
     return { files, clusters: this.clustersFor(entries, resolvedOptions) };
   }
 

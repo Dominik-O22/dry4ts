@@ -2,10 +2,31 @@ import fs from "node:fs";
 
 import { canonicalPath, ChangedRegions, parseUnifiedDiff } from "./ChangedRegions.js";
 import { maxScore, minScore } from "./Clusters.js";
+import { candidateKindNames } from "./FileScanner.js";
 import { GitProvider } from "./GitProvider.js";
 import { Options } from "./Options.js";
 import { TypeScriptDuplicateFinder } from "./TypeScriptDuplicateFinder.js";
 import type { Cluster, ClusterLocation, ClusterReport, ClusterStatus, Location } from "./types.js";
+
+// Wrap a comma-joined list to fit under the usage column.
+function wrapKinds(names: readonly string[], indent: string, width: number): string[] {
+  const lines: string[] = [];
+  let current = `${indent}Valid kinds: `;
+  for (const [index, name] of names.entries()) {
+    const token = index < names.length - 1 ? `${name},` : name;
+    const candidate = current.trimEnd() === indent.trimEnd() || current.endsWith(": ")
+      ? current + token
+      : `${current} ${token}`;
+    if (candidate.length > width && current.trim() !== "") {
+      lines.push(current.trimEnd());
+      current = `${indent}${token}`;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current.trim() !== "") lines.push(current.trimEnd());
+  return lines;
+}
 
 export const USAGE = [
   "Usage: dry-ts [options] [file-or-directory ...]",
@@ -27,10 +48,17 @@ export const USAGE = [
   "                  repeatable, cannot be combined with --changed-from",
   "  --explain-changed",
   "                  Dump the resolved changed-region map to stderr",
+  "  --only-new      Restrict reported clusters to status new; requires",
+  "                  --changed-from/--changed. Output filter only; exit code",
+  "                  is unchanged. Totals go to stderr.",
   "  --fail-on-duplicates",
   "                  Exit 1 on findings: with --changed-from/--changed only",
   "                  clusters with status new; otherwise any cluster",
   "  --no-gitignore  Include files and directories ignored by .gitignore",
+  "  --exclude-kinds KIND[,KIND...]",
+  "                  Drop candidate declarations of these SyntaxKinds; comma-",
+  "                  separated, repeatable. Opt-in only (no default exclusions).",
+  ...wrapKinds(candidateKindNames, "                  ", 76),
 ].join("\n");
 
 export function main(args: readonly string[] = process.argv.slice(2)): void {
@@ -74,15 +102,23 @@ function run(options: Options): void {
     status: scope ? statusFor(cluster, scope) : "unscoped",
   }));
 
+  // --only-new scopes the OUTPUT only; the exit code below still considers the
+  // full set. onlyNew is unreachable without a scope (Options guards it), so
+  // every reported status here is new/known, never unscoped.
+  const visible = options.onlyNew ? reported.filter((cluster) => cluster.status === "new") : reported;
+  if (options.onlyNew) {
+    console.error(`showing ${visible.length} new (${reported.length - visible.length} known hidden)`);
+  }
+
   switch (options.format) {
     case "edn":
-      console.log(toEdn(reported));
+      console.log(toEdn(visible));
       break;
     case "json":
-      console.log(toJson(reported));
+      console.log(toJson(visible));
       break;
     case "text":
-      printText(reported);
+      printText(visible);
       break;
   }
 

@@ -21,11 +21,21 @@ export class FileScanner {
   private readonly interner = new FingerprintInterner();
   private readonly markerHashes = new Map<string, number>();
 
-  scanFiles(files: readonly string[], minLines: number, minNodes = 1): Entry[] {
-    return files.flatMap((file) => this.scanFile(file, minLines, minNodes));
+  scanFiles(
+    files: readonly string[],
+    minLines: number,
+    minNodes = 1,
+    excludeKinds: ReadonlySet<ts.SyntaxKind> = EMPTY_KIND_SET,
+  ): Entry[] {
+    return files.flatMap((file) => this.scanFile(file, minLines, minNodes, excludeKinds));
   }
 
-  scanFile(file: string, minLines: number, minNodes = 1): Entry[] {
+  scanFile(
+    file: string,
+    minLines: number,
+    minNodes = 1,
+    excludeKinds: ReadonlySet<ts.SyntaxKind> = EMPTY_KIND_SET,
+  ): Entry[] {
     const text = fs.readFileSync(file, "utf8");
     const sourceFile = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, false, scriptKind(file));
     const parseDiagnostics = (sourceFile as ts.SourceFile & { parseDiagnostics?: readonly ts.DiagnosticWithLocation[] })
@@ -59,7 +69,7 @@ export class FileScanner {
       const hash = this.interner.idFor(this.normalizer.tag(node), childHashes);
       hashes.push(hash);
 
-      if (candidateRootKinds.has(node.kind) && hashes.length - rangeStart >= minNodes) {
+      if (candidateRootKinds.has(node.kind) && !excludeKinds.has(node.kind) && hashes.length - rangeStart >= minNodes) {
         const { startLine, endLine } = lineRangeFor(sourceFile, node);
         if (endLine - startLine + 1 >= minLines) {
           entries.push({
@@ -112,28 +122,66 @@ function sortedUnique(hashes: readonly number[], start: number): Float64Array {
   return sorted.slice(0, writeIndex);
 }
 
-const candidateRootKinds = new Set<ts.SyntaxKind>([
-  ts.SyntaxKind.ClassDeclaration,
-  ts.SyntaxKind.InterfaceDeclaration,
-  ts.SyntaxKind.TypeAliasDeclaration,
-  ts.SyntaxKind.EnumDeclaration,
-  ts.SyntaxKind.ModuleDeclaration,
-  ts.SyntaxKind.FunctionDeclaration,
-  ts.SyntaxKind.MethodDeclaration,
-  ts.SyntaxKind.Constructor,
-  ts.SyntaxKind.GetAccessor,
-  ts.SyntaxKind.SetAccessor,
-  ts.SyntaxKind.PropertyDeclaration,
-  ts.SyntaxKind.PropertySignature,
-  ts.SyntaxKind.MethodSignature,
-  ts.SyntaxKind.CallSignature,
-  ts.SyntaxKind.ConstructSignature,
-  ts.SyntaxKind.IndexSignature,
-  ts.SyntaxKind.VariableStatement,
-  ts.SyntaxKind.EnumMember,
-  ts.SyntaxKind.ArrowFunction,
-  ts.SyntaxKind.FunctionExpression,
-]);
+// Single source of truth for the candidate root kinds: the declaration shapes
+// dry-ts treats as comparable units. Each entry carries the canonical name a
+// user types for --exclude-kinds plus a plain-English blurb for the help/README
+// docs. The name is spelled out explicitly rather than derived from
+// ts.SyntaxKind[kind]: TS reverse-enum lookup returns the marker alias for
+// boundary kinds (e.g. ts.SyntaxKind[VariableStatement] is "FirstStatement"),
+// which is not the name users expect or that the docs advertise. Order here is
+// the order shown to users.
+const candidateKinds: readonly { name: string; kind: ts.SyntaxKind; blurb: string }[] = [
+  { name: "ClassDeclaration", kind: ts.SyntaxKind.ClassDeclaration, blurb: "a `class Foo {}` declaration" },
+  { name: "InterfaceDeclaration", kind: ts.SyntaxKind.InterfaceDeclaration, blurb: "an `interface Foo {}` declaration" },
+  { name: "TypeAliasDeclaration", kind: ts.SyntaxKind.TypeAliasDeclaration, blurb: "a `type Foo = ...` alias" },
+  { name: "EnumDeclaration", kind: ts.SyntaxKind.EnumDeclaration, blurb: "an `enum Foo {}` declaration" },
+  { name: "ModuleDeclaration", kind: ts.SyntaxKind.ModuleDeclaration, blurb: "a `namespace Foo {}` / `module Foo {}` block" },
+  { name: "FunctionDeclaration", kind: ts.SyntaxKind.FunctionDeclaration, blurb: "a `function foo() {}` declaration" },
+  { name: "MethodDeclaration", kind: ts.SyntaxKind.MethodDeclaration, blurb: "a method body in a class or object literal: `foo() {}`" },
+  { name: "Constructor", kind: ts.SyntaxKind.Constructor, blurb: "a class `constructor() {}`" },
+  { name: "GetAccessor", kind: ts.SyntaxKind.GetAccessor, blurb: "a getter: `get foo() {}`" },
+  { name: "SetAccessor", kind: ts.SyntaxKind.SetAccessor, blurb: "a setter: `set foo(v) {}`" },
+  { name: "PropertyDeclaration", kind: ts.SyntaxKind.PropertyDeclaration, blurb: "a class field: `foo = ...` / `foo: T`" },
+  { name: "PropertySignature", kind: ts.SyntaxKind.PropertySignature, blurb: "a property in an interface/type: `foo: T`" },
+  { name: "MethodSignature", kind: ts.SyntaxKind.MethodSignature, blurb: "a method signature in an interface/type: `foo(): T`" },
+  { name: "CallSignature", kind: ts.SyntaxKind.CallSignature, blurb: "a callable signature in a type: `(arg: T): U`" },
+  { name: "ConstructSignature", kind: ts.SyntaxKind.ConstructSignature, blurb: "a constructable signature in a type: `new (): T`" },
+  { name: "IndexSignature", kind: ts.SyntaxKind.IndexSignature, blurb: "an index signature: `[key: string]: T`" },
+  { name: "VariableStatement", kind: ts.SyntaxKind.VariableStatement, blurb: "a `const` / `let` / `var` statement (the whole declaration line)" },
+  { name: "EnumMember", kind: ts.SyntaxKind.EnumMember, blurb: "a single member inside an enum" },
+  { name: "ArrowFunction", kind: ts.SyntaxKind.ArrowFunction, blurb: "an arrow function used as a value: `() => {}`" },
+  { name: "FunctionExpression", kind: ts.SyntaxKind.FunctionExpression, blurb: "a `function () {}` used as a value" },
+];
+
+const candidateRootKinds = new Set<ts.SyntaxKind>(candidateKinds.map((entry) => entry.kind));
+
+const EMPTY_KIND_SET: ReadonlySet<ts.SyntaxKind> = new Set();
+
+// Derived from candidateKinds so the two can never drift.
+const candidateKindByName = new Map<string, ts.SyntaxKind>(
+  candidateKinds.map((entry) => [entry.name, entry.kind]),
+);
+
+export const candidateKindNames: readonly string[] = candidateKinds.map((entry) => entry.name);
+
+// For help and README docs.
+export const candidateKindDescriptions: readonly { name: string; blurb: string }[] =
+  candidateKinds.map(({ name, blurb }) => ({ name, blurb }));
+
+// Resolves --exclude-kinds names to SyntaxKinds, validating each against the
+// candidate set. An unknown or non-candidate name throws rather than silently
+// no-op'ing — a silent gate-flag bypass is a footgun.
+export function resolveExcludeKinds(names: readonly string[]): ReadonlySet<ts.SyntaxKind> {
+  const kinds = new Set<ts.SyntaxKind>();
+  for (const name of names) {
+    const kind = candidateKindByName.get(name);
+    if (kind === undefined) {
+      throw new Error(`Unknown candidate kind: ${name}`);
+    }
+    kinds.add(kind);
+  }
+  return kinds;
+}
 
 function scriptKind(file: string): ts.ScriptKind {
   if (file.endsWith(".jsx")) {

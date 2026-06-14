@@ -1661,6 +1661,65 @@ test("status appears in every output format", async () => {
   assert.ok(unscoped.stdout.includes('"status": "unscoped"'), unscoped.stdout);
 });
 
+// edited.ts is a new duplicate (scoped via --changed edited.ts); known1/known2
+// are a pre-existing cluster that stays known. The shared helper keeps the
+// --only-new tests from duplicating each other (the self-scan gate enforces it).
+async function newAndKnownFixture(): Promise<string> {
+  const { dir } = await writeFixture({
+    "edited.ts": uniqueBody + uniqueBodyCopy,
+    "known1.ts": duplicateBody,
+    "known2.ts": duplicateBody,
+  });
+  return dir;
+}
+
+test("--only-new hides known clusters from output but keeps the new ones", async () => {
+  const result = runCli([...gateFlags, "--json", "--only-new", "--changed", "edited.ts", "."], await newAndKnownFixture());
+  assert.equal(result.exitCode, 0, result.stderr);
+  const statuses = statusByFile(result.stdout);
+  assert.equal(statuses.get("edited.ts"), "new", result.stdout);
+  assert.equal(statuses.has("known1.ts"), false, result.stdout);
+  assert.equal(statuses.has("known2.ts"), false, result.stdout);
+  // Summary line conveys totals so the suppression is visible.
+  assert.ok(/showing 1 new \(\d+ known hidden\)/.test(result.stderr), result.stderr);
+});
+
+test("--only-new is honored across text and edn formats", async () => {
+  const dir = await newAndKnownFixture();
+  const text = runCli([...gateFlags, "--only-new", "--changed", "edited.ts", "."], dir);
+  assert.ok(text.stdout.includes("status=new"), text.stdout);
+  assert.ok(!text.stdout.includes("status=known"), text.stdout);
+  const edn = runCli([...gateFlags, "--edn", "--only-new", "--changed", "edited.ts", "."], dir);
+  assert.ok(edn.stdout.includes(":status :new"), edn.stdout);
+  assert.ok(!edn.stdout.includes(":status :known"), edn.stdout);
+});
+
+test("--only-new leaves the exit code governed by --fail-on-duplicates", async () => {
+  // A new cluster is present: the gate still fails even though output is scoped.
+  const gated = runCli(
+    [...gateFlags, "--fail-on-duplicates", "--only-new", "--changed", "edited.ts", "."],
+    await newAndKnownFixture(),
+  );
+  assert.equal(gated.exitCode, 1, gated.stderr);
+
+  // Purely-known run (clean tree under --changed-from): nothing new, gate
+  // passes with exit 0 and the scoped output is empty.
+  const cleanDir = await gitRepo({ "known1.ts": duplicateBody, "known2.ts": duplicateBody });
+  const passed = runCli(
+    [...gateFlags, "--json", "--fail-on-duplicates", "--only-new", "--changed-from", "HEAD", "."],
+    cleanDir,
+  );
+  assert.equal(passed.exitCode, 0, passed.stderr);
+  assert.deepEqual(JSON.parse(passed.stdout).clusters, [], passed.stdout);
+  assert.ok(/showing 0 new \(\d+ known hidden\)/.test(passed.stderr), passed.stderr);
+});
+
+test("--only-new without a change scope errors and exits 2", async () => {
+  const result = runCli([...gateFlags, "--only-new", "."], await twoDuplicateFiles());
+  assert.equal(result.exitCode, 2, result.stdout);
+  assert.ok(result.stderr.includes("--only-new requires --changed-from or --changed"), result.stderr);
+});
+
 test("--explain-changed dumps the resolved changed-region map to stderr", async () => {
   const result = runCli([...gateFlags, "--explain-changed", "--changed", "one.ts", "."], await twoDuplicateFiles());
   assert.ok(result.stderr.includes("Changed regions (--explain-changed):"), result.stderr);
@@ -1750,4 +1809,140 @@ test("--explain-changed without any changed scope reports no scope active", asyn
   assert.equal(result.exitCode, 0, result.stderr);
   assert.ok(result.stderr.includes("Changed regions (--explain-changed):"), result.stderr);
   assert.ok(result.stderr.includes("(no changed scope active)"), result.stderr);
+});
+
+// --- --exclude-kinds (plan 007) ------------------------------------------
+
+// One fixture shared by every --exclude-kinds behavior test. Each class holds
+// an identical dep-only constructor (a candidate Constructor root) but a
+// *different* method body, so the enclosing classes do not themselves cluster —
+// only the constructors do. Each file also has an identical standalone function
+// so a real duplicate survives constructor exclusion.
+function excludeKindsFixtureSources(): Record<string, string> {
+  const classBody = (cls: string, method: string, op: string) => `
+export class ${cls} {
+  constructor(
+    private readonly first: First,
+    private readonly second: Second,
+    private readonly third: Third,
+    private readonly fourth: Fourth,
+  ) {
+    this.first = first;
+    this.second = second;
+    this.third = third;
+    this.fourth = fourth;
+  }
+  ${method}(value: number): number {
+    return value ${op} 1;
+  }
+}
+`;
+  const functionBody = (name: string, p: string) => `
+export function ${name}(${p}: number[]): number {
+  const kept = ${p}.filter((item) => item % 2 === 0);
+  return kept.map((item) => item * 2).reduce((sum, next) => sum + next, 0);
+}
+`;
+  return {
+    "left.ts": `${classBody("Left", "increase", "+")}${functionBody("left", "xs")}`,
+    "right.ts": `${classBody("Right", "multiply", "*")}${functionBody("right", "ys")}`,
+  };
+}
+
+const excludeKindsScan = { threshold: 0.5, minLines: 3, minNodes: 6 };
+
+// True when any cluster has a location whose line span matches the constructor
+// (lines 3-13 in classBody). Used to assert the constructor cluster's presence
+// or absence without depending on cluster ordering.
+function hasConstructorCluster(clusters: readonly Cluster[]): boolean {
+  return clusters.some((cluster) =>
+    cluster.locations.some((location) => location.startLine === 3 && location.endLine === 13),
+  );
+}
+
+test("without --exclude-kinds, identical dep-only constructors cluster", async () => {
+  const { dir } = await writeFixture(excludeKindsFixtureSources());
+  const clusters = new TypeScriptDuplicateFinder().findClusters({ paths: [dir], ...excludeKindsScan });
+  assert.ok(hasConstructorCluster(clusters), "expected a constructor cluster by default");
+});
+
+test("--exclude-kinds Constructor drops the constructor cluster but keeps function duplicates", async () => {
+  const { dir } = await writeFixture(excludeKindsFixtureSources());
+  const clusters = new TypeScriptDuplicateFinder().findClusters({
+    paths: [dir],
+    ...excludeKindsScan,
+    excludeKinds: ["Constructor"],
+  });
+  assert.ok(!hasConstructorCluster(clusters), "constructor cluster should be excluded");
+  const functionCluster = clusters.find((cluster) =>
+    cluster.locations.every((location) => location.startLine >= 18),
+  );
+  assert.ok(functionCluster, "real function duplicate should still cluster");
+});
+
+test("--exclude-kinds PropertySignature drops interface member clusters but keeps method bodies", async () => {
+  const { dir } = await writeFixture({
+    "port-a.ts": `
+export interface PortA {
+  readonly alpha: (first: number, second: number, third: number) => number;
+  readonly beta: (first: number, second: number, third: number) => number;
+}
+export class ImplA {
+  run(values: number[]): number {
+    const kept = values.filter((value) => value > 0);
+    return kept.map((value) => value + 1).reduce((sum, next) => sum + next, 0);
+  }
+}
+`,
+    "port-b.ts": `
+export interface PortB {
+  readonly gamma: (first: number, second: number, third: number) => number;
+  readonly delta: (first: number, second: number, third: number) => number;
+}
+export class ImplB {
+  run(rows: number[]): number {
+    const chosen = rows.filter((row) => row > 0);
+    return chosen.map((row) => row + 1).reduce((total, next) => total + next, 0);
+  }
+}
+`,
+  });
+  const base = { paths: [dir], threshold: 0.5, minLines: 1, minNodes: 4 };
+  // A PropertySignature candidate is a single member line (e.g. line 3 or 4).
+  const hasMemberSignatureLocation = (clusters: readonly Cluster[]) =>
+    clusters.some((cluster) =>
+      cluster.locations.some((location) => location.startLine === location.endLine && location.startLine <= 4),
+    );
+  // The class methods share the same body — a real, non-signature duplicate.
+  const hasMethodCluster = (clusters: readonly Cluster[]) =>
+    clusters.some((cluster) => cluster.locations.some((location) => location.startLine >= 6 && location.endLine > location.startLine));
+
+  const withSignatures = new TypeScriptDuplicateFinder().findClusters(base);
+  const withoutSignatures = new TypeScriptDuplicateFinder().findClusters({
+    ...base,
+    excludeKinds: ["PropertySignature"],
+  });
+  assert.ok(hasMemberSignatureLocation(withSignatures), "member signatures should cluster by default");
+  assert.ok(!hasMemberSignatureLocation(withoutSignatures), "excluding PropertySignature should drop member-signature candidates");
+  assert.ok(hasMethodCluster(withoutSignatures), "the method-body duplicate should still cluster");
+});
+
+test("--exclude-kinds rejects unknown or non-candidate kind names", () => {
+  assert.throws(() => Options.parse("--exclude-kinds", "NotAKind"), /Unknown candidate kind: NotAKind/);
+  // SourceFile is a real SyntaxKind but not a candidate root — still rejected.
+  assert.throws(() => Options.parse("--exclude-kinds", "SourceFile"), /Unknown candidate kind: SourceFile/);
+  assert.throws(() => Options.from({ excludeKinds: ["Nope"] }), /Unknown candidate kind: Nope/);
+});
+
+test("--exclude-kinds parses comma-separated and repeated values", () => {
+  const options = Options.parse("--exclude-kinds", "Constructor,PropertySignature", "--exclude-kinds", "MethodSignature");
+  assert.deepEqual(options.excludeKinds, ["Constructor", "PropertySignature", "MethodSignature"]);
+});
+
+test("--exclude-kinds accepts the canonical VariableStatement name, not the TS marker alias", () => {
+  // ts.SyntaxKind[VariableStatement] reverse-maps to the marker alias
+  // "FirstStatement"; users type the canonical name, which must be accepted and
+  // the alias rejected.
+  assert.doesNotThrow(() => Options.parse("--exclude-kinds", "VariableStatement"));
+  assert.throws(() => Options.parse("--exclude-kinds", "FirstStatement"), /Unknown candidate kind: FirstStatement/);
 });

@@ -52,11 +52,53 @@ Options:
                 Cannot be combined with --changed-from.
 --explain-changed
                 Dump the resolved changed-region map to stderr for debugging.
+--only-new      Restrict reported clusters to status "new". Output filter only:
+                the exit code is unchanged (still governed by
+                --fail-on-duplicates). Requires --changed-from/--changed.
+                Totals print to stderr, e.g. "showing 6 new (73 known hidden)".
 --fail-on-duplicates
                 Exit 1 on findings. With --changed-from/--changed, only
                 clusters with status "new" gate; otherwise any cluster does.
 --no-gitignore  Include files and directories ignored by .gitignore
+--exclude-kinds KIND[,KIND...]
+                Drop candidate declarations of the given SyntaxKinds before
+                matching. Comma-separated and repeatable. Opt-in only: with no
+                flag, output is unchanged. Useful for suppressing boilerplate
+                false positives such as dep-only DI constructors
+                (--exclude-kinds Constructor) or port/interface member
+                signatures (--exclude-kinds PropertySignature,MethodSignature).
+                An unknown or non-candidate kind name is a hard error.
 ```
+
+Valid `--exclude-kinds` names are the candidate root kinds — the TypeScript AST
+node types dry-ts treats as comparable units. The names are TypeScript
+`SyntaxKind`s; what each one is in plain terms:
+
+| Name | What it is |
+| --- | --- |
+| `ClassDeclaration` | a `class Foo {}` declaration |
+| `InterfaceDeclaration` | an `interface Foo {}` declaration |
+| `TypeAliasDeclaration` | a `type Foo = ...` alias |
+| `EnumDeclaration` | an `enum Foo {}` declaration |
+| `ModuleDeclaration` | a `namespace Foo {}` / `module Foo {}` block |
+| `FunctionDeclaration` | a `function foo() {}` declaration |
+| `MethodDeclaration` | a method body in a class or object literal: `foo() {}` |
+| `Constructor` | a class `constructor() {}` |
+| `GetAccessor` | a getter: `get foo() {}` |
+| `SetAccessor` | a setter: `set foo(v) {}` |
+| `PropertyDeclaration` | a class field: `foo = ...` / `foo: T` |
+| `PropertySignature` | a property in an interface/type: `foo: T` |
+| `MethodSignature` | a method signature in an interface/type: `foo(): T` |
+| `CallSignature` | a callable signature in a type: `(arg: T): U` |
+| `ConstructSignature` | a constructable signature in a type: `new (): T` |
+| `IndexSignature` | an index signature: `[key: string]: T` |
+| `VariableStatement` | a `const` / `let` / `var` statement (the whole declaration line) |
+| `EnumMember` | a single member inside an enum |
+| `ArrowFunction` | an arrow function used as a value: `() => {}` |
+| `FunctionExpression` | a `function () {}` used as a value |
+
+Excluding a kind never hides a longer child candidate — children are always
+visited regardless.
 
 ### Incremental gating
 
@@ -74,6 +116,12 @@ Every cluster carries a `status`:
   never gates.
 - `unscoped` — emitted for every cluster when no changed-scope flag is active
   (the tool cannot know what is "known" without a scope).
+
+In a CI gate the actionable `new` clusters are easily buried under pre-existing
+`known` ones. `--only-new` filters the *report* down to `new` clusters across
+all formats (text/json/edn); the exit code still reflects the full set, so the
+gate behaves identically while the log stays readable. It requires a
+changed-scope flag (there is no `new` status without one).
 
 `--changed-from` resolves `merge-base(REF, HEAD)` and diffs from there, so a
 branch behind its base does not see base-side changes pollute the result. Write
@@ -227,11 +275,19 @@ Three corpus tiers, all scanned with `bun run bench -- <paths>`:
 1. **Real mid-size project** — any ~30k LOC repository you have locally.
    Use it as a regression check: cluster output should stay identical across
    performance changes, and timing should not regress.
-2. **Pinned large repository** — `bun run bench:setup` shallow-clones
-   `microsoft/TypeScript` at the tag matching the installed `typescript`
-   dependency into `.bench/TypeScript` (gitignored). Scan
-   `.bench/TypeScript/src/compiler` for a worst-case stress: very large
-   files, deeply nested ASTs, and high structural self-similarity.
+2. **Pinned large repositories** — `bun run bench:setup` fetches two pinned
+   real-world corpora into `.bench/` (gitignored). Pass a name
+   (`bun run bench:setup sentry`) to fetch just one.
+   - `microsoft/TypeScript` at a statically pinned tag (`v5.9.3`, chosen by
+     maintainers to match the current `typescript` dependency — bumped by hand,
+     not resolved automatically). Scan `.bench/TypeScript/src/compiler` for a
+     worst-case stress:
+     very large files, deeply nested ASTs, and high structural self-similarity.
+     Already pushed quite low (~1.5s), so it has little regression headroom.
+   - `getsentry/sentry` (sparse blobless clone of `static/app` only). Scan
+     `.bench/sentry/static/app` — a large, messy real-world TS/TSX frontend
+     (~6.8k files, ~2.6k clusters). Wider and more varied than the compiler
+     subtree, so it surfaces hot-path regressions the compiler scan would miss.
 3. **Synthetic regimes** — `bun run bench:corpus <regime>` generates a
    deterministic corpus into `.bench/corpus/<regime>`:
    - `identical` (default 800 functions): dense identical structures,
@@ -254,7 +310,9 @@ bun run bench:corpus identical -- --count 1200
 bun run bench -- --runs 5 .bench/corpus/identical
 ```
 
-Baseline (2026-06-13, v0.3.0, TypeScript v5.9.3 corpus):
-`src/compiler` scans in ~1.5s and reports 246 clusters. Use this as a
-regression check: cluster count should stay at 246 and timing should not
-regress across further changes.
+Baselines (use as regression checks — cluster counts must stay fixed and timing
+must not regress across changes):
+
+- TypeScript v5.9.3 `src/compiler`: ~1.5s, 246 clusters (since v0.3.0).
+- Sentry 25.10.0 `static/app`: ~5.3s, 2574 clusters (since v0.5.0,
+  `--exclude-kinds` hot-path change measured against it).
