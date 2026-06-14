@@ -16,8 +16,11 @@ Two steps that are easy to forget — neither happens automatically on merge:
 1. **Publish to npm.** `.github/workflows/publish.yml` triggers on
    `release: published`, NOT on push to `main`. After a version PR lands,
    merging does not publish. Cut the GitHub Release to publish:
-   `gh release create vX.Y.Z --generate-notes` (npm OIDC trusted publish runs
+   `gh release create vX.Y.Z --notes "<body>"` (npm OIDC trusted publish runs
    from there). VERSION/CHANGELOG bumps live in the PR; the release just tags it.
+   Write the release body from the matching `CHANGELOG.md` section (the curated
+   Added/Changed/Fixed prose), like v0.3.0/v0.4.0 — do NOT use `--generate-notes`,
+   which only dumps PR titles and loses the real notes.
 2. **Bump the skill bundle.** When a release changes CLI flags or the public
    API, update `skills/*/SKILL.md` (the `library_version` frontmatter + any new
    flag/pattern) and `skills/_artifacts/skill_tree.yaml` (`version`). These are
