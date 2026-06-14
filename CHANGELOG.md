@@ -43,6 +43,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cluster ordinals (and the first-listed cluster) in text/JSON/EDN output can
   differ from prior versions for the same scan. Scores, locations, statuses, and
   exit codes are unchanged.
+- The `Options` constructor now takes a single named `ResolvedOptions` object
+  instead of 19 positional parameters — a transposed field is a compile error,
+  and new flags no longer append positionals. `Options.from` /
+  `Options.parse` / `Options.defaults` are unchanged; only direct
+  `new Options(...)` positional callers are affected (none in the codebase). New
+  exported type `ResolvedOptions`.
 
 ### Documentation
 

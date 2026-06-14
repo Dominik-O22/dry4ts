@@ -71,82 +71,149 @@ export interface OptionsInput {
   readonly counterparts?: boolean;
 }
 
+// A fully-resolved option set: every field present, defaults and any profile
+// already applied. The Options constructor's single argument. Replaces 19
+// positional parameters whose three adjacent booleans (excludeTaggedTemplates /
+// excludeTests / counterparts) `tsc` could not tell apart on transposition — a
+// named object makes a transposed field a compile error, and new flags stop
+// appending positionals (TODOS "Internal Options object/builder").
+export interface ResolvedOptions {
+  readonly paths: readonly string[];
+  readonly threshold: number;
+  readonly minLines: number;
+  readonly minNodes: number;
+  readonly format: OutputFormat;
+  readonly help: boolean;
+  readonly failOnDuplicates: boolean;
+  readonly respectGitignore: boolean;
+  readonly minLocations: number;
+  readonly changedFrom: string | undefined;
+  readonly changed: readonly string[];
+  readonly explainChanged: boolean;
+  readonly onlyNew: boolean;
+  readonly excludeKinds: readonly string[];
+  readonly minDistinctKinds: number;
+  readonly exclude: readonly string[];
+  readonly excludeTaggedTemplates: boolean;
+  readonly excludeTests: boolean;
+  readonly counterparts: boolean;
+}
+
 export class Options {
-  constructor(
-    public readonly paths: readonly string[],
-    public readonly threshold: number,
-    public readonly minLines: number,
-    public readonly minNodes: number,
-    public readonly format: OutputFormat,
-    public readonly help: boolean,
-    public readonly failOnDuplicates: boolean,
-    public readonly respectGitignore: boolean,
-    public readonly minLocations: number = 2,
-    public readonly changedFrom: string | undefined = undefined,
-    public readonly changed: readonly string[] = [],
-    public readonly explainChanged: boolean = false,
-    public readonly onlyNew: boolean = false,
-    public readonly excludeKinds: readonly string[] = [],
-    public readonly minDistinctKinds: number = 0,
-    public readonly exclude: readonly string[] = [],
-    public readonly excludeTaggedTemplates: boolean = false,
-    public readonly excludeTests: boolean = false,
-    public readonly counterparts: boolean = false,
-  ) {
-    if (!(threshold > 0 && threshold <= 1)) {
-      throw new Error(`threshold must be greater than 0 and at most 1, got ${threshold}`);
+  readonly paths: readonly string[];
+  readonly threshold: number;
+  readonly minLines: number;
+  readonly minNodes: number;
+  readonly format: OutputFormat;
+  readonly help: boolean;
+  readonly failOnDuplicates: boolean;
+  readonly respectGitignore: boolean;
+  readonly minLocations: number;
+  readonly changedFrom: string | undefined;
+  readonly changed: readonly string[];
+  readonly explainChanged: boolean;
+  readonly onlyNew: boolean;
+  readonly excludeKinds: readonly string[];
+  readonly minDistinctKinds: number;
+  readonly exclude: readonly string[];
+  readonly excludeTaggedTemplates: boolean;
+  readonly excludeTests: boolean;
+  readonly counterparts: boolean;
+
+  constructor(resolved: ResolvedOptions) {
+    if (!(resolved.threshold > 0 && resolved.threshold <= 1)) {
+      throw new Error(`threshold must be greater than 0 and at most 1, got ${resolved.threshold}`);
     }
-    if (minLines < 1) {
-      throw new Error(`minLines must be at least 1, got ${minLines}`);
+    if (resolved.minLines < 1) {
+      throw new Error(`minLines must be at least 1, got ${resolved.minLines}`);
     }
-    if (minNodes < 1) {
-      throw new Error(`minNodes must be at least 1, got ${minNodes}`);
+    if (resolved.minNodes < 1) {
+      throw new Error(`minNodes must be at least 1, got ${resolved.minNodes}`);
     }
-    if (minDistinctKinds < 0) {
-      throw new Error(`minDistinctKinds must be at least 0, got ${minDistinctKinds}`);
+    if (resolved.minDistinctKinds < 0) {
+      throw new Error(`minDistinctKinds must be at least 0, got ${resolved.minDistinctKinds}`);
     }
-    if (minLocations < 2) {
-      throw new Error(`minLocations must be at least 2, got ${minLocations}`);
+    if (resolved.minLocations < 2) {
+      throw new Error(`minLocations must be at least 2, got ${resolved.minLocations}`);
     }
-    if (changedFrom !== undefined && changed.length > 0) {
+    if (resolved.changedFrom !== undefined && resolved.changed.length > 0) {
       throw new Error("--changed-from and --changed cannot be combined");
     }
-    if (onlyNew && changedFrom === undefined && changed.length === 0) {
+    if (resolved.onlyNew && resolved.changedFrom === undefined && resolved.changed.length === 0) {
       throw new Error("--only-new requires --changed-from or --changed");
     }
     // Validate names eagerly so an unknown/non-candidate kind fails at
     // construction time, not silently at scan time.
-    resolveExcludeKinds(excludeKinds);
+    resolveExcludeKinds(resolved.excludeKinds);
+
+    this.paths = resolved.paths;
+    this.threshold = resolved.threshold;
+    this.minLines = resolved.minLines;
+    this.minNodes = resolved.minNodes;
+    this.format = resolved.format;
+    this.help = resolved.help;
+    this.failOnDuplicates = resolved.failOnDuplicates;
+    this.respectGitignore = resolved.respectGitignore;
+    this.minLocations = resolved.minLocations;
+    this.changedFrom = resolved.changedFrom;
+    this.changed = resolved.changed;
+    this.explainChanged = resolved.explainChanged;
+    this.onlyNew = resolved.onlyNew;
+    this.excludeKinds = resolved.excludeKinds;
+    this.minDistinctKinds = resolved.minDistinctKinds;
+    this.exclude = resolved.exclude;
+    this.excludeTaggedTemplates = resolved.excludeTaggedTemplates;
+    this.excludeTests = resolved.excludeTests;
+    this.counterparts = resolved.counterparts;
   }
 
   static defaults(): Options {
-    return new Options(["src"], 0.82, 4, 20, "text", false, false, true, 2);
+    return new Options({
+      paths: ["src"],
+      threshold: 0.82,
+      minLines: 4,
+      minNodes: 20,
+      format: "text",
+      help: false,
+      failOnDuplicates: false,
+      respectGitignore: true,
+      minLocations: 2,
+      changedFrom: undefined,
+      changed: [],
+      explainChanged: false,
+      onlyNew: false,
+      excludeKinds: [],
+      minDistinctKinds: 0,
+      exclude: [],
+      excludeTaggedTemplates: false,
+      excludeTests: false,
+      counterparts: false,
+    });
   }
 
   static from(input: OptionsInput = {}): Options {
     const defaults = Options.defaults();
-    const paths = input.paths && input.paths.length > 0 ? [...input.paths] : defaults.paths;
-    return new Options(
-      paths,
-      input.threshold ?? defaults.threshold,
-      input.minLines ?? defaults.minLines,
-      input.minNodes ?? defaults.minNodes,
-      input.format ?? defaults.format,
-      input.help ?? defaults.help,
-      input.failOnDuplicates ?? defaults.failOnDuplicates,
-      input.respectGitignore ?? defaults.respectGitignore,
-      input.minLocations ?? defaults.minLocations,
-      input.changedFrom,
-      input.changed ?? [],
-      input.explainChanged ?? defaults.explainChanged,
-      input.onlyNew ?? defaults.onlyNew,
-      input.excludeKinds ?? [],
-      input.minDistinctKinds ?? defaults.minDistinctKinds,
-      input.exclude ?? [],
-      input.excludeTaggedTemplates ?? defaults.excludeTaggedTemplates,
-      input.excludeTests ?? defaults.excludeTests,
-      input.counterparts ?? defaults.counterparts,
-    );
+    return new Options({
+      paths: input.paths && input.paths.length > 0 ? [...input.paths] : defaults.paths,
+      threshold: input.threshold ?? defaults.threshold,
+      minLines: input.minLines ?? defaults.minLines,
+      minNodes: input.minNodes ?? defaults.minNodes,
+      format: input.format ?? defaults.format,
+      help: input.help ?? defaults.help,
+      failOnDuplicates: input.failOnDuplicates ?? defaults.failOnDuplicates,
+      respectGitignore: input.respectGitignore ?? defaults.respectGitignore,
+      minLocations: input.minLocations ?? defaults.minLocations,
+      changedFrom: input.changedFrom,
+      changed: input.changed ?? [],
+      explainChanged: input.explainChanged ?? defaults.explainChanged,
+      onlyNew: input.onlyNew ?? defaults.onlyNew,
+      excludeKinds: input.excludeKinds ?? [],
+      minDistinctKinds: input.minDistinctKinds ?? defaults.minDistinctKinds,
+      exclude: input.exclude ?? [],
+      excludeTaggedTemplates: input.excludeTaggedTemplates ?? defaults.excludeTaggedTemplates,
+      excludeTests: input.excludeTests ?? defaults.excludeTests,
+      counterparts: input.counterparts ?? defaults.counterparts,
+    });
   }
 
   static parse(...args: string[]): Options {
@@ -268,27 +335,27 @@ export class Options {
     // unused when help is set (main() prints USAGE and returns).
     const profile = help || profileName === undefined ? {} : resolveProfile(profileName);
 
-    return new Options(
-      paths.length > 0 ? paths : ["src"],
-      pick(threshold, undefined, 0.82),
-      pick(minLines, undefined, 4),
-      pick(minNodes, profile.minNodes, 20),
-      pick(format, undefined, "text"),
-      help ?? false,
-      pick(failOnDuplicates, profile.failOnDuplicates, false),
-      pick(respectGitignore, undefined, true),
-      pick(minLocations, undefined, 2),
+    return new Options({
+      paths: paths.length > 0 ? paths : ["src"],
+      threshold: pick(threshold, undefined, 0.82),
+      minLines: pick(minLines, undefined, 4),
+      minNodes: pick(minNodes, profile.minNodes, 20),
+      format: pick(format, undefined, "text"),
+      help: help ?? false,
+      failOnDuplicates: pick(failOnDuplicates, profile.failOnDuplicates, false),
+      respectGitignore: pick(respectGitignore, undefined, true),
+      minLocations: pick(minLocations, undefined, 2),
       changedFrom,
       changed,
-      explainChanged ?? false,
-      pick(onlyNew, profile.onlyNew, false),
-      unionLists(profile.excludeKinds, excludeKinds),
-      pick(minDistinctKinds, undefined, 0),
+      explainChanged: explainChanged ?? false,
+      onlyNew: pick(onlyNew, profile.onlyNew, false),
+      excludeKinds: unionLists(profile.excludeKinds, excludeKinds),
+      minDistinctKinds: pick(minDistinctKinds, undefined, 0),
       exclude,
-      pick(excludeTaggedTemplates, undefined, false),
-      pick(excludeTests, profile.excludeTests, false),
-      pick(counterparts, undefined, false),
-    );
+      excludeTaggedTemplates: pick(excludeTaggedTemplates, undefined, false),
+      excludeTests: pick(excludeTests, profile.excludeTests, false),
+      counterparts: pick(counterparts, undefined, false),
+    });
   }
 }
 
