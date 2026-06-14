@@ -5,6 +5,29 @@ All notable changes to dry-ts are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-06-14
+
+### Added
+
+- `--min-distinct-kinds N` adds a structure-variety floor that complements
+  `--min-nodes`. A large candidate can still be near-uniform boilerplate (a
+  property-only interface, a flat config object) that clears the node-count bar
+  yet reaches the similarity threshold against any similarly-shaped block.
+  `--min-distinct-kinds` drops a candidate whose subtree spans fewer than `N`
+  distinct node kinds, while keeping candidates with varied control flow.
+  Default off (`0`); only node kinds count toward diversity, not markers. Tags
+  are tracked only when the flag is active, so the default scan path is
+  unchanged and adds no cost.
+- `// dry-ignore` inline directive: a source-level escape hatch for an
+  intentional, idiomatic repetition you do not want to exclude wholesale by kind
+  or file. A `// dry-ignore` (or `// dry-ignore-next-line`) comment in a
+  declaration's leading trivia drops that declaration as a candidate; the
+  block-comment form `/* dry-ignore */` works too. Suppression is scoped to the
+  node whose leading comment carries the directive (a directive on a wrapping
+  `const` statement does not reach a nested arrow function), and never hides
+  unrelated child candidates. No flag required and no second parse — the
+  directive is read from the source already in memory.
+
 ## [0.5.0] - 2026-06-14
 
 ### Added

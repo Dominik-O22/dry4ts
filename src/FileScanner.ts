@@ -26,8 +26,9 @@ export class FileScanner {
     minLines: number,
     minNodes = 1,
     excludeKinds: ReadonlySet<ts.SyntaxKind> = EMPTY_KIND_SET,
+    minDistinctKinds = 0,
   ): Entry[] {
-    return files.flatMap((file) => this.scanFile(file, minLines, minNodes, excludeKinds));
+    return files.flatMap((file) => this.scanFile(file, minLines, minNodes, excludeKinds, minDistinctKinds));
   }
 
   scanFile(
@@ -35,6 +36,7 @@ export class FileScanner {
     minLines: number,
     minNodes = 1,
     excludeKinds: ReadonlySet<ts.SyntaxKind> = EMPTY_KIND_SET,
+    minDistinctKinds = 0,
   ): Entry[] {
     const text = fs.readFileSync(file, "utf8");
     const sourceFile = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, false, scriptKind(file));
@@ -52,9 +54,17 @@ export class FileScanner {
     const entries: Array<{ order: number; entry: Entry }> = [];
     let nextOrder = 0;
 
+    // Kind-diversity floor (plan 008). Only tracked when active so the default
+    // (off) scan path adds no cost. `tags` holds one node-kind tag per visited
+    // node, post-order, so a candidate's subtree is the slice [tagStart, end);
+    // markers do not count toward kind diversity by design.
+    const trackKinds = minDistinctKinds > 0;
+    const tags: string[] = [];
+
     const visit = (node: ts.Node): number => {
       const order = nextOrder++;
       const rangeStart = hashes.length;
+      const tagStart = tags.length;
       const childHashes: number[] = [];
       for (const marker of this.normalizer.markers(node)) {
         const markerHash = this.markerHash(marker);
@@ -66,10 +76,20 @@ export class FileScanner {
           childHashes.push(visit(child));
         }
       });
-      const hash = this.interner.idFor(this.normalizer.tag(node), childHashes);
+      const tag = this.normalizer.tag(node);
+      const hash = this.interner.idFor(tag, childHashes);
       hashes.push(hash);
+      if (trackKinds) {
+        tags.push(tag);
+      }
 
-      if (candidateRootKinds.has(node.kind) && !excludeKinds.has(node.kind) && hashes.length - rangeStart >= minNodes) {
+      if (
+        candidateRootKinds.has(node.kind) &&
+        !excludeKinds.has(node.kind) &&
+        hashes.length - rangeStart >= minNodes &&
+        !hasIgnoreDirective(text, node) &&
+        (!trackKinds || distinctKindCount(tags, tagStart) >= minDistinctKinds)
+      ) {
         const { startLine, endLine } = lineRangeFor(sourceFile, node);
         if (endLine - startLine + 1 >= minLines) {
           entries.push({
@@ -104,6 +124,17 @@ export class FileScanner {
     }
     return hash;
   }
+}
+
+// Distinct node-kind tags over a candidate's subtree slice [start, end). Built
+// only when the floor is active (guarded at the call site), so it never touches
+// the default scan path.
+function distinctKindCount(tags: readonly string[], start: number): number {
+  const seen = new Set<string>();
+  for (let i = start; i < tags.length; i += 1) {
+    seen.add(tags[i]);
+  }
+  return seen.size;
 }
 
 function sortedUnique(hashes: readonly number[], start: number): Float64Array {
@@ -194,6 +225,31 @@ function scriptKind(file: string): ts.ScriptKind {
     return ts.ScriptKind.TSX;
   }
   return ts.ScriptKind.TS;
+}
+
+// Source-level escape hatch. A `// dry-ignore` (or `dry-ignore-next-line`)
+// comment in a node's leading trivia suppresses that node as a candidate. We
+// read the existing `text` via getLeadingCommentRanges — forEachChild skips
+// comment trivia, so there is no second parse. Suppression is scoped to the
+// node whose trivia carries the directive: the comment must sit on the specific
+// declaration the user means (a directive on a wrapping VariableStatement does
+// not reach a nested ArrowFunction, which keeps its own leading trivia).
+function hasIgnoreDirective(text: string, node: ts.Node): boolean {
+  const ranges = ts.getLeadingCommentRanges(text, node.getFullStart());
+  if (!ranges) {
+    return false;
+  }
+  for (const range of ranges) {
+    const raw = text.substring(range.pos, range.end);
+    const body =
+      range.kind === ts.SyntaxKind.MultiLineCommentTrivia
+        ? raw.slice(2, -2)
+        : raw.slice(2);
+    if (/^\s*dry-ignore(-next-line)?\b/.test(body)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function lineRangeFor(sourceFile: ts.SourceFile, node: ts.Node): { startLine: number; endLine: number } {

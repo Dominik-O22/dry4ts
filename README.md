@@ -100,6 +100,47 @@ node types dry-ts treats as comparable units. The names are TypeScript
 Excluding a kind never hides a longer child candidate — children are always
 visited regardless.
 
+### Dropping near-uniform candidates: `--min-distinct-kinds`
+
+`--min-nodes` filters by raw node count, but a large candidate can still be
+near-uniform boilerplate — a property-only interface, a flat config object —
+that clears the node bar yet reaches the similarity threshold against any
+similarly-shaped block. `--min-distinct-kinds N` drops a candidate whose subtree
+spans fewer than `N` distinct node kinds, while keeping candidates with varied
+control flow.
+
+It complements `--min-nodes` (size) with a structure-variety floor. Default
+**off** (`0`); markers do not count toward kind diversity, only node kinds do.
+The off path tracks nothing, so it costs nothing.
+
+### Suppressing a single occurrence: `// dry-ignore`
+
+For an intentional, idiomatic repetition that you do not want to exclude
+wholesale by kind or file, annotate the specific declaration at the source:
+
+```ts
+// dry-ignore
+export function knownDuplicate(): void {
+  // ...
+}
+```
+
+A `// dry-ignore` (or `// dry-ignore-next-line`) comment in a declaration's
+**leading trivia** drops that declaration as a candidate. The block-comment form
+`/* dry-ignore */` works too. No flag required; reads the existing source, no
+second parse.
+
+Placement rule: suppression is scoped to the node whose leading comment carries
+the directive — put it on the exact declaration you mean. A directive on a
+wrapping `const` statement suppresses that `VariableStatement` candidate but does
+**not** reach a nested arrow function, which keeps its own (separate) leading
+trivia and remains a candidate. Suppressing a parent never hides unrelated child
+candidates inside it.
+
+For file- or glob-level ignores, exclude the path via `.gitignore` (or
+`--no-gitignore` to override); a config-level ignore surface is tracked
+separately.
+
 ### Incremental gating
 
 `--fail-on-duplicates` on its own is zero-tolerance: any cluster anywhere fails
