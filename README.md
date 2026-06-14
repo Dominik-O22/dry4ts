@@ -1,72 +1,46 @@
 # dry-ts
 
-dry-ts finds candidate duplicate TypeScript code across files and directories. It reports fuzzy structural matches as clusters of related filename and line ranges so another mechanism can evaluate and reduce duplication.
+dry-ts finds candidate duplicate TypeScript code across files and directories. It reports fuzzy structural matches as clusters of related filename and line ranges so another mechanism — a CI gate, an AI agent, a human reviewer — can evaluate and reduce duplication.
+
+It catches Type-2/Type-3 clones — same shape, renamed identifiers, reordered or slightly varied statements — that token and line matchers miss. That is exactly the class an LLM produces when it reimplements existing structure, so dry-ts is built with **agents and PR gates as the primary consumers**. See [How it works](#how-it-works) for the engine.
 
 ## Quickstart
 
 ```bash
-# Scan a source tree for candidate duplicates
+# 1. Scan a source tree for candidate duplicates
 bunx dry-ts src
 
-# PR gate — fail only if THIS change adds duplication (the recommended workflow)
+# 2. PR gate — fail only if THIS change adds duplication (the recommended CI workflow)
 bunx dry-ts --profile pr --changed-from origin/main src
+
+# 3. Agent loop — after edits, emit only NEW duplication as JSON, each finding
+#    routed to its nearest existing match
+bunx dry-ts --profile agent --changed-from HEAD src
+
+# 4. SARIF for GitHub code scanning (inline PR annotations)
+bunx dry-ts --sarif --changed-from origin/main src > dry-ts.sarif
 ```
 
-`--profile pr` is a curated preset; it expands to `--exclude-tests --min-nodes 50 --exclude-kinds ArrowFunction,VariableStatement --only-new --fail-on-duplicates`. See [Curating results](#curating-results) for the other profiles.
+`--profile pr` and `--profile agent` are curated presets (see [Profiles](#profiles---profile-name)). Both **require** a changed-scope flag and fail loud without one, so they never gate against the wrong base.
 
-**What it is:** a TypeScript-first *structural* duplicate-**candidate** detector, built for PR gates and AI/agent consumers. It catches Type-2/Type-3 clones — same shape, renamed identifiers, reordered or slightly varied statements — that token and line matchers miss.
+- **Config:** persisting flags in a committed config file (`.dry-ts.json`) so a repo sets policy once is [planned](https://github.com/Dominik-O22/dry4ts/issues/23), not shipped. Until then, encode policy in a profile + a short flag list.
+- **Suppress an intentional repetition:** annotate it with [`// dry-ignore`](#suppressing-a-single-occurrence--dry-ignore), or exclude a whole path with `--exclude`.
+- **Full flag reference:** [Usage](#usage). **Cutting noise:** [Curating results](#curating-results).
 
-**What it is not:** a general-purpose, multi-language copy/paste detector. For broad Type-1 token cloning across many languages with mature CI reporters, reach for [jscpd](https://github.com/kucherenko/jscpd) or PMD CPD. dry-ts reports structural *similarity candidates*, not confirmed semantic duplication — keep that framing when you triage.
+**What it is:** a TypeScript-first *structural* duplicate-**candidate** detector, built for PR gates and AI/agent consumers.
 
-**Maturity:** young package — pin the version (`dry-ts@x.y.z`). Normalization can change between releases, so an unpinned bump can shift findings. It has no install hooks and two runtime dependencies (`ignore`, `typescript`); `git` is spawned only for `--changed-from`.
+**What it is not:** a general-purpose, multi-language copy/paste detector. For broad Type-1 token cloning across many languages with mature CI reporters, reach for [jscpd](https://github.com/kucherenko/jscpd) or PMD CPD. dry-ts reports structural *similarity candidates*, not confirmed semantic duplication — keep that framing when you triage. The point is to catch accidental reimplementation before it lands, not to "dedupe everything."
 
-## Overview
+**Maturity:** young package — pin the version (`dry-ts@x.y.z`). It has no install hooks and two runtime dependencies (`ignore`, `typescript`); `git` is spawned only for `--changed-from`.
 
-dry-ts parses TypeScript source with the TypeScript compiler API, selects TypeScript declarations and function-like nodes as comparison candidates, normalizes each candidate's AST, and compares sets of structural fingerprints with Jaccard similarity:
+### Output stability
 
-```text
-score = shared fingerprints / all fingerprints seen in either candidate
-```
+dry-ts is stateless — no baseline file — so findings are a pure function of the input and the normalization rules. Those rules (`src/TypeScriptNormalizer.ts`, `src/NormalizedNode.ts`) and the scoring can evolve, which means an upgrade can shift findings. The policy:
 
-Names and literal values normalize away, while TypeScript syntax shape remains. Classes, interfaces, type aliases, enums, functions, methods, constructors, properties, variable statements, accessors, enum members, arrow functions, and function expressions can all become candidates.
+- **Any change that can move findings is at least a MINOR version bump**, called out in [CHANGELOG.md](CHANGELOG.md) under that release.
+- **Pin `dry-ts@x.y.z` in CI** so a gate stays reproducible across runs, and read the changelog before bumping the pin.
 
-## How dry-ts differs from token and line matchers
-
-Most duplicate-code tools match **tokens** or **lines**. dry-ts matches
-**normalized AST structure**. The difference is which kind of clone each can see,
-in the standard Type 1–4 clone taxonomy:
-
-- **Type 1** — identical code, modulo whitespace and comments.
-- **Type 2** — Type 1 with renamed identifiers and changed literals; same structure.
-- **Type 3** — near-miss: statements added, removed, or reordered.
-- **Type 4** — semantically equivalent but structurally different.
-
-| Tool | Method | Catches |
-| --- | --- | --- |
-| Simian | line hashing (ignores whitespace, braces, comments) | mostly Type 1 |
-| jscpd | contiguous token-sequence matching (Rabin–Karp over Prism tokens) | Type 1 |
-| PMD CPD | contiguous token-sequence matching (Rabin–Karp / suffix tree); can normalize identifiers and literals | Type 1, Type 2 |
-| **dry-ts** | **set similarity over normalized-AST fingerprints (Jaccard)** | **Type 2 and Type 3** |
-
-Two properties follow from comparing *sets* of structural fingerprints instead of
-contiguous token runs:
-
-1. **Rename- and reorder-tolerant.** Names and literals normalize away before
-   fingerprinting, and Jaccard scores *partial* overlap, so two blocks with the
-   same shape but added, removed, or reordered statements still score high. Token-
-   and line-sequence matchers need a contiguous run, so a single insertion splits
-   the match. (PMD CPD's `ignore-identifiers` / `ignore-literals` reach Type 2, but
-   still match contiguous token sequences — not fuzzy structural overlap.)
-2. **Graded, not binary.** The output is a similarity score (default ≥ 0.82), not
-   "≥ N identical tokens" — you tune by structural similarity, not run length.
-
-dry-ts does **not** target Type 4 (semantic) clones; it compares structure, not
-behavior. What it adds over token/line matchers is the Type-2/Type-3 middle:
-same shape, different names, slight variations. That is exactly the class an LLM
-produces when it reimplements existing structure — and dry-ts is built for
-**agents as the primary consumer** of its output (catching their own
-reimplementations, or gating others' in CI), not for humans reading copy-paste
-reports.
+CI tools live or die on trust; treating output stability as part of semver is how a pinned gate stays honest.
 
 ## Usage
 
@@ -88,6 +62,8 @@ bun ./dist/bin/dry-ts.js [options] [file-or-directory ...]
 Options:
 
 ```text
+--profile NAME  Start from a curated preset (pr, src, audit, tests, agent),
+                then apply explicit flags on top. See "Profiles".
 --threshold N   Minimum structural similarity score, default 0.82
 --min-lines N   Minimum source lines in a candidate declaration, default 4
 --min-nodes N   Minimum normalized syntax nodes, default 20; candidates
@@ -102,7 +78,8 @@ Options:
 --sarif         Same as --format sarif (SARIF 2.1.0 for GitHub code scanning)
 --changed-from REF
                 Incremental gating: mark clusters that intersect code changed
-                since merge-base(REF, HEAD) as status "new". Untracked scanned
+                since merge-base(REF, HEAD) as status "new". The scope is your
+                working tree (committed + staged + unstaged). Untracked scanned
                 files count as fully changed. Requires a git repository.
 --changed FILE  Incremental gating: mark clusters intersecting FILE (every
                 line) as status "new". Repeatable; for agents/non-git callers.
@@ -179,7 +156,7 @@ node types dry-ts treats as comparable units. The names are TypeScript
 Excluding a kind never hides a longer child candidate — children are always
 visited regardless.
 
-### Curating results
+## Curating results
 
 Out of the box on a large frontend monorepo a scan can report thousands of
 clusters, much of it *expected* duplication — test scaffolding, CSS-in-JS,
@@ -219,7 +196,7 @@ The levers themselves, roughly in order of leverage on a frontend codebase:
 generated code, fixtures, stories), `--min-nodes N` (raise the size floor), and
 the kind filters below.
 
-#### Profiles: `--profile NAME`
+### Profiles: `--profile NAME`
 
 Rather than rediscover the right flag combination per run, start from a curated
 preset. `--profile NAME` seeds a bundle of defaults; any explicit flag you pass
@@ -231,6 +208,7 @@ than replacing them — so `--profile pr --exclude-kinds Constructor` excludes
 | Profile | Expands to | For |
 | --- | --- | --- |
 | `pr` | `--exclude-tests --min-nodes 50 --exclude-kinds ArrowFunction,VariableStatement --only-new --fail-on-duplicates` | PR gate, highest signal. **Requires** `--changed-from`/`--changed` (it sets `--only-new`, which errors without a scope — so it fails loud rather than gating against the wrong base). |
+| `agent` | `pr` **+** `--counterparts --format json` | After-edit agent loop. The PR gate plus per-location [counterpart routing](#nearest-counterpart-provenance---counterparts) and JSON output, so an agent reads each new finding's nearest existing match. Inherits `pr`'s scope requirement. See [AI Agents](#ai-agents). |
 | `src` | `--exclude-tests` | Source-only scan with test scaffolding dropped. |
 | `audit` | `--min-nodes 12` | Broad exploratory scan — lower the floor to surface near-misses the default filters out. |
 | `tests` | `--exclude-kinds ArrowFunction --min-nodes 40` | Test-*infrastructure* duplication (shared setup/fixtures/builders), explicitly **not** the anonymous arrow bodies that dominate a raw test scan. Point it at your test directories. |
@@ -330,10 +308,9 @@ hides any real duplicate that later lands there.
 
 For file- or glob-level ignores, exclude the path via `--exclude`/`.gitignore`
 (or `--no-gitignore` to override). Persisting *flags* in config (so you do not
-retype `--exclude-tests --min-nodes 40 …` every run) is a separate, planned
-convenience — config state, not a findings baseline — and does not exist yet.
+retype `--exclude-tests --min-nodes 40 …` every run) is [planned](https://github.com/Dominik-O22/dry4ts/issues/23) — config state, not a findings baseline — and does not exist yet.
 
-### Incremental gating
+## Incremental gating
 
 `--fail-on-duplicates` on its own is zero-tolerance: any cluster anywhere fails
 the build, which no real codebase survives. Pair it with a changed-scope flag to
@@ -352,22 +329,33 @@ Every cluster carries a `status`:
 
 In a CI gate the actionable `new` clusters are easily buried under pre-existing
 `known` ones. `--only-new` filters the *report* down to `new` clusters across
-all formats (text/json/edn); the exit code still reflects the full set, so the
-gate behaves identically while the log stays readable. It requires a
+all formats (text/json/edn/sarif); the exit code still reflects the full set, so
+the gate behaves identically while the log stays readable. It requires a
 changed-scope flag (there is no `new` status without one).
 
-`--changed-from` resolves `merge-base(REF, HEAD)` and diffs from there, so a
+### What counts as "changed"
+
+`--changed-from REF` resolves `merge-base(REF, HEAD)` and diffs from there, so a
 branch behind its base does not see base-side changes pollute the result. Write
 `--changed-from origin/main` and get correct PR semantics directly.
 
+The diff is taken against your **working tree**, so the scope includes
+**committed, staged, and unstaged** edits — an uncommitted change already gates.
+That is what makes it right for an agent loop that runs *before* committing. On
+top of that, any scanned file that git does not track counts as **fully
+changed** (a brand-new file is all-new, so a freshly-added duplicate cannot slip
+past the gate).
+
 A file renamed into scope with no edits gates nothing — moving code is not
 duplicating it. `--changed FILE` scopes the *whole* file (file granularity),
-including any pre-existing duplication inside it; use `--changed-from` for
-line-level precision.
+including any pre-existing duplication inside it, and is the path for non-git
+callers; use `--changed-from` for line-level precision.
 
 When no paths are provided, dry-ts scans `src`. Directory arguments recursively include `.js`, `.jsx`, `.ts`, `.tsx`, `.mts`, and `.cts` files, excluding TypeScript declaration files. Directory scans respect `.gitignore` from the working directory by default; pass `--no-gitignore` to include ignored paths. Explicit file arguments are always scanned even when they match a `.gitignore` pattern.
 
 `--exclude GLOB` drops files and directories matching a `.gitignore`-style glob, e.g. `--exclude '**/*.spec.*' --exclude '**/*.stories.*'`. It is repeatable and applies during directory scans regardless of `--no-gitignore` (it is an explicit instruction, not repo config); explicit file arguments are still always scanned. This is the highest-leverage way to cut whole categories of expected duplication — on a large frontend codebase, test and story files alone are typically about half of all reported clusters.
+
+### Output formats
 
 Default text output:
 
@@ -419,30 +407,12 @@ JSON output:
 }
 ```
 
-## Library API
-
-```ts
-import { TypeScriptDuplicateFinder } from "dry-ts";
-
-const clusters = new TypeScriptDuplicateFinder().findClusters({
-  paths: ["src"],
-  threshold: 0.82,
-  minLines: 4,
-  minNodes: 20,
-  minLocations: 2,
-  respectGitignore: true, // default; set false to include .gitignore-d paths
-});
-```
-
-`findClusters()` returns raw clusters with `status` unset. The changed-scope
-flags (`--changed-from`, `--changed`) and the `status` field
-(`"new" | "known" | "unscoped"`) are assigned by the CLI, not the library
-finder.
+`--format sarif` emits SARIF 2.1.0 for GitHub code scanning — see [SARIF](#sarif--github-code-scanning).
 
 ## CI
 
 Gate a PR only when it introduces *new* duplication, tolerating known debt, with
-`--changed-from` against the PR's base branch:
+`--changed-from` against the PR's base branch. This is the one copy-paste action:
 
 ```yaml
 name: Duplicate Code
@@ -460,11 +430,12 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.6
-      - run: bunx dry-ts --format json --fail-on-duplicates --changed-from origin/${{ github.base_ref || 'main' }} src
+      - run: bunx dry-ts@x.y.z --profile pr --changed-from origin/${{ github.base_ref || 'main' }} src
 ```
 
-To gate on *all* duplication (zero-tolerance) instead, drop `--changed-from`:
-`bunx dry-ts --format json --fail-on-duplicates src`.
+Pin `dry-ts@x.y.z` to a real version (see [Output stability](#output-stability)). To gate on *all*
+duplication (zero-tolerance) instead, drop `--changed-from` and the `pr` profile:
+`bunx dry-ts --fail-on-duplicates src`.
 
 For this repository, `bun run ci` builds, tests, and runs dry-ts against `src test`.
 
@@ -495,11 +466,24 @@ the build.
 
 If you use an AI agent, run `npx @tanstack/intent@latest install`.
 
-Prefer JSON output for autonomous tools:
+dry-ts is built for agents as a first-class consumer: run it after an edit,
+parse the JSON, and route each finding. The `agent` profile bundles exactly that
+configuration.
 
 ```bash
-bunx dry-ts --format json src test
+# After an agent edits code: gate on duplication the edit introduced and hand
+# the agent routed JSON — each new cluster with its nearest existing match.
+bunx dry-ts --profile agent --changed-from HEAD src test
 ```
+
+The loop:
+
+1. **Run after edits** with `--profile agent` (= `--only-new --counterparts --fail-on-duplicates --format json` over the `pr` floors).
+2. **Read the exit code.** `0` = clean. `1` = new duplication found, with the JSON below on stdout. `2` = infra/config failure — do **not** read it as findings.
+3. **Per cluster, read `locations[].nearest`** — the nearest existing match — and its `changed` flag to route the fix:
+   - counterpart `changed: false` ⇒ the new code duplicates **existing** code → reuse / extract toward the existing definition.
+   - counterpart `changed: true` ⇒ the agent reimplemented **itself** within its own diff → refactor the new code (lowest-risk; nothing stable depends on it yet).
+4. **Reuse existing code, or justify the duplication** (a `// dry-ignore` if it is intentional).
 
 Exit codes are stable for automation:
 
@@ -601,16 +585,84 @@ Copy-paste recipes:
 # Self-catch: did the block I just wrote re-implement existing structure?
 dry-ts --counterparts --json --changed src/foo.ts src test
 
-# Line-precise self-catch against the last commit, gated.
+# Line-precise self-catch against the last commit, gated (or just --profile agent).
 dry-ts --counterparts --only-new --fail-on-duplicates --changed-from HEAD src test
 
 # CI fixer: gate a PR and hand a reviewer/fixer agent the routed JSON.
-dry-ts --counterparts --only-new --fail-on-duplicates --changed-from origin/main --json src test
+dry-ts --profile agent --changed-from origin/main src test
 ```
 
 On a finding, exit `1` still emits the parseable JSON above on stdout — read it.
 Exit `2` is an infra/config failure (see the exit-code table) and must **not** be
 read as duplicate findings.
+
+## Library API
+
+```ts
+import { TypeScriptDuplicateFinder } from "dry-ts";
+
+const clusters = new TypeScriptDuplicateFinder().findClusters({
+  paths: ["src"],
+  threshold: 0.82,
+  minLines: 4,
+  minNodes: 20,
+  minLocations: 2,
+  respectGitignore: true, // default; set false to include .gitignore-d paths
+});
+```
+
+`findClusters()` returns raw clusters with `status` unset. The changed-scope
+flags (`--changed-from`, `--changed`) and the `status` field
+(`"new" | "known" | "unscoped"`) are assigned by the CLI, not the library
+finder.
+
+## How it works
+
+dry-ts parses TypeScript source with the TypeScript compiler API, selects TypeScript declarations and function-like nodes as comparison candidates, normalizes each candidate's AST, and compares sets of structural fingerprints with Jaccard similarity:
+
+```text
+score = shared fingerprints / all fingerprints seen in either candidate
+```
+
+Names and literal values normalize away, while TypeScript syntax shape remains. Classes, interfaces, type aliases, enums, functions, methods, constructors, properties, variable statements, accessors, enum members, arrow functions, and function expressions can all become candidates.
+
+### How dry-ts differs from token and line matchers
+
+Most duplicate-code tools match **tokens** or **lines**. dry-ts matches
+**normalized AST structure**. The difference is which kind of clone each can see,
+in the standard Type 1–4 clone taxonomy:
+
+- **Type 1** — identical code, modulo whitespace and comments.
+- **Type 2** — Type 1 with renamed identifiers and changed literals; same structure.
+- **Type 3** — near-miss: statements added, removed, or reordered.
+- **Type 4** — semantically equivalent but structurally different.
+
+| Tool | Method | Catches |
+| --- | --- | --- |
+| Simian | line hashing (ignores whitespace, braces, comments) | mostly Type 1 |
+| jscpd | contiguous token-sequence matching (Rabin–Karp over Prism tokens) | Type 1 |
+| PMD CPD | contiguous token-sequence matching (Rabin–Karp / suffix tree); can normalize identifiers and literals | Type 1, Type 2 |
+| **dry-ts** | **set similarity over normalized-AST fingerprints (Jaccard)** | **Type 2 and Type 3** |
+
+Two properties follow from comparing *sets* of structural fingerprints instead of
+contiguous token runs:
+
+1. **Rename- and reorder-tolerant.** Names and literals normalize away before
+   fingerprinting, and Jaccard scores *partial* overlap, so two blocks with the
+   same shape but added, removed, or reordered statements still score high. Token-
+   and line-sequence matchers need a contiguous run, so a single insertion splits
+   the match. (PMD CPD's `ignore-identifiers` / `ignore-literals` reach Type 2, but
+   still match contiguous token sequences — not fuzzy structural overlap.)
+2. **Graded, not binary.** The output is a similarity score (default ≥ 0.82), not
+   "≥ N identical tokens" — you tune by structural similarity, not run length.
+
+dry-ts does **not** target Type 4 (semantic) clones; it compares structure, not
+behavior. What it adds over token/line matchers is the Type-2/Type-3 middle:
+same shape, different names, slight variations. That is exactly the class an LLM
+produces when it reimplements existing structure — and dry-ts is built for
+**agents as the primary consumer** of its output (catching their own
+reimplementations, or gating others' in CI), not for humans reading copy-paste
+reports.
 
 ## Publishing
 
