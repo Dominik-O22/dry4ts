@@ -1264,9 +1264,13 @@ type MatchingPairProbe = readonly [MatchingPairProbeEntry, MatchingPairProbeEntr
 
 function matchingPairsForTest(entries: readonly MatchingPairProbeEntry[], threshold: number): MatchingPairProbe[] {
   const finder = new TypeScriptDuplicateFinder() as unknown as {
-    matchingPairs(entries: readonly MatchingPairProbeEntry[], threshold: number): MatchingPairProbe[];
+    matchingPairs(
+      entries: readonly MatchingPairProbeEntry[],
+      threshold: number,
+      nearest: Map<string, unknown> | null,
+    ): MatchingPairProbe[];
   };
-  return finder.matchingPairs(entries, threshold);
+  return finder.matchingPairs(entries, threshold, null);
 }
 
 const probeFingerprintIds = new Map<string, number>();
@@ -2626,4 +2630,353 @@ test("--exclude-tagged-templates off (default) leaves output byte-for-byte uncha
 test("--exclude-tagged-templates parses as a boolean flag", () => {
   assert.equal(Options.parse("--exclude-tagged-templates").excludeTaggedTemplates, true);
   assert.equal(Options.parse().excludeTaggedTemplates, false);
+});
+
+// --- --counterparts (plan 014, nearest-counterpart provenance) -------------
+
+// A standalone function whose body is identical across files modulo the name and
+// the iterated variable; the two copies are an exact-fingerprint duplicate.
+function counterpartFn(name: string, variable: string): string {
+  return `
+export function ${name}(${variable}: number[]): number {
+  const kept = ${variable}.filter((item) => item % 2 === 0);
+  return kept.map((item) => item * 2).reduce((sum, next) => sum + next, 0);
+}
+`;
+}
+
+const counterpartScan = { threshold: 0.4, minLines: 3, minNodes: 8, counterparts: true } as const;
+
+test("--counterparts: a two-member exact-dup pair points each location at the other", async () => {
+  const { dir } = await writeFixture({ "a.ts": counterpartFn("aa", "items"), "b.ts": counterpartFn("bb", "values") });
+  const [cluster] = new TypeScriptDuplicateFinder().findClusters({ paths: [dir], ...counterpartScan });
+  assert.equal(cluster.locations.length, 2);
+  const [first, second] = cluster.locations;
+  // Each nearest references the other member by both file/range and index.
+  assert.ok(first.nearest && second.nearest);
+  assert.equal(first.nearest.file, second.file);
+  assert.equal(first.nearest.index, 1);
+  assert.equal(second.nearest.index, 0);
+  // Exact duplicate: shared == total, score == 1.
+  assert.equal(first.nearest.shared, first.nearest.total);
+  assert.equal(first.nearest.score, 1);
+  assert.equal(second.nearest.score, 1);
+  // index dereferences within this same cluster.
+  assert.equal(cluster.locations[first.nearest.index].file, first.nearest.file);
+});
+
+test("--counterparts: a transitive cluster reports each member's highest-score partner, deterministically", async () => {
+  // aa and bb are structurally identical (score 1); cc is the same shape plus one
+  // extra statement, so its strongest partner is whichever of aa/bb the tie-break
+  // chooses — never an arbitrary one.
+  const sources = {
+    "a.ts": counterpartFn("aa", "items"),
+    "b.ts": counterpartFn("bb", "values"),
+    "c.ts": `
+export function cc(rows: number[]): number {
+  const offset = 1;
+  const kept = rows.filter((item) => item % 2 === 0);
+  return kept.map((item) => item * 2).reduce((sum, next) => sum + next, offset);
+}
+`,
+  };
+  const run = async () => {
+    const { dir } = await writeFixture(sources);
+    const [cluster] = new TypeScriptDuplicateFinder().findClusters({ paths: [dir], ...counterpartScan });
+    return cluster;
+  };
+  const cluster = await run();
+  assert.equal(cluster.locations.length, 3);
+  const byBase = (name: string) => cluster.locations.find((l) => l.file.endsWith(name))!;
+  const aa = byBase("a.ts");
+  const bb = byBase("b.ts");
+  const cc = byBase("c.ts");
+  // aa and bb are each other's nearest at score 1 (the tightest pair).
+  assert.equal(aa.nearest!.score, 1);
+  assert.equal(bb.nearest!.score, 1);
+  assert.equal(aa.nearest!.file, bb.file);
+  assert.equal(bb.nearest!.file, aa.file);
+  // cc's nearest is its absolute highest-score partner (< 1), not arbitrary; the
+  // partner is a real same-cluster member that the index dereferences to.
+  assert.ok(cc.nearest!.score > 0.4 && cc.nearest!.score < 1);
+  assert.ok(cluster.locations.some((l) => l.file === cc.nearest!.file));
+  assert.equal(cluster.locations[cc.nearest!.index].file, cc.nearest!.file);
+
+  // Determinism: a second independent scan produces the identical nearest edges.
+  const second = await run();
+  const edges = (c: Cluster) =>
+    c.locations.map((l) => `${path.basename(l.file)}->${path.basename(l.nearest!.file)}@${l.nearest!.score}`).sort();
+  assert.deepEqual(edges(cluster), edges(second));
+});
+
+test("--counterparts: a >=3-member identical-fingerprint group resolves true nearest among all members (A1)", async () => {
+  // Four exact-fingerprint copies are connected by a spanning tree, not a clique;
+  // every member's nearest must still be a real group member at score 1.
+  const { dir } = await writeFixture({
+    "a.ts": counterpartFn("aa", "v1"),
+    "b.ts": counterpartFn("bb", "v2"),
+    "c.ts": counterpartFn("cc", "v3"),
+    "d.ts": counterpartFn("dd", "v4"),
+  });
+  const [cluster] = new TypeScriptDuplicateFinder().findClusters({
+    paths: [dir],
+    ...counterpartScan,
+    threshold: 0.8,
+  });
+  assert.equal(cluster.locations.length, 4);
+  for (const location of cluster.locations) {
+    assert.ok(location.nearest, `every member carries a nearest, missing on ${location.file}`);
+    assert.equal(location.nearest.score, 1);
+    assert.equal(location.nearest.shared, location.nearest.total);
+    // The counterpart is another member of this same cluster, and the index
+    // dereferences to it.
+    assert.notEqual(location.nearest.file, location.file);
+    assert.equal(cluster.locations[location.nearest.index].file, location.nearest.file);
+  }
+});
+
+test("--counterparts: a same-locationKey collision keeps the rendered location's nearest self-consistent (A1/C1 regression)", async () => {
+  // A one-line `const x = (...) => ...` produces two candidate roots at the SAME
+  // file:start-end key (VariableStatement and its initializer ArrowFunction). The
+  // collector keeps the higher-nodes VariableStatement; the join must report a
+  // nearest whose shared count does not exceed that rendered location's own
+  // fingerprint length, and whose counterpart is a real same-cluster member.
+  const oneLiner = (name: string) =>
+    `export const ${name} = (first: number, second: number, third: number, fourth: number) => first + second + third + fourth + first + second;\n`;
+  const { dir } = await writeFixture({ "a.ts": oneLiner("handlerA"), "b.ts": oneLiner("handlerB") });
+  const clusters = new TypeScriptDuplicateFinder().findClusters({
+    paths: [dir],
+    threshold: 0.5,
+    minLines: 1,
+    minNodes: 4,
+    counterparts: true,
+  });
+  const collided = clusters
+    .flatMap((c) => c.locations.map((l) => ({ cluster: c, location: l })))
+    .filter(
+      ({ location }) => location.startLine === 1 && location.endLine === 1 && location.kind === "VariableStatement",
+    );
+  assert.ok(collided.length >= 2, "expected the VariableStatement at the colliding one-line key");
+  for (const { cluster, location } of collided) {
+    assert.ok(location.nearest);
+    // shared cannot exceed the rendered location's own fingerprint truth: total =
+    // a + b - shared >= shared implies shared <= total, and the rendered location
+    // is the max-nodes Entry, so shared must be <= total here.
+    assert.ok(location.nearest.shared <= location.nearest.total);
+    // The counterpart is a member of this same cluster (index dereferences).
+    assert.equal(cluster.locations[location.nearest.index].file, location.nearest.file);
+  }
+});
+
+test("--counterparts: no location in a rendered cluster leaks an undefined nearest", async () => {
+  const { dir } = await writeFixture({
+    "a.ts": counterpartFn("aa", "items"),
+    "b.ts": counterpartFn("bb", "values"),
+    "c.ts": counterpartFn("cc", "rows"),
+  });
+  const clusters = new TypeScriptDuplicateFinder().findClusters({ paths: [dir], ...counterpartScan });
+  assert.ok(clusters.length > 0);
+  for (const cluster of clusters) {
+    for (const location of cluster.locations) {
+      assert.notEqual(location.nearest, undefined, `join miss on ${location.file}`);
+    }
+  }
+});
+
+test("--counterparts off: cluster shape is byte-identical and carries no nearest own-property", async () => {
+  const sources = { "a.ts": counterpartFn("aa", "items"), "b.ts": counterpartFn("bb", "values") };
+  const withFlag = await writeFixture(sources);
+  const withoutFlag = await writeFixture(sources);
+  const scan = { threshold: 0.4, minLines: 3, minNodes: 8 };
+  const off = new TypeScriptDuplicateFinder().findClusters({ paths: [withoutFlag.dir], ...scan });
+  const on = new TypeScriptDuplicateFinder().findClusters({ paths: [withFlag.dir], ...scan, counterparts: true });
+  // Same clusters either way.
+  assert.deepEqual(clusterShape(off), clusterShape(on));
+  // Off the flag, no location object carries a `nearest` (or `changed`)
+  // own-property — not even set to undefined.
+  for (const cluster of off) {
+    for (const location of cluster.locations) {
+      assert.ok(!Object.hasOwn(location, "nearest"), "off path must not create a nearest own-property");
+      assert.ok(!Object.hasOwn(location, "changed"), "off path must not create a changed own-property");
+    }
+  }
+  // On the flag, every location has the own-property.
+  for (const cluster of on) {
+    for (const location of cluster.locations) {
+      assert.ok(Object.hasOwn(location, "nearest"), "on path must attach a nearest own-property");
+    }
+  }
+  // The default text/json/edn render is unchanged off the flag.
+  assert.ok(!formatCluster({ ...off[0], status: "unscoped" }, 1).includes("nearest"));
+  assert.ok(!toJson(off).includes("nearest"));
+  assert.ok(!toEdn(off).includes(":nearest"));
+});
+
+test("--counterparts + --only-new reports the absolute nearest (new/new) with per-location changed (B1/C1)", async () => {
+  // old.ts is committed; new1/new2 are added after the commit (untracked => new).
+  // All three are exact-fingerprint duplicates, so each new file's absolute
+  // strongest match is the OTHER new file, not the old one.
+  const dir = await gitRepo({ "old.ts": counterpartFn("oldFn", "items") });
+  await writeFile(path.join(dir, "new1.ts"), counterpartFn("alpha", "values"));
+  await writeFile(path.join(dir, "new2.ts"), counterpartFn("beta", "rows"));
+
+  const result = runCli([...gateFlags, "--json", "--counterparts", "--only-new", "--changed-from", "HEAD", "."], dir);
+  assert.equal(result.exitCode, 0, result.stderr);
+  const [cluster] = JSON.parse(result.stdout).clusters;
+  assert.ok(cluster, result.stdout);
+  const byBase = (name: string) => cluster.locations.find((l: { file: string }) => l.file.endsWith(name));
+  const new1 = byBase("new1.ts");
+  const new2 = byBase("new2.ts");
+  const old = byBase("old.ts");
+  // Per-location changed: the two new files are changed, the committed one is not.
+  assert.equal(new1.changed, true, result.stdout);
+  assert.equal(new2.changed, true, result.stdout);
+  assert.equal(old.changed, false, result.stdout);
+  // B1: new1's absolute nearest is the OTHER new file, NOT forced to the old one.
+  assert.ok(new1.nearest.file.endsWith("new2.ts"), `expected new1 -> new2, got ${new1.nearest.file}`);
+  assert.notEqual(new1.nearest.file.endsWith("old.ts"), true);
+  // The nearest index dereferences to a location present in the printed cluster.
+  assert.equal(cluster.locations[new1.nearest.index].file, new1.nearest.file);
+});
+
+test("per-location changed is gated: absent without --counterparts and absent with no scope", async () => {
+  // 1) A change scope is active but --counterparts is off: no location carries
+  //    `changed` (the --changed output stays byte-identical to today).
+  const dir = await gitRepo({ "k1.ts": duplicateBody, "k2.ts": duplicateBody });
+  await writeFile(path.join(dir, "k1.ts"), `${duplicateBody}${uniqueBody}`);
+  const scoped = runCli([...gateFlags, "--json", "--changed-from", "HEAD", "."], dir);
+  assert.equal(scoped.exitCode, 0, scoped.stderr);
+  for (const cluster of JSON.parse(scoped.stdout).clusters) {
+    for (const location of cluster.locations) {
+      assert.ok(!Object.hasOwn(location, "changed"), "no `changed` without --counterparts");
+      assert.ok(!Object.hasOwn(location, "nearest"), "no `nearest` without --counterparts");
+    }
+  }
+
+  // 2) --counterparts on but no change scope at all: `changed` is absent even
+  //    though `nearest` is present.
+  const { dir: plainDir } = await writeFixture({ "a.ts": duplicateBody, "b.ts": duplicateBody });
+  const unscoped = runCli([...gateFlags, "--json", "--counterparts", "."], plainDir);
+  assert.equal(unscoped.exitCode, 0, unscoped.stderr);
+  for (const cluster of JSON.parse(unscoped.stdout).clusters) {
+    for (const location of cluster.locations) {
+      assert.ok(!Object.hasOwn(location, "changed"), "no `changed` without an active scope");
+      assert.ok(Object.hasOwn(location, "nearest"), "nearest present under --counterparts");
+    }
+  }
+});
+
+test("--counterparts parses as a boolean flag and does not transpose the adjacent booleans", () => {
+  assert.equal(Options.parse("--counterparts").counterparts, true);
+  // Ordering pin: a default parse leaves all three adjacent booleans false, and
+  // --counterparts flips only its own field (guards a silent constructor
+  // transposition of excludeTaggedTemplates/excludeTests/counterparts).
+  assert.equal(Options.parse().counterparts, false);
+  assert.equal(Options.parse().excludeTests, false);
+  assert.equal(Options.parse().excludeTaggedTemplates, false);
+  assert.equal(Options.parse("--counterparts").excludeTests, false);
+  assert.equal(Options.parse("--counterparts").excludeTaggedTemplates, false);
+  assert.equal(Options.parse("--exclude-tests").counterparts, false);
+});
+
+test("--counterparts: text and edn render the counterpart (and changed) on the location's own line", async () => {
+  const { dir } = await writeFixture({ "a.ts": counterpartFn("aa", "items"), "b.ts": counterpartFn("bb", "values") });
+  const [cluster] = new TypeScriptDuplicateFinder().findClusters({ paths: [dir], ...counterpartScan });
+  // Attach per-location changed the way run() does under an active scope, so the
+  // render exercises changedSuffix/nearestSuffix (text) and nearestEdn (edn) —
+  // the formatters whose only prior coverage is the off-path "must NOT appear".
+  const rendered = {
+    ...cluster,
+    status: "new" as const,
+    locations: cluster.locations.map((location) => ({ ...location, changed: true })),
+  };
+  // text: one line per location, with `changed=` and `→ nearest <ref> (shared/total)` appended.
+  const text = formatCluster(rendered, 1);
+  assert.match(text, /changed=true → nearest .+:\d+-\d+ \(\d+\/\d+\)/);
+  // edn: independent optional groups, :changed then a :nearest map with all fields.
+  const edn = toEdn([rendered]);
+  assert.match(edn, /:changed true/);
+  assert.match(edn, /:nearest \{:index \d+ :file ".+" :start-line \d+ :end-line \d+ :shared \d+ :total \d+ :score \d/);
+  // json passes the same fields through.
+  const [jsonCluster] = JSON.parse(toJson([rendered])).clusters;
+  assert.equal(jsonCluster.locations[0].changed, true);
+  assert.ok(Number.isInteger(jsonCluster.locations[0].nearest.index));
+  assert.equal(jsonCluster.locations[0].nearest.score, 1);
+});
+
+test("--counterparts: a node-count collision attaches the rendered node's OWN nearest, not a collided smaller sibling's (Codex #1 regression)", async () => {
+  // A one-line `const x = (...) => ...` emits BOTH a VariableStatement and its inner
+  // ArrowFunction at the SAME line-based file:start-end. The arrow bodies are
+  // byte-identical across the two files (an exact score-1.0 edge), but one declaration
+  // is `export const` and the other plain `const`, so the VariableStatement-to-
+  // VariableStatement edge is < 1.0. ClusterCollector renders the max-nodes
+  // VariableStatement, so its `nearest` MUST describe that VariableStatement's own
+  // sub-1.0 edge — never the collided inner arrow's perfect 1.0, which would mislabel
+  // a partial structural match as an exact duplicate and misroute an agent's fix.
+  const body = "(m: number, n: number) => m + n + m + n + m + n + m + n";
+  const { dir } = await writeFixture({ "a.ts": `export const x = ${body};\n`, "b.ts": `const y = ${body};\n` });
+  const [cluster] = new TypeScriptDuplicateFinder().findClusters({
+    paths: [dir],
+    threshold: 0.3,
+    minLines: 1,
+    minNodes: 3,
+    counterparts: true,
+  });
+  const rendered = cluster.locations.filter((l) => l.kind === "VariableStatement");
+  assert.equal(rendered.length, 2, "both VariableStatements render at the colliding key");
+  // The cluster DOES contain a 1.0 edge (the identical inner arrows) — that score-1.0
+  // sibling is exactly what must NOT leak onto the rendered VariableStatement.
+  assert.equal(cluster.score.max, 1, "the identical inner arrows form a score-1.0 edge in this cluster");
+  for (const location of rendered) {
+    assert.ok(location.nearest);
+    // The reported score is the rendered node's OWN edge — NOT the inner arrow's 1.0.
+    assert.ok(
+      location.nearest.score < 1,
+      `a collided smaller sibling's 1.0 leaked onto a ${location.kind}: ${location.nearest.score}`,
+    );
+    // shared/total are internally consistent with the reported score (same node).
+    assert.equal(location.nearest.shared / location.nearest.total, location.nearest.score);
+    // The counterpart is the OTHER file's rendered location, and the index resolves.
+    assert.notEqual(location.nearest.file, location.file);
+    assert.equal(cluster.locations[location.nearest.index].file, location.nearest.file);
+  }
+});
+
+test("--counterparts: the COUNTERPART side of a collision reports the rendered-to-rendered edge, not a sub-node edge (Codex #2 regression)", async () => {
+  // Owner side and counterpart side are symmetric. Here each VariableStatement's
+  // STRONGEST raw edge is to the OTHER file's inner ArrowFunction (the arrows are
+  // identical, score 1.0; the const-vs-let VariableStatements are a weaker match).
+  // The arrow is non-rendered (the collector keeps the larger VariableStatement at
+  // that key), so the reported nearest must describe the rendered VariableStatement-
+  // to-VariableStatement edge — never the stronger owner→inner-arrow edge, which
+  // would overstate the rendered-to-rendered similarity.
+  const body = "(m: number, n: number) => m + n + m + n + m + n + m + n";
+  const { dir } = await writeFixture({ "a.ts": `const x = ${body};\n`, "b.ts": `let y = ${body};\n` });
+  const [cluster] = new TypeScriptDuplicateFinder().findClusters({
+    paths: [dir],
+    threshold: 0.3,
+    minLines: 1,
+    minNodes: 3,
+    counterparts: true,
+  });
+  const rendered = cluster.locations.filter((l) => l.kind === "VariableStatement");
+  assert.equal(rendered.length, 2, "both VariableStatements render at the colliding key");
+  // A stronger sub-node edge exists in the cluster (the identical inner arrows, 1.0,
+  // and the owner→inner-arrow cross edges) — none may leak onto the rendered pair.
+  assert.equal(cluster.score.max, 1, "the identical inner arrows form a score-1.0 edge in this cluster");
+  for (const location of rendered) {
+    assert.ok(location.nearest);
+    // The reported score is the true VariableStatement↔VariableStatement edge — the
+    // cluster's minimum (the rendered-to-rendered match), strictly below the stronger
+    // sub-node edges that exist in the same cluster.
+    assert.equal(location.nearest.score, cluster.score.min);
+    assert.ok(
+      location.nearest.score < cluster.score.max,
+      `a stronger sub-node edge leaked onto a rendered ${location.kind}: ${location.nearest.score}`,
+    );
+    // The counterpart is the OTHER file's rendered VariableStatement, index resolves.
+    assert.equal(cluster.locations[location.nearest.index].kind, "VariableStatement");
+    assert.notEqual(location.nearest.file, location.file);
+    assert.equal(cluster.locations[location.nearest.index].file, location.nearest.file);
+  }
 });
