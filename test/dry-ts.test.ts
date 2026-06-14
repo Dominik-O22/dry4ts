@@ -1946,3 +1946,211 @@ test("--exclude-kinds accepts the canonical VariableStatement name, not the TS m
   assert.doesNotThrow(() => Options.parse("--exclude-kinds", "VariableStatement"));
   assert.throws(() => Options.parse("--exclude-kinds", "FirstStatement"), /Unknown candidate kind: FirstStatement/);
 });
+
+// --- // dry-ignore directive (plan 009) -----------------------------------
+
+// An identical standalone function body; only the name differs (and names are
+// normalized away), so two copies cluster unless suppressed.
+function ignoreFn(name: string, lead = ""): string {
+  return `${lead}export function ${name}(values: number[]): number {
+  const kept = values.filter((item) => item % 2 === 0);
+  return kept.map((item) => item * 2).reduce((sum, next) => sum + next, 0);
+}
+`;
+}
+
+const ignoreScan = { threshold: 0.8, minLines: 3, minNodes: 6 };
+
+test("without a directive, an identical function clusters across files", async () => {
+  const { dir } = await writeFixture({ "a.ts": ignoreFn("alpha"), "b.ts": ignoreFn("beta") });
+  const clusters = new TypeScriptDuplicateFinder().findClusters({ paths: [dir], ...ignoreScan });
+  assert.equal(clusters.length, 1, "the duplicate function should cluster by default");
+});
+
+test("// dry-ignore on both occurrences suppresses the cluster; removing it restores the finding", async () => {
+  const annotated = { "a.ts": ignoreFn("alpha", "// dry-ignore\n"), "b.ts": ignoreFn("beta", "// dry-ignore\n") };
+  const suppressed = await writeFixture(annotated);
+  assert.equal(
+    new TypeScriptDuplicateFinder().findClusters({ paths: [suppressed.dir], ...ignoreScan }).length,
+    0,
+    "annotated duplicates should not cluster",
+  );
+
+  const restored = await writeFixture({ "a.ts": ignoreFn("alpha"), "b.ts": ignoreFn("beta") });
+  assert.equal(
+    new TypeScriptDuplicateFinder().findClusters({ paths: [restored.dir], ...ignoreScan }).length,
+    1,
+    "removing the directive restores the finding",
+  );
+});
+
+test("/* dry-ignore */ block-comment form suppresses the candidate", async () => {
+  const { dir } = await writeFixture({
+    "a.ts": ignoreFn("alpha", "/* dry-ignore */\n"),
+    "b.ts": ignoreFn("beta", "/* dry-ignore */\n"),
+  });
+  assert.equal(new TypeScriptDuplicateFinder().findClusters({ paths: [dir], ...ignoreScan }).length, 0);
+});
+
+// dry-ignore — structurally identical to the block-comment test above; this is
+// dry-ts dogfooding its own directive on the duplicate test body.
+test("a directive on only one of two occurrences drops the pair (no surviving partner)",
+  // dry-ignore
+  async () => {
+  const { dir } = await writeFixture({ "a.ts": ignoreFn("alpha", "// dry-ignore\n"), "b.ts": ignoreFn("beta") });
+  assert.equal(
+    new TypeScriptDuplicateFinder().findClusters({ paths: [dir], ...ignoreScan }).length,
+    0,
+    "with one occurrence suppressed the other has no partner",
+  );
+});
+
+test("an unannotated duplicate in the same file is still reported", async () => {
+  // Each file carries an annotated funcA pair and an unrelated unannotated funcB
+  // pair. Suppressing funcA must not hide funcB.
+  const funcB = (name: string) => `export function ${name}(rows: string[]): string {
+  const upper = rows.map((row) => row.toUpperCase());
+  return upper.filter((row) => row.length > 0).join(",");
+}
+`;
+  const { dir } = await writeFixture({
+    "a.ts": `${ignoreFn("alpha", "// dry-ignore\n")}${funcB("gamma")}`,
+    "b.ts": `${ignoreFn("beta", "// dry-ignore\n")}${funcB("delta")}`,
+  });
+  const clusters = new TypeScriptDuplicateFinder().findClusters({ paths: [dir], ...ignoreScan });
+  assert.equal(clusters.length, 1, "only the unannotated funcB pair should cluster");
+});
+
+test("a directive on a VariableStatement does not suppress its nested ArrowFunction", async () => {
+  // Placement rule: suppression is scoped to the node whose leading trivia
+  // carries the directive. The comment sits on the `const` statement, so the
+  // VariableStatement candidate is suppressed but the nested arrow keeps its
+  // own (empty) leading trivia and remains a candidate.
+  const arrow = (name: string) => `// dry-ignore
+export const ${name} = (first: number, second: number, third: number): number => {
+  const total = first + second + third;
+  return total * 2 + first;
+};
+`;
+  const { dir } = await writeFixture({ "a.ts": arrow("handler"), "b.ts": arrow("worker") });
+  const clusters = new TypeScriptDuplicateFinder().findClusters({ paths: [dir], ...ignoreScan });
+  assert.ok(clusters.length >= 1, "the nested arrow function should still cluster");
+});
+
+// --- --min-distinct-kinds (plan 008) --------------------------------------
+
+// Two interfaces with the same shape but different names: near-uniform, all
+// PropertySignature + the same primitive type, so they carry few distinct kinds
+// yet clear a node-count bar and reach the Jaccard threshold.
+function uniformInterface(name: string): string {
+  return `export interface ${name} {
+  alpha: string;
+  beta: string;
+  gamma: string;
+  delta: string;
+  epsilon: string;
+  zeta: string;
+}
+`;
+}
+
+// A function with varied control flow: many distinct node kinds.
+function variedFunction(name: string): string {
+  return `export function ${name}(values: number[]): number {
+  let total = 0;
+  for (const value of values) {
+    if (value > 0) {
+      total += value * 2;
+    } else {
+      total -= value;
+    }
+  }
+  return total > 100 ? total : total + 1;
+}
+`;
+}
+
+const diversityScan = { threshold: 0.8, minLines: 1, minNodes: 4 };
+
+// Two files, each with a near-uniform interface and a varied function.
+function diversityFixtureSources(): Record<string, string> {
+  return {
+    "a.ts": `${uniformInterface("ConfigA")}${variedFunction("sumA")}`,
+    "b.ts": `${uniformInterface("ConfigB")}${variedFunction("sumB")}`,
+  };
+}
+
+test("--min-distinct-kinds drops a near-uniform interface but keeps a varied function", async () => {
+  const sources = diversityFixtureSources();
+
+  // Floor off: both the uniform interface and the varied function cluster.
+  const off = await writeFixture(sources);
+  const baseline = new TypeScriptDuplicateFinder().findClusters({ paths: [off.dir], ...diversityScan });
+  const hasInterface = (clusters: readonly Cluster[]) =>
+    clusters.some((cluster) => cluster.locations.some((loc) => loc.startLine === 1));
+  assert.ok(hasInterface(baseline), "uniform interface should cluster with the floor off");
+  assert.ok(baseline.length >= 2, "both the interface and the function should cluster by default");
+
+  // Floor on: the uniform interface falls below the distinct-kind bar; the
+  // varied function clears it.
+  const on = await writeFixture(sources);
+  const floored = new TypeScriptDuplicateFinder().findClusters({
+    paths: [on.dir],
+    ...diversityScan,
+    minDistinctKinds: 5,
+  });
+  assert.ok(!hasInterface(floored), "uniform interface should be dropped above the floor");
+  assert.ok(floored.length >= 1, "the varied function should still cluster");
+});
+
+test("--min-distinct-kinds 0 (default) leaves output byte-for-byte unchanged", async () => {
+  const sources = diversityFixtureSources();
+  const a = await writeFixture(sources);
+  const b = await writeFixture(sources);
+  const withoutFlag = new TypeScriptDuplicateFinder().findClusters({ paths: [a.dir], ...diversityScan });
+  const withZero = new TypeScriptDuplicateFinder().findClusters({
+    paths: [b.dir],
+    ...diversityScan,
+    minDistinctKinds: 0,
+  });
+  // Compare cluster shape (line spans per file) — the tmp dir differs.
+  const shape = (clusters: readonly Cluster[]) =>
+    clusters
+      .map((cluster) =>
+        cluster.locations.map((loc) => `${loc.startLine}-${loc.endLine}`).sort().join(","),
+      )
+      .sort();
+  assert.deepEqual(shape(withZero), shape(withoutFlag));
+});
+
+test("--min-distinct-kinds rejects a negative floor", () => {
+  assert.throws(() => Options.parse("--min-distinct-kinds", "-1"), /minDistinctKinds must be at least 0/);
+});
+
+// The "isRecord codexism": Codex repeatedly emits the same `isRecord` type guard
+// across files. That is genuine structural duplication — the false-positive
+// reducers (--min-distinct-kinds, --exclude-kinds, // dry-ignore) must never
+// silently swallow it. This pins that we still detect it, even with a modest
+// diversity floor active, so an over-eager reducer can't regress real findings.
+function isRecordGuard(name: string): string {
+  return `export function ${name}(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+`;
+}
+
+test("duplicate isRecord type guards are still detected (codexism regression)", async () => {
+  const { dir } = await writeFixture({
+    "guards-a.ts": isRecordGuard("isRecord"),
+    "guards-b.ts": isRecordGuard("isPlainRecord"),
+  });
+  const scan = { paths: [dir], threshold: 0.8, minLines: 1, minNodes: 4 };
+
+  const withoutFloor = new TypeScriptDuplicateFinder().findClusters(scan);
+  assert.equal(withoutFloor.length, 1, "the duplicated isRecord guard should cluster");
+
+  // A real guard carries plenty of distinct kinds (typeof, binary, call,
+  // literals…), so a modest floor must not drop it.
+  const withFloor = new TypeScriptDuplicateFinder().findClusters({ ...scan, minDistinctKinds: 5 });
+  assert.equal(withFloor.length, 1, "a modest diversity floor must not hide the real isRecord duplicate");
+});

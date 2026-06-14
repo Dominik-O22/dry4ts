@@ -16,6 +16,7 @@ export interface OptionsInput {
   readonly explainChanged?: boolean;
   readonly onlyNew?: boolean;
   readonly excludeKinds?: readonly string[];
+  readonly minDistinctKinds?: number;
 }
 
 export class Options {
@@ -34,6 +35,7 @@ export class Options {
     public readonly explainChanged: boolean = false,
     public readonly onlyNew: boolean = false,
     public readonly excludeKinds: readonly string[] = [],
+    public readonly minDistinctKinds: number = 0,
   ) {
     if (!(threshold > 0 && threshold <= 1)) {
       throw new Error(`threshold must be greater than 0 and at most 1, got ${threshold}`);
@@ -43,6 +45,9 @@ export class Options {
     }
     if (minNodes < 1) {
       throw new Error(`minNodes must be at least 1, got ${minNodes}`);
+    }
+    if (minDistinctKinds < 0) {
+      throw new Error(`minDistinctKinds must be at least 0, got ${minDistinctKinds}`);
     }
     if (minLocations < 2) {
       throw new Error(`minLocations must be at least 2, got ${minLocations}`);
@@ -80,6 +85,7 @@ export class Options {
       input.explainChanged ?? defaults.explainChanged,
       input.onlyNew ?? defaults.onlyNew,
       input.excludeKinds ?? [],
+      input.minDistinctKinds ?? defaults.minDistinctKinds,
     );
   }
 
@@ -98,6 +104,7 @@ export class Options {
     let explainChanged = false;
     let onlyNew = false;
     const excludeKinds: string[] = [];
+    let minDistinctKinds = 0;
 
     for (let i = 0; i < args.length; i += 1) {
       const arg = args[i];
@@ -110,6 +117,9 @@ export class Options {
           break;
         case "--min-nodes":
           minNodes = integerValue(args, ++i, arg);
+          break;
+        case "--min-distinct-kinds":
+          minDistinctKinds = integerValue(args, ++i, arg);
           break;
         case "--min-locations":
           minLocations = integerValue(args, ++i, arg);
@@ -184,6 +194,7 @@ export class Options {
       explainChanged,
       onlyNew,
       excludeKinds,
+      minDistinctKinds,
     );
   }
 }

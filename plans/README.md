@@ -15,8 +15,8 @@ starting, honor its STOP conditions, and update the plan row when done.
 | [005](005-prune-candidate-pairs.md) | Prune candidate pairs before exact similarity | P2 | L | 004 | DONE (executed 2026-06-12, approved at `1dbe7f0` on branch `advisor/005-prune-candidate-pairs`; test/check/bench passed) |
 | [006](006-only-new-output-filter.md) | `--only-new` output filter (#24) | P1 | XS | - | DONE (branch `advisor/006-only-new`; Options.onlyNew + DryTs output filter, 4 tests, gate green at 103 pass) |
 | [007](007-exclude-candidate-kinds.md) | Exclude boilerplate candidate kinds (#19) | P1 | S | - | DONE (stacked on 006, 2026-06-14; opt-in `--exclude-kinds`, no default exclusions, 6 tests; gate green, no perf regression on sentry/compiler corpora) |
-| [008](008-kind-diversity-floor.md) | Kind-diversity (entropy) floor (#20) | P2 | S-M | 007 | TODO |
-| [009](009-dry-ignore-directive.md) | Inline `// dry-ignore` directive (#22) | P2 | S | - | TODO |
+| [008](008-kind-diversity-floor.md) | Kind-diversity (entropy) floor (#20) | P2 | S-M | 007 | DONE (stacked on 009, branch `advisor/009-dry-ignore`, 2026-06-14; `--min-distinct-kinds N` distinct-tag floor at the candidate gate, tags tracked only when flag>0 so off-path is free; chose distinct-kind count over Shannon entropy per plan; 4 tests incl. isRecord-codexism regression; gate green at 119 pass, off-path bench ~0.34s unchanged) |
+| [009](009-dry-ignore-directive.md) | Inline `// dry-ignore` directive (#22) | P2 | S | - | DONE (branch `advisor/009-dry-ignore`, 2026-06-14; leading-trivia `// dry-ignore` / `-next-line` + block form at the candidate gate, node-scoped, no second parse; 6 tests, gate green at 115 pass; README documented; dogfooded on a twin test body) |
 | [010](010-type-aware-normalization.md) | Optional type-aware normalization (#21) | P3 | M | 007,008 (soft) | TODO |
 | [011](011-dryrc-config-file.md) | `.dryrc` config + per-path overrides (#23) | P3 | L | 007,008 | TODO |
 
