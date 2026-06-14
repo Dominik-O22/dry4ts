@@ -1,3 +1,13 @@
+<!-- /autoplan restore point: /home/doop/.gstack/projects/Dominik-O22-dry4ts/advisor-012-explain-autoplan-restore-20260614-174433.md -->
+> **REJECTED / SUPERSEDED 2026-06-14 (autoplan).** Both CEO review voices rejected
+> this plan's premise 6/6: a per-location dominant-kind histogram describes a
+> candidate, it does not explain the *match*, and it steers toward tuning knobs
+> (`--min-distinct-kinds`/`--min-nodes`) that the n8n FP-class audit shows have ~0
+> effect on the residual. The histogram was agent-conceived with no user or
+> real-user investment. Replaced by the agent-first reframe in
+> **[plan 014: nearest-counterpart provenance](014-counterpart-provenance.md)**.
+> Kept for the audit trail; do not execute. See the GSTACK REVIEW REPORT below.
+
 # Plan 012: `--explain` match-explanation output (issue #29)
 
 > **Executor instructions**: Follow step by step. Run every verification command
@@ -201,3 +211,78 @@ off, per-location dominant kinds, points at #29's tuning workflow.
   gate it too.
 - `dominantKinds` is additive and optional on `ClusterLocation`, like `kind`/
   `name`; the stable JSON shape contract is preserved (existing fields untouched).
+
+---
+
+## GSTACK REVIEW REPORT
+
+_/autoplan run 2026-06-14, branch `advisor/012-explain`. Phase 1 (CEO) complete.
+Phases 2-4 paused at the premise gate pending a direction decision (below)._
+
+### Phase 1 — CEO dual voices
+
+Drift check passed: code matches "Current state" (PR #38 `kind`/`name` on every
+`ClusterLocation`; plan 008 `trackKinds`/`tags`/`distinctKindCount` intact). Note:
+`--exclude-tagged-templates` (issue #34 / plan 034) DID ship — plan 012's `kind`
+dependency surface is fully present. The plan's engineering is clean and reversible-off;
+the contested point is strategic, not mechanical.
+
+```
+CEO DUAL VOICES — CONSENSUS TABLE
+  Dimension                            Claude  Codex  Consensus
+  1. Premises valid?                    No      No     CONFIRMED-NO
+  2. Right problem to solve?            No      No     CONFIRMED-NO
+  3. Scope calibration correct?         Partial Partial CONFIRMED-PARTIAL
+  4. Alternatives explored?             No      No     CONFIRMED-NO
+  5. Competitive risks covered?         No      No     CONFIRMED-NO
+  6. 6-month trajectory sound?          No      No     CONFIRMED-NO
+```
+
+**CONFIRMED findings (both voices, independent):**
+
+1. **Histogram describes a candidate; it does not explain the match. (CRITICAL)**
+   The match is the shared-fingerprint intersection / pair score / nearest
+   counterpart — all explicitly deferred by this plan. A top-N node-kind frequency
+   table over one candidate's subtree is candidate metadata, not match provenance.
+2. **Knob-mapping premise is shallow and partly false. (HIGH)** "90%
+   `PropertySignature` → `--min-distinct-kinds`" is not generally valid (could be
+   `--exclude-kinds`, type-ref retention, generated-file suppression, same-root-kind,
+   a path override, or a real match). And memory `n8n-cli-fp-class-breakdown`:
+   `--min-distinct-kinds`/`--min-nodes` have **~0 effect** on the residual the
+   histogram steers toward. Most informative where suppression is already trivial;
+   least informative where triage is actually needed (gray-zone matches have varied
+   kinds by definition — the plan's own Step 5 test asserts "no single dominant").
+3. **Competitors validate showing the source, not kinds. (MEDIUM)** jscpd / PMD CPD /
+   Simian all emit the duplicated *fragment* (+ fingerprints/line counts), never an
+   AST-kind explanation. `--explain` as specced invents a weaker novel primitive and
+   leaves the table-stakes "show the matched code/diff" unbuilt.
+4. **Reversibility (Claude). (HIGH)** `dominantKinds` in the *stable* JSON/EDN
+   contract (README sells the small shape as a feature; CLAUDE.md forces a skill-bundle
+   bump on API change) is irreversible ballast. `--explain-changed`-style **stderr**
+   is the iterate/delete-freely choice.
+5. **Wrong work deferred (Codex). (HIGH)** Pair-counterpart provenance (TODOS),
+   baseline ratchet, PR-grade reporting are more adoption-tied than `dominantKinds`.
+   For CI users "which old block did my changed block match?" beats "top three AST
+   kinds here."
+
+**10x reframe (both, converging):** a **decision surface**, not a diagnostic dump —
+`--suggest`/`--triage`: per cluster report nearest counterpart, shared/total
+fingerprints, root-kind compatibility, dominant-kind ratio, and a **"would be
+suppressed by X"** recommendation; globally rank suppression candidates by
+"clusters removed / real-looking matches at risk."
+
+### USER CHALLENGE (not auto-decided)
+
+Both models recommend the user's stated direction (ship 012 as specced) should
+change. Default remains the user's original direction unless explicitly changed.
+See premise gate. Phases Eng/DX/Design not yet run — they would review whichever
+shape the user picks.
+
+<!-- AUTONOMOUS DECISION LOG -->
+## Decision Audit Trail
+
+| # | Phase | Decision | Classification | Principle | Rationale | Rejected |
+|---|-------|----------|----------------|-----------|-----------|----------|
+| 1 | CEO | Drift check / feasibility | Mechanical | P6 | Code matches plan's Current state; #38 + 008 + 034 all present | n/a |
+| 2 | CEO | Premise "histogram reveals the knob" | USER CHALLENGE | n/a (gate) | Both voices reject; surfaced to user, not auto-decided | n/a |
+| 3 | CEO | Direction (annotate vs reduce vs decision-surface) | USER CHALLENGE | n/a (gate) | Both voices recommend reframe; user's pick is sovereign | n/a |

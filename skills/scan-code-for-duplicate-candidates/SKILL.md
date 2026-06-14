@@ -4,7 +4,7 @@ description: >
   Run dry-ts locally or from code to find fuzzy structural duplicate clusters. Load when choosing paths, interpreting score, status, and line-range output, tuning --threshold, --min-lines, --min-nodes, or using TypeScriptDuplicateFinder.findClusters.
 type: core
 library: dry-ts
-library_version: "0.9.0"
+library_version: "0.10.0"
 sources:
   - "dry-ts:README.md"
   - "dry-ts:src/TypeScriptDuplicateFinder.ts"
@@ -135,6 +135,26 @@ CLUSTER 1 score=0.89 locations=2 status=unscoped
 
 The score is structural similarity, and the line ranges identify related duplicate regions for review. `nodes` is the normalized syntax node count for that duplicated block. `kind` is the candidate root SyntaxKind name (e.g. `FunctionDeclaration`, `Constructor`, `InterfaceDeclaration`, `ArrowFunction`) and `name` is the declaration identifier — so you can classify a finding without opening the file; `name=` is dropped for anonymous declarations (arrows, callable signatures), where JSON/EDN report `null`/`nil`. `status` is `unscoped` for a plain scan; under a changed-scope flag it becomes `new` (marked `status=new (intersects your change)`) or `known`.
 
+### Add per-location nearest-counterpart provenance (`--counterparts`)
+
+```bash
+bunx dry-ts src test --counterparts --json
+```
+
+`--counterparts` adds, per cluster location, its nearest matching counterpart —
+the absolute strongest AST-similar partner in the same cluster — as `{ index,
+file, startLine, endLine, shared, total, score }`, and (under an active change
+scope) a per-location `changed` boolean. In a transitive cluster (>2 members) the
+`score` range alone hides the edge structure; the counterpart resolves *which*
+member a location actually matches and *how strongly* (`shared`/`total` are the
+exact pairwise fingerprint-intersection/union counts, `score` is `shared/total`).
+`index` dereferences within the same cluster's `locations`. In text it appends to
+the location's own line: `… changed=true → nearest src/b.ts:5-33 (44/52)`. With
+`changed` on both sides an agent routes the fix: counterpart `changed:true` ⇒
+new/new (refactor the new code); `changed:false` ⇒ new/old (extract toward the
+existing code). Opt-in, default off; off-path output is byte-for-byte unchanged.
+`--only-new` filters whole clusters, never individual locations or counterparts.
+
 ### Diagnose a surprising changed-scope result
 
 ```bash
@@ -157,14 +177,21 @@ const clusters = finder.findClusters({
   excludeKinds: ["Constructor", "PropertySignature"],
   minDistinctKinds: 8,
   exclude: ["**/*.spec.*", "**/*.stories.*"],
+  counterparts: true,
 });
 
 for (const cluster of clusters) {
   for (const location of cluster.locations) {
-    console.log(`${cluster.score.max.toFixed(2)} ${location.file}:${location.startLine}`);
+    const nearest = location.nearest;
+    const ref = nearest ? ` → ${nearest.file}:${nearest.startLine} (${nearest.shared}/${nearest.total})` : "";
+    console.log(`${cluster.score.max.toFixed(2)} ${location.file}:${location.startLine}${ref}`);
   }
 }
 ```
+
+With `counterparts: true`, each location carries a `nearest` field (`{ index,
+file, startLine, endLine, shared, total, score }`); without it, `nearest` is
+absent (the object shape is byte-identical to the default).
 
 `findClusters` returns clusters with `status` unset — the `new`/`known`/`unscoped`
 labels and the `--changed-from`/`--changed` scope are CLI behavior, not library
