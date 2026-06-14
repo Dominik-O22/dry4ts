@@ -56,6 +56,16 @@ bun ./dist/bin/dry-ts.js --format json --fail-on-duplicates --changed-from HEAD~
 Findings are worded "intersects your change", never "you created this": the
 counterpart of a `new` cluster may be old code you copied from.
 
+`--profile agent` bundles this whole loop into one flag: it expands to the `pr`
+gate plus `--counterparts --format json`, so it gates on `status: "new"` and
+hands you each finding's nearest existing match to route the fix. It inherits
+`pr`'s `--only-new`, so it still needs a `--changed-from`/`--changed` scope and
+fails loud (exit `2`) without one:
+
+```bash
+bun ./dist/bin/dry-ts.js --profile agent --changed-from HEAD src   # uncommitted edits
+```
+
 Without a `--changed`/`--changed-from` flag, `--fail-on-duplicates` is
 zero-tolerance and every cluster reports `status: "unscoped"` — so a build can
 exit `1` while no cluster says `"new"`. Read the exit code, not just `status`,
