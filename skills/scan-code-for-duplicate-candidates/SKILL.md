@@ -4,11 +4,12 @@ description: >
   Run dry-ts locally or from code to find fuzzy structural duplicate clusters. Load when choosing paths, interpreting score, status, and line-range output, tuning --threshold, --min-lines, --min-nodes, or using TypeScriptDuplicateFinder.findClusters.
 type: core
 library: dry-ts
-library_version: "0.4.0"
+library_version: "0.5.0"
 sources:
   - "dry-ts:README.md"
   - "dry-ts:src/TypeScriptDuplicateFinder.ts"
   - "dry-ts:src/TypeScriptNormalizer.ts"
+  - "dry-ts:src/FileScanner.ts"
   - "dry-ts:src/Options.ts"
   - "dry-ts:src/types.ts"
 ---
@@ -52,6 +53,21 @@ bunx dry-ts src test --threshold 0.78 --min-lines 3 --min-nodes 12
 
 Lower `--threshold`, `--min-lines`, and `--min-nodes` only when intentionally looking for smaller or fuzzier structural matches.
 
+### Suppress boilerplate candidate kinds
+
+```bash
+bunx dry-ts src --exclude-kinds Constructor,PropertySignature,MethodSignature
+```
+
+`--exclude-kinds` drops candidate declarations of the named TypeScript
+`SyntaxKind`s before matching, so structurally-identical boilerplate stops
+clustering: dependency-injection constructors (`Constructor`) or port/interface
+member signatures (`PropertySignature,MethodSignature`). It is opt-in — with no
+flag, nothing is excluded — comma-separated and repeatable. An unknown or
+non-candidate kind name is a hard error (exit `2`); valid names are the
+candidate root kinds listed in the README. Excluding a kind never hides a
+longer child candidate, since children are always visited.
+
 ### Read cluster locations before refactoring
 
 ```text
@@ -81,6 +97,7 @@ const clusters = finder.findClusters({
   threshold: 0.82,
   minLines: 4,
   minNodes: 20,
+  excludeKinds: ["Constructor", "PropertySignature"],
 });
 
 for (const cluster of clusters) {

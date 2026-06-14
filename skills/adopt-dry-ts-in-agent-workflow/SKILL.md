@@ -4,12 +4,13 @@ description: >
   Run dry-ts after AI-generated edits to catch structural duplication before it accumulates. Load when building autonomous review loops, gating only on duplication an edit introduced with --changed/--changed-from, triaging duplicate clusters by status, using JSON output after generated changes, or deciding when local duplicate checks should become CI gates.
 type: core
 library: dry-ts
-library_version: "0.4.0"
+library_version: "0.5.0"
 sources:
   - "dry-ts:README.md"
   - "dry-ts:AGENTS.md"
   - "dry-ts:src/TypeScriptDuplicateFinder.ts"
   - "dry-ts:src/DryTs.ts"
+  - "dry-ts:src/Options.ts"
   - "dry-ts:test/dry-ts.test.ts"
 ---
 
@@ -39,6 +40,30 @@ those clusters (extract a shared helper) and re-run until it exits `0`. `--chang
 <file>` scopes the *whole file*, so a `new` finding can point at pre-existing code
 you copied; the wording is "intersects your change", never "you created this".
 This keeps the loop honest without a full-codebase zero-tolerance gate.
+
+### Cut framework boilerplate out of the loop
+
+```bash
+# DI constructors and interface signatures are structurally identical by design;
+# drop them so the agent loop only flags real copy-paste.
+bunx dry-ts --format json --fail-on-duplicates --changed-from HEAD \
+  --exclude-kinds Constructor,PropertySignature,MethodSignature src
+```
+
+`--exclude-kinds` removes candidate declarations of the named `SyntaxKind`s
+before matching, so generated boilerplate an agent cannot meaningfully refactor
+(dependency-injection constructors, port/interface members) stops producing
+`new` findings that the loop would chase forever. It is opt-in and repeatable;
+an unknown kind name fails closed as exit `2`. Pair with `--only-new` to keep
+the agent focused on just the duplication its edit introduced:
+
+```bash
+bunx dry-ts --fail-on-duplicates --changed-from HEAD --only-new src
+```
+
+`--only-new` filters the report to `status: "new"` clusters (requires a
+changed-scope flag); the exit code is unchanged and suppressed totals go to
+stderr, so the agent sees only what it must act on without losing the debt count.
 
 ### Run a local guard after generated edits
 
