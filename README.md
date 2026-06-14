@@ -210,11 +210,18 @@ Default text output:
 
 ```text
 CLUSTER 1 score=0.89 locations=2 status=unscoped
-  src/invoice.ts:12-25 nodes=88
-  src/receipt.ts:30-44 nodes=91
+  src/invoice.ts:12-25 nodes=88 kind=FunctionDeclaration name=renderInvoice
+  src/receipt.ts:30-44 nodes=91 kind=FunctionDeclaration name=renderReceipt
 ```
 
 Under a changed-scope, findings are marked: `status=new (intersects your change)`.
+
+Each location carries two diagnostic facts so a reader can classify a finding
+without opening the file: `kind` (the candidate root SyntaxKind — `Constructor`,
+`InterfaceDeclaration`, `ArrowFunction`, …) and `name` (the declaration
+identifier). A `Constructor` is named `constructor`; an anonymous candidate (an
+arrow function, a callable signature) has no name — the text format drops the
+`name=` token, JSON/EDN report `null`/`nil`.
 
 EDN output:
 
@@ -224,8 +231,8 @@ EDN output:
    :score-max 0.8909090909090909
    :status :unscoped
    :location-count 2
-   :locations [{:file "src/invoice.ts", :start-line 12, :end-line 25, :nodes 88}
-               {:file "src/receipt.ts", :start-line 30, :end-line 44, :nodes 91}]}]}
+   :locations [{:file "src/invoice.ts", :start-line 12, :end-line 25, :nodes 88, :kind "FunctionDeclaration", :name "renderInvoice"}
+               {:file "src/receipt.ts", :start-line 30, :end-line 44, :nodes 91, :kind "FunctionDeclaration", :name "renderReceipt"}]}]}
 ```
 
 JSON output:
@@ -238,8 +245,8 @@ JSON output:
       "status": "unscoped",
       "locationCount": 2,
       "locations": [
-        { "file": "src/invoice.ts", "startLine": 12, "endLine": 25, "nodes": 88 },
-        { "file": "src/receipt.ts", "startLine": 30, "endLine": 44, "nodes": 91 }
+        { "file": "src/invoice.ts", "startLine": 12, "endLine": 25, "nodes": 88, "kind": "FunctionDeclaration", "name": "renderInvoice" },
+        { "file": "src/receipt.ts", "startLine": 30, "endLine": 44, "nodes": 91, "kind": "FunctionDeclaration", "name": "renderReceipt" }
       ]
     }
   ]
@@ -318,7 +325,7 @@ The gate fails closed: a missing git binary, a bad ref, unparseable diff output,
 an unreadable source file, or zero files scanned under `--fail-on-duplicates` all
 exit 2 with a message — never a silent green or a 1 that reads as "findings".
 
-The JSON shape is intentionally small and stable: `{ "clusters": ClusterReport[] }`. Each cluster includes a `score` range, a `status` (`"new" | "known" | "unscoped"`), `locationCount`, and grouped `locations`. Each location includes `nodes`, the normalized syntax node count for that duplicated block.
+The JSON shape is intentionally small and stable: `{ "clusters": ClusterReport[] }`. Each cluster includes a `score` range, a `status` (`"new" | "known" | "unscoped"`), `locationCount`, and grouped `locations`. Each location includes `nodes` (the normalized syntax node count for that duplicated block), `kind` (the candidate root SyntaxKind name), and `name` (the declaration identifier, or `null` when anonymous). `kind` and `name` let an agent triage a finding — e.g. skip a `Constructor` in a `*.spec.ts` as dependency-injection boilerplate — without a second read of the source.
 
 ## Publishing
 

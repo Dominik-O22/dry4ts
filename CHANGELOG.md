@@ -5,6 +5,21 @@ All notable changes to dry-ts are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-06-14
+
+### Added
+
+- Each reported location now carries `kind` and `name`, so a consumer can
+  classify a finding without re-reading the source. `kind` is the candidate root
+  SyntaxKind name (`FunctionDeclaration`, `Constructor`, `InterfaceDeclaration`,
+  `ArrowFunction`, …); `name` is the declaration identifier, or `null` when
+  anonymous (an arrow function, a callable signature). A constructor is named
+  `constructor`; a `VariableStatement` takes its first binding name. The text
+  format appends `kind=… name=…` (dropping `name=` when anonymous); JSON and EDN
+  add `kind`/`name` fields (`null`/`nil` when anonymous). The fields are computed
+  only for kept candidates, so the scan path is otherwise unchanged. Additive to
+  the JSON shape — existing fields are untouched.
+
 ## [0.8.0] - 2026-06-14
 
 ### Added

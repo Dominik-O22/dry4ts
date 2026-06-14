@@ -275,7 +275,12 @@ export function toJson(clusters: readonly Cluster[]): string {
 }
 
 function locationEdn(location: ClusterLocation): string {
-  return `{:file "${escapeEdn(location.file)}", :start-line ${location.startLine}, :end-line ${location.endLine}, :nodes ${location.nodes}}`;
+  const base = `{:file "${escapeEdn(location.file)}", :start-line ${location.startLine}, :end-line ${location.endLine}, :nodes ${location.nodes}`;
+  if (location.kind === undefined) {
+    return `${base}}`;
+  }
+  const name = location.name == null ? "nil" : `"${escapeEdn(location.name)}"`;
+  return `${base}, :kind "${escapeEdn(location.kind)}", :name ${name}}`;
 }
 
 function escapeEdn(text: string): string {
@@ -293,5 +298,15 @@ function lineRange(location: Location): string {
 }
 
 function clusterLineRange(location: ClusterLocation): string {
-  return `${lineRange(location)} nodes=${location.nodes}`;
+  return `${lineRange(location)} nodes=${location.nodes}${kindSuffix(location)}`;
+}
+
+// Appends the diagnostic facts the scanner attaches (kind, and name when the
+// declaration has one). Synthetic locations without a kind render as before.
+function kindSuffix(location: ClusterLocation): string {
+  if (location.kind === undefined) {
+    return "";
+  }
+  const name = location.name == null ? "" : ` name=${location.name}`;
+  return ` kind=${location.kind}${name}`;
 }

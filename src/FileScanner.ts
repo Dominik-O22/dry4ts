@@ -11,6 +11,10 @@ export interface Entry {
   readonly endLine: number;
   readonly nodes: number;
   readonly fingerprints: Float64Array;
+  // Candidate root SyntaxKind name and declaration identifier (null when
+  // anonymous), surfaced on each reported location; see ClusterLocation.
+  readonly kind: string;
+  readonly name: string | null;
 }
 
 // Parses and fingerprints files in a single AST walk, without materializing the
@@ -105,6 +109,8 @@ export class FileScanner {
               endLine,
               nodes: hashes.length - rangeStart,
               fingerprints: sortedUnique(hashes, rangeStart),
+              kind: candidateKindNameByKind.get(node.kind)!,
+              name: declarationName(node, sourceFile),
             },
           });
         }
@@ -198,6 +204,13 @@ const candidateKindByName = new Map<string, ts.SyntaxKind>(
   candidateKinds.map((entry) => [entry.name, entry.kind]),
 );
 
+// Reverse of candidateKindByName: the canonical name dry-ts reports for a
+// candidate root kind. Lookup is always populated at the call site (guarded by
+// candidateRootKinds), so the get() there is non-null.
+const candidateKindNameByKind = new Map<ts.SyntaxKind, string>(
+  candidateKinds.map((entry) => [entry.kind, entry.name]),
+);
+
 export const candidateKindNames: readonly string[] = candidateKinds.map((entry) => entry.name);
 
 // For help and README docs.
@@ -288,4 +301,21 @@ function lineRangeFor(sourceFile: ts.SourceFile, node: ts.Node): { startLine: nu
     startLine: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile, false)).line + 1,
     endLine: sourceFile.getLineAndCharacterOfPosition(node.getEnd()).line + 1,
   };
+}
+
+// A constructor has no name node, so label it by keyword; a VariableStatement is
+// named after its first binding (`const foo = ...` -> "foo"); everything else
+// defers to TypeScript's name resolver (null for anonymous arrows, unnamed
+// function expressions, call/index signatures). getText needs the sourceFile
+// passed because the AST is parsed without parent pointers (setParentNodes=false).
+function declarationName(node: ts.Node, sourceFile: ts.SourceFile): string | null {
+  if (ts.isConstructorDeclaration(node)) {
+    return "constructor";
+  }
+  if (ts.isVariableStatement(node)) {
+    const first = node.declarationList.declarations[0];
+    return first ? first.name.getText(sourceFile) : null;
+  }
+  const nameNode = ts.getNameOfDeclaration(node as ts.Declaration);
+  return nameNode ? nameNode.getText(sourceFile) : null;
 }
