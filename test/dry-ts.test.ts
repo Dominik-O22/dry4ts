@@ -11,8 +11,12 @@ import {
   ChangedRegions,
   type Cluster,
   canonicalPath,
+  crossFileSharedNames,
   formatCluster,
+  hasCrossFileSharedName,
+  isTestFile,
   main,
+  noiseSummary,
   Options,
   type OptionsInput,
   parseUnifiedDiff,
@@ -256,7 +260,7 @@ test("formats clusters with score range, location count, node size, kind, and na
 
   assert.equal(
     formatCluster(clusters[0], 1),
-    "CLUSTER 1 score=0.85-0.90 locations=3 status=unscoped\n  a.ts:10-14 nodes=50 kind=MethodDeclaration name=run\n  b.ts:10-14 nodes=50 kind=MethodDeclaration name=run\n  c.ts:10-14 nodes=50 kind=MethodDeclaration name=run",
+    "CLUSTER 1 score=0.85-0.90 locations=3 status=unscoped same-name=run\n  a.ts:10-14 nodes=50 kind=MethodDeclaration name=run\n  b.ts:10-14 nodes=50 kind=MethodDeclaration name=run\n  c.ts:10-14 nodes=50 kind=MethodDeclaration name=run",
   );
 });
 
@@ -285,6 +289,129 @@ test("does not expose complete pairwise match counts in cluster output", () => {
 
   assert.equal(cluster.locations.length, 5);
   assert.equal(formatCluster(cluster, 1).split("\n")[0], "CLUSTER 1 score=1.00 locations=5 status=unscoped");
+});
+
+test("crossFileSharedNames reports names recurring across distinct files only", () => {
+  const cluster: Cluster = {
+    score: { min: 0.9, max: 0.9 },
+    locations: [
+      { file: "a.ts", startLine: 1, endLine: 5, nodes: 30, kind: "FunctionDeclaration", name: "render" },
+      { file: "b.ts", startLine: 1, endLine: 5, nodes: 30, kind: "FunctionDeclaration", name: "render" },
+      { file: "a.ts", startLine: 9, endLine: 13, nodes: 30, kind: "FunctionDeclaration", name: "solo" },
+      { file: "c.ts", startLine: 1, endLine: 5, nodes: 30, kind: "ArrowFunction", name: null },
+    ],
+  };
+  assert.deepEqual(crossFileSharedNames(cluster), ["render"]);
+  assert.equal(hasCrossFileSharedName(cluster), true);
+});
+
+test("a name repeated within one file is not a cross-file signal", () => {
+  const cluster: Cluster = {
+    score: { min: 0.9, max: 0.9 },
+    locations: [
+      { file: "a.ts", startLine: 1, endLine: 5, nodes: 30, kind: "FunctionDeclaration", name: "dup" },
+      { file: "a.ts", startLine: 9, endLine: 13, nodes: 30, kind: "FunctionDeclaration", name: "dup" },
+    ],
+  };
+  assert.deepEqual(crossFileSharedNames(cluster), []);
+  assert.equal(hasCrossFileSharedName(cluster), false);
+});
+
+test("cross-file same-name clusters rank above higher-scoring clusters", () => {
+  const collector = new ClusterCollector();
+  const loc = (file: string, name: string, startLine: number) => ({
+    file,
+    startLine,
+    endLine: startLine + 4,
+    nodes: 50,
+    kind: "FunctionDeclaration",
+    name,
+  });
+  // Lower score, but the same name in two files — the actionable signal.
+  collector.addMatch(loc("a.ts", "validateUser", 1), loc("b.ts", "validateUser", 1), 0.85);
+  // Higher score, but distinct names — an incidental structural twin.
+  collector.addMatch(loc("c.ts", "alpha", 1), loc("d.ts", "beta", 1), 0.98);
+
+  const clusters = collector.clusters();
+  assert.deepEqual(
+    clusters[0].locations.map((location) => location.file),
+    ["a.ts", "b.ts"],
+    "the same-name cross-file cluster floats to the top despite a lower score",
+  );
+});
+
+test("formatCluster appends same-name after the change marker, never inside it", () => {
+  const cluster: Cluster = {
+    score: { min: 1, max: 1 },
+    status: "new",
+    locations: [
+      { file: "a.ts", startLine: 1, endLine: 5, nodes: 30, kind: "FunctionDeclaration", name: "handle" },
+      { file: "b.ts", startLine: 1, endLine: 5, nodes: 30, kind: "FunctionDeclaration", name: "handle" },
+    ],
+  };
+  const header = formatCluster(cluster, 1).split("\n")[0];
+  assert.equal(header, "CLUSTER 1 score=1.00 locations=2 status=new (intersects your change) same-name=handle");
+});
+
+test("isTestFile matches the --exclude-tests preset and nothing else", () => {
+  assert.equal(isTestFile("foo.test.ts"), true);
+  assert.equal(isTestFile("pkg/foo.spec.tsx"), true);
+  assert.equal(isTestFile("src/__tests__/foo.ts"), true);
+  assert.equal(isTestFile("src/__mocks__/foo.ts"), true);
+  assert.equal(isTestFile("src/foo.ts"), false);
+  assert.equal(isTestFile("foo.ts"), false);
+});
+
+test("noiseSummary estimates the --exclude-tests reduction and names other levers", () => {
+  const clusterOf = (files: string[]): Cluster => ({
+    score: { min: 0.9, max: 0.9 },
+    locations: files.map((file, index) => ({
+      file,
+      startLine: 1 + index * 10,
+      endLine: 5 + index * 10,
+      nodes: 30,
+      kind: "FunctionDeclaration",
+      name: "x",
+    })),
+  });
+  const testClusters = Array.from({ length: 6 }, (_, i) => clusterOf([`a${i}.test.ts`, `b${i}.test.ts`]));
+  const srcClusters = Array.from({ length: 4 }, (_, i) => clusterOf([`a${i}.ts`, `b${i}.ts`]));
+  const clusters = [...testClusters, ...srcClusters];
+
+  const summary = noiseSummary(clusters, Options.from({}));
+  assert.ok(summary, "expected a footer for a 10-cluster run");
+  assert.ok(summary?.includes("6 disappear with --exclude-tests"), summary ?? "");
+  assert.ok(summary?.includes("≈4 left"), summary ?? "");
+  assert.ok(summary?.includes("--exclude-tagged-templates"), summary ?? "");
+  assert.ok(summary?.includes("--min-nodes N raises the size floor (currently 20)"), summary ?? "");
+});
+
+test("noiseSummary stays silent below the firehose threshold", () => {
+  const clusterOf = (file: string): Cluster => ({
+    score: { min: 0.9, max: 0.9 },
+    locations: [
+      { file: `${file}a.test.ts`, startLine: 1, endLine: 5, nodes: 30, kind: "FunctionDeclaration", name: "x" },
+      { file: `${file}b.test.ts`, startLine: 1, endLine: 5, nodes: 30, kind: "FunctionDeclaration", name: "x" },
+    ],
+  });
+  const nine = Array.from({ length: 9 }, (_, i) => clusterOf(String(i)));
+  assert.equal(noiseSummary(nine, Options.from({})), null);
+});
+
+test("noiseSummary omits a lever already in effect", () => {
+  const clusterOf = (i: number): Cluster => ({
+    score: { min: 0.9, max: 0.9 },
+    locations: [
+      { file: `a${i}.test.ts`, startLine: 1, endLine: 5, nodes: 30, kind: "FunctionDeclaration", name: "x" },
+      { file: `b${i}.test.ts`, startLine: 1, endLine: 5, nodes: 30, kind: "FunctionDeclaration", name: "x" },
+    ],
+  });
+  const clusters = Array.from({ length: 12 }, (_, i) => clusterOf(i));
+  const summary = noiseSummary(clusters, Options.from({ excludeTests: true, excludeTaggedTemplates: true }));
+  assert.ok(summary, "still names the always-available levers");
+  assert.ok(!summary?.includes("--exclude-tests"), summary ?? "");
+  assert.ok(!summary?.includes("--exclude-tagged-templates"), summary ?? "");
+  assert.ok(summary?.includes("--min-nodes"), summary ?? "");
 });
 
 test("finds duplicate clusters directly", async () => {
@@ -1504,7 +1631,7 @@ test("printText with empty clusters prints no duplicate clusters found", () => {
   } finally {
     console.log = original;
   }
-  assert.deepEqual(lines, ["No duplicate clusters found."]);
+  assert.deepEqual(lines, ["No duplicate candidate clusters found."]);
 });
 
 test("printText with two clusters separates them with a blank line", () => {

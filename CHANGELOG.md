@@ -5,6 +5,47 @@ All notable changes to dry-ts are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Same-name cross-file ranking.** Clusters where one declaration name recurs
+  across two or more distinct files now sort to the top of the report — the
+  strongest, near-zero-false-positive "real, copy-pasted duplicate" signal — and
+  carry a trailing `same-name=<name>` tag (up to three names, then `(+N)`) in the
+  text header so the reason for the ranking is legible in-band. Within each tier,
+  ordering is unchanged (strongest score first). Names recurring only within a
+  single file do not qualify. New exported helpers `crossFileSharedNames` and
+  `hasCrossFileSharedName`.
+- **Curation footer.** On a large text run (≥10 clusters) dry-ts prints a short
+  footer to stderr naming the curation levers that would cut the noise and
+  estimating the `--exclude-tests` reduction (e.g. "1250 disappear with
+  --exclude-tests → ≈1324 left"). It teaches the curation workflow in-band
+  instead of leaving it below the fold in the README. stderr keeps stdout pure
+  findings; JSON/EDN never print it. New exported helpers `noiseSummary` and
+  `isTestFile`.
+
+### Changed
+
+- Default report order now ranks same-name cross-file clusters first, so the
+  cluster ordinals (and the first-listed cluster) in text/JSON/EDN output can
+  differ from prior versions for the same scan. Scores, locations, statuses, and
+  exit codes are unchanged.
+
+### Documentation
+
+- New README "Curating results" section documenting the ranking and footer.
+- `// dry-ignore` is now documented as deliberately all-or-nothing and global to
+  a declaration (no fingerprint-keyed "intentional pair" acknowledgment, by
+  design — that would be a stored baseline); `--exclude` by path is named as the
+  intended blunt instrument for intentional N-member families.
+- New README "Quickstart" + positioning block up top (first-contact path):
+  recommended PR-gate command, honest "what it is / is not" scoping (TypeScript-
+  first structural *candidate* detector for PR gates and agents — not a general
+  jscpd/PMD replacement), and a maturity/pinning note.
+- Empty-result message now reads "No duplicate candidate clusters found." to keep
+  the candidate-vs-confirmed-duplication framing honest.
+
 ## [0.10.0] - 2026-06-14
 
 ### Added

@@ -128,12 +128,14 @@ and suppressing a parent never hides unrelated child candidates inside it.
 ### Read cluster locations before refactoring
 
 ```text
-CLUSTER 1 score=0.89 locations=2 status=unscoped
-  src/invoice.ts:12-25 nodes=88 kind=FunctionDeclaration name=renderInvoice
-  src/receipt.ts:30-44 nodes=91 kind=FunctionDeclaration name=renderReceipt
+CLUSTER 1 score=1.00 locations=2 status=unscoped same-name=validateUser
+  src/auth.ts:12-25 nodes=88 kind=FunctionDeclaration name=validateUser
+  src/admin/auth.ts:30-44 nodes=91 kind=FunctionDeclaration name=validateUser
 ```
 
 The score is structural similarity, and the line ranges identify related duplicate regions for review. `nodes` is the normalized syntax node count for that duplicated block. `kind` is the candidate root SyntaxKind name (e.g. `FunctionDeclaration`, `Constructor`, `InterfaceDeclaration`, `ArrowFunction`) and `name` is the declaration identifier — so you can classify a finding without opening the file; `name=` is dropped for anonymous declarations (arrows, callable signatures), where JSON/EDN report `null`/`nil`. `status` is `unscoped` for a plain scan; under a changed-scope flag it becomes `new` (marked `status=new (intersects your change)`) or `known`.
+
+Clusters are ranked: those whose same declaration name recurs across two or more files float to the top, tagged `same-name=<name>` (the strongest "real, copy-pasted duplicate" signal) — start your review there. On a large run (≥10 clusters) a curation footer prints to **stderr** naming the levers that cut noise (`--exclude-tests`, `--exclude-tagged-templates`, `--min-nodes`, `--exclude`) and estimating the reduction; stdout stays pure findings, and JSON/EDN never print it.
 
 ### Add per-location nearest-counterpart provenance (`--counterparts`)
 

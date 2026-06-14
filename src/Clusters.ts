@@ -32,7 +32,7 @@ export class ClusterCollector {
         locations: locations.sort(compareLocations),
       });
     }
-    return clusters.sort(compareClusters);
+    return rankClusters(clusters);
   }
 
   private find(key: string): string {
@@ -121,6 +121,61 @@ export function compareLocations(left: Location, right: Location): number {
   return left.file.localeCompare(right.file) || left.startLine - right.startLine || left.endLine - right.endLine;
 }
 
-function compareClusters(left: Cluster, right: Cluster): number {
-  return maxScore(right) - maxScore(left) || compareLocations(left.locations[0], right.locations[0]);
+// Report order. Primary key: clusters whose SAME declaration name recurs across
+// two or more distinct files float to the top — the strongest "this is a real,
+// copy-pasted duplicate" signal (a `validateUser` cloned into another module),
+// near-zero false positive in practice. Within each tier, strongest score first,
+// then the deterministic location tie-break. Decorated up front (Schwartzian) so
+// the cross-file-name scan runs once per cluster, not once per comparison.
+function rankClusters(clusters: readonly Cluster[]): Cluster[] {
+  return clusters
+    .map((cluster) => ({ cluster, crossFile: hasCrossFileSharedName(cluster) ? 1 : 0 }))
+    .sort(
+      (left, right) =>
+        right.crossFile - left.crossFile ||
+        maxScore(right.cluster) - maxScore(left.cluster) ||
+        compareLocations(left.cluster.locations[0], right.cluster.locations[0]),
+    )
+    .map(({ cluster }) => cluster);
+}
+
+// The set of declaration names that appear in two or more distinct files within a
+// cluster — the cross-file recurrence that marks a cluster as a likely real
+// duplicate (vs an incidental structural twin). Names recurring within a single
+// file (overloads, shadowed locals) do not qualify: cross-file is the signal.
+// Anonymous locations (null name) are skipped. Returned sorted for deterministic
+// rendering; callers needing only the boolean use hasCrossFileSharedName.
+export function crossFileSharedNames(cluster: Cluster): string[] {
+  const filesByName = new Map<string, Set<string>>();
+  for (const location of cluster.locations) {
+    if (location.name == null) {
+      continue;
+    }
+    const files = filesByName.get(location.name) ?? new Set<string>();
+    files.add(location.file);
+    filesByName.set(location.name, files);
+  }
+  const shared: string[] = [];
+  for (const [name, files] of filesByName) {
+    if (files.size >= 2) {
+      shared.push(name);
+    }
+  }
+  return shared.sort();
+}
+
+export function hasCrossFileSharedName(cluster: Cluster): boolean {
+  const filesByName = new Map<string, Set<string>>();
+  for (const location of cluster.locations) {
+    if (location.name == null) {
+      continue;
+    }
+    const files = filesByName.get(location.name) ?? new Set<string>();
+    files.add(location.file);
+    if (files.size >= 2) {
+      return true;
+    }
+    filesByName.set(location.name, files);
+  }
+  return false;
 }

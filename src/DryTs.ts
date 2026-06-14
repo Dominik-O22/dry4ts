@@ -1,11 +1,11 @@
 import fs from "node:fs";
 
 import { ChangedRegions, canonicalPath, parseUnifiedDiff } from "./ChangedRegions.js";
-import { maxScore, minScore } from "./Clusters.js";
+import { crossFileSharedNames, maxScore, minScore } from "./Clusters.js";
 import { candidateKindNames } from "./FileScanner.js";
 import { GitProvider } from "./GitProvider.js";
 import { Options } from "./Options.js";
-import { TypeScriptDuplicateFinder } from "./TypeScriptDuplicateFinder.js";
+import { isTestFile, TypeScriptDuplicateFinder } from "./TypeScriptDuplicateFinder.js";
 import type { Cluster, ClusterLocation, ClusterReport, ClusterStatus, Location, Nearest } from "./types.js";
 
 // Wrap a comma-joined list to fit under the usage column.
@@ -149,9 +149,17 @@ function run(options: Options): void {
     case "json":
       console.log(toJson(visible));
       break;
-    case "text":
+    case "text": {
       printText(visible);
+      // Teaching footer to stderr (diagnostic, like --only-new's totals): keeps
+      // stdout pure findings while surfacing the curation levers in-band. Text
+      // format only — machine formats stay clean.
+      const summary = noiseSummary(visible, options);
+      if (summary) {
+        console.error(summary);
+      }
       break;
+    }
   }
 
   const failing = scope ? reported.some((cluster) => cluster.status === "new") : reported.length > 0;
@@ -252,9 +260,52 @@ function statusOf(cluster: Cluster): ClusterStatus {
   return cluster.status ?? "unscoped";
 }
 
+// Below this many clusters the output is not a firehose and a curation lecture
+// is noise — a small, clean run gets no footer.
+const NOISE_FOOTER_MIN_CLUSTERS = 10;
+
+// Builds the teaching footer: which curation levers would cut the current noise,
+// and by how much. Returns null when there is nothing useful to say (too few
+// clusters, or every applicable lever is already in effect).
+//
+// The --exclude-tests estimate is computed from the REPORTED clusters, not by
+// re-scanning: a cluster drops out once excluding test files leaves it under
+// --min-locations. This is an estimate (the `≈`): removing a location that
+// bridged two halves could split a cluster rather than delete it, so the true
+// remaining count can differ slightly — but never silently, and the dominant
+// effect (all-test clusters vanishing) is exact.
+export function noiseSummary(clusters: readonly Cluster[], options: Options): string | null {
+  if (clusters.length < NOISE_FOOTER_MIN_CLUSTERS) {
+    return null;
+  }
+  const bullets: string[] = [];
+
+  if (!options.excludeTests) {
+    const dropped = clusters.filter(
+      (cluster) => cluster.locations.filter((location) => !isTestFile(location.file)).length < options.minLocations,
+    ).length;
+    if (dropped > 0) {
+      bullets.push(
+        `${dropped} disappear with --exclude-tests (clusters that fall below --min-locations once test files are dropped) → ≈${clusters.length - dropped} left`,
+      );
+    }
+  }
+  if (!options.excludeTaggedTemplates) {
+    bullets.push(
+      "--exclude-tagged-templates drops CSS-in-JS / styled-components clusters (a frontend false-positive class)",
+    );
+  }
+  bullets.push(`--min-nodes N raises the size floor (currently ${options.minNodes}); --exclude '<glob>' drops paths`);
+
+  return [
+    `${clusters.length} clusters. Curation levers (see README "Curating results"):`,
+    ...bullets.map((bullet) => `  - ${bullet}`),
+  ].join("\n");
+}
+
 export function printText(clusters: readonly Cluster[]): void {
   if (clusters.length === 0) {
-    console.log("No duplicate clusters found.");
+    console.log("No duplicate candidate clusters found.");
     return;
   }
   clusters.forEach((cluster, index) => {
@@ -269,9 +320,24 @@ export function printText(clusters: readonly Cluster[]): void {
 export function formatCluster(cluster: Cluster, ordinal: number): string {
   const status = statusOf(cluster);
   const marker = status === "new" ? " (intersects your change)" : "";
-  const header = `CLUSTER ${ordinal} score=${scoreRange(cluster)} locations=${cluster.locations.length} status=${status}${marker}`;
+  const header = `CLUSTER ${ordinal} score=${scoreRange(cluster)} locations=${cluster.locations.length} status=${status}${marker}${sameNameSuffix(cluster)}`;
   const lines = cluster.locations.map((location) => `  ${clusterLineRange(location)}`);
   return [header, ...lines].join("\n");
+}
+
+// Surfaces the ranking signal in-band: when one declaration name recurs across
+// files in this cluster (the reason it floats to the top — see rankClusters),
+// name it so the reader sees WHY it ranked high without scanning every location.
+// At most three names listed; the rest collapse to "(+N)". Omitted entirely when
+// no name is shared cross-file, keeping the common case byte-identical.
+function sameNameSuffix(cluster: Cluster): string {
+  const shared = crossFileSharedNames(cluster);
+  if (shared.length === 0) {
+    return "";
+  }
+  const shown = shared.slice(0, 3).join(",");
+  const rest = shared.length > 3 ? `(+${shared.length - 3})` : "";
+  return ` same-name=${shown}${rest}`;
 }
 
 export function toEdn(clusters: readonly Cluster[]): string {
