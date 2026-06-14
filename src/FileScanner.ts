@@ -27,8 +27,11 @@ export class FileScanner {
     minNodes = 1,
     excludeKinds: ReadonlySet<ts.SyntaxKind> = EMPTY_KIND_SET,
     minDistinctKinds = 0,
+    excludeTaggedTemplates = false,
   ): Entry[] {
-    return files.flatMap((file) => this.scanFile(file, minLines, minNodes, excludeKinds, minDistinctKinds));
+    return files.flatMap((file) =>
+      this.scanFile(file, minLines, minNodes, excludeKinds, minDistinctKinds, excludeTaggedTemplates),
+    );
   }
 
   scanFile(
@@ -37,6 +40,7 @@ export class FileScanner {
     minNodes = 1,
     excludeKinds: ReadonlySet<ts.SyntaxKind> = EMPTY_KIND_SET,
     minDistinctKinds = 0,
+    excludeTaggedTemplates = false,
   ): Entry[] {
     const text = fs.readFileSync(file, "utf8");
     const sourceFile = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, false, scriptKind(file));
@@ -88,7 +92,8 @@ export class FileScanner {
         !excludeKinds.has(node.kind) &&
         hashes.length - rangeStart >= minNodes &&
         !hasIgnoreDirective(text, node) &&
-        (!trackKinds || distinctKindCount(tags, tagStart) >= minDistinctKinds)
+        (!trackKinds || distinctKindCount(tags, tagStart) >= minDistinctKinds) &&
+        (!excludeTaggedTemplates || !isTaggedTemplateValued(node))
       ) {
         const { startLine, endLine } = lineRangeFor(sourceFile, node);
         if (endLine - startLine + 1 >= minLines) {
@@ -248,6 +253,32 @@ function hasIgnoreDirective(text: string, node: ts.Node): boolean {
     if (/^\s*dry-ignore(-next-line)?\b/.test(body)) {
       return true;
     }
+  }
+  return false;
+}
+
+// CSS-in-JS / styled-components reducer (--exclude-tagged-templates, plan 034).
+// Styled-components and friends (`const X = styled(Button)`…``, `styled('span')`…``,
+// `css`…``, `gql`…``) normalize to a near-identical AST — a VariableStatement whose
+// initializer is a TaggedTemplateExpression — so they cluster across dozens of files
+// despite sharing no logic. We drop ANY tagged-template-valued candidate rather than
+// scoping to the `styled` tag specifically: every tagged-template idiom shares the same
+// false-positive shape, and matching by structure (not tag identifier) is simpler and
+// catches `css`/`gql`/styled aliases without a tag allowlist. Guarded at the call site
+// so the default (off) scan path never pays for it.
+function isTaggedTemplateValued(node: ts.Node): boolean {
+  if (ts.isTaggedTemplateExpression(node)) {
+    return true;
+  }
+  // The dominant case: `const X = styled(...)`…`` parses as a VariableStatement.
+  // Unwrap to the first declaration's initializer and check that.
+  if (ts.isVariableStatement(node)) {
+    const initializer = node.declarationList.declarations[0]?.initializer;
+    return initializer !== undefined && ts.isTaggedTemplateExpression(initializer);
+  }
+  // Other value-position roots that can directly hold a tagged template.
+  if (ts.isPropertyDeclaration(node) || ts.isPropertyAssignment(node)) {
+    return node.initializer !== undefined && ts.isTaggedTemplateExpression(node.initializer);
   }
   return false;
 }

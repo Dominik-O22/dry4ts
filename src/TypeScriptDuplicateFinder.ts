@@ -34,6 +34,7 @@ export class TypeScriptDuplicateFinder {
       resolvedOptions.minNodes,
       excludeKinds,
       resolvedOptions.minDistinctKinds,
+      resolvedOptions.excludeTaggedTemplates,
     );
     return { files, clusters: this.clustersFor(entries, resolvedOptions) };
   }
