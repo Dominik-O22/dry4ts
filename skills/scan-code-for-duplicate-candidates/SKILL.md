@@ -4,7 +4,7 @@ description: >
   Run dry-ts locally or from code to find fuzzy structural duplicate clusters. Load when choosing paths, interpreting score, status, and line-range output, tuning --threshold, --min-lines, --min-nodes, or using TypeScriptDuplicateFinder.findClusters.
 type: core
 library: dry-ts
-library_version: "0.8.0"
+library_version: "0.9.0"
 sources:
   - "dry-ts:README.md"
   - "dry-ts:src/TypeScriptDuplicateFinder.ts"
@@ -129,11 +129,11 @@ and suppressing a parent never hides unrelated child candidates inside it.
 
 ```text
 CLUSTER 1 score=0.89 locations=2 status=unscoped
-  src/invoice.ts:12-25 nodes=88
-  src/receipt.ts:30-44 nodes=91
+  src/invoice.ts:12-25 nodes=88 kind=FunctionDeclaration name=renderInvoice
+  src/receipt.ts:30-44 nodes=91 kind=FunctionDeclaration name=renderReceipt
 ```
 
-The score is structural similarity, and the line ranges identify related duplicate regions for review. `nodes` is the normalized syntax node count for that duplicated block. `status` is `unscoped` for a plain scan; under a changed-scope flag it becomes `new` (marked `status=new (intersects your change)`) or `known`.
+The score is structural similarity, and the line ranges identify related duplicate regions for review. `nodes` is the normalized syntax node count for that duplicated block. `kind` is the candidate root SyntaxKind name (e.g. `FunctionDeclaration`, `Constructor`, `InterfaceDeclaration`, `ArrowFunction`) and `name` is the declaration identifier — so you can classify a finding without opening the file; `name=` is dropped for anonymous declarations (arrows, callable signatures), where JSON/EDN report `null`/`nil`. `status` is `unscoped` for a plain scan; under a changed-scope flag it becomes `new` (marked `status=new (intersects your change)`) or `known`.
 
 ### Diagnose a surprising changed-scope result
 
