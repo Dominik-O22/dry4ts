@@ -24,7 +24,8 @@ Known deferred work. Performance plans live in `plans/README.md`.
   file=...` annotations on finding locations, plus findings-first text
   output. The `status` field from the incremental-gating plan provides all
   data; only formatters needed. (Deferred from incremental-gating CEO
-  review, 2026-06-13.)
+  review, 2026-06-13.) `--format sarif` (the broader code-scanning standard)
+  shipped for #47; this remains as the lighter-weight inline-annotation sibling.
 - [ ] Line-range syntax for `--changed` (P3, S): optional `:start-end` suffix
   (`--changed foo.ts:10-42`) giving non-git callers line-level gating
   precision. Today `--changed` is whole-file granularity, so pre-existing

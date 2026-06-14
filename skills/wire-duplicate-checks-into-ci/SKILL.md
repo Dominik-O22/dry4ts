@@ -4,7 +4,7 @@ description: >
   Use dry-ts as a CI or automated review gate with --format json and --fail-on-duplicates. Load when writing GitHub Actions, gating a PR only on new duplication with --changed-from, parsing cluster JSON status, or handling dry-ts exit codes 0, 1, and 2.
 type: core
 library: dry-ts
-library_version: "0.11.0"
+library_version: "0.12.0"
 sources:
   - "dry-ts:README.md"
   - "dry-ts:AGENTS.md"
@@ -83,6 +83,23 @@ bunx dry-ts --format json src test
 ```
 
 JSON output is stable and small: `{ "clusters": ClusterReport[] }`.
+
+### Upload SARIF to GitHub code scanning
+
+```yaml
+      - run: bunx dry-ts --sarif --changed-from origin/${{ github.base_ref || 'main' }} src > dry-ts.sarif
+      - uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: dry-ts.sarif
+```
+
+`--format sarif` (alias `--sarif`) emits SARIF 2.1.0 so findings surface inline
+on the PR via code scanning. One `result` per cluster under the rule
+`dry-ts/structural-duplicate`; a cluster's `level` follows its status (`new` →
+`warning`, `known`/`unscoped` → `note`), and `--counterparts` nearest data lands
+in `relatedLocations`. Findings are framed as structural *candidates*. Drop
+`--fail-on-duplicates` (omitted above) if you want the annotations without
+failing the build.
 
 ### Handle exit codes by meaning
 
