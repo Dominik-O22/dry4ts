@@ -204,8 +204,9 @@ estimates the reduction:
   - --min-nodes N raises the size floor (currently 20); --exclude '<glob>' drops paths
 ```
 
-It is a teaching aid, not a finding: it goes to stderr so stdout stays pure
-findings (pipe- and grep-safe), and it shows only on a terminal. The `≈` is
+It is a teaching aid, not a finding: it goes to stderr (not stdout), so it never
+pollutes the findings stream — pipe or redirect stdout and the footer stays out
+of it. The `≈` is
 honest — the `--exclude-tests` count is estimated from the reported clusters,
 not a re-scan, so a removed location that bridged two halves of a cluster can
 split it rather than delete it. JSON/EDN output never prints the footer.
