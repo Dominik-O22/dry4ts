@@ -64,6 +64,11 @@ Options:
                 --exclude '**/*.spec.*'. Repeatable. Applies during directory
                 scans regardless of --no-gitignore; explicit file arguments are
                 always scanned.
+--exclude-tests Skip test files during directory scans: a curated preset of
+                **/*.test.*, **/*.spec.*, **/*.e2e-spec.*, **/__tests__/**, and
+                **/__mocks__/**, merged into the --exclude glob list (composes
+                with any --exclude globs; explicit file arguments still scanned).
+                Opt-in, default off; output byte-for-byte unchanged when off.
 --exclude-kinds KIND[,KIND...]
                 Drop candidate declarations of the given SyntaxKinds before
                 matching. Comma-separated and repeatable. Opt-in only: with no
@@ -141,6 +146,28 @@ allowlist to maintain. Default **off**; when off, output is byte-for-byte
 unchanged and the check costs nothing. Like the other reducers it never stops
 recursion into children — a genuine duplicate nested inside a tagged template is
 still reported.
+
+### Skipping test files: `--exclude-tests`
+
+Test files are the single largest false-positive class in real scans — ~82% of
+clusters on a Node/TS backend (n8n `cli/src`), ~49% on a frontend (Sentry). Most
+of that is table-driven test cases: identical arrange/act/assert blocks differing
+only in data. That repetition is **correct** — test bodies should be DAMP
+(descriptive and meaningful) over DRY, so readability and failure-localization
+win, and table-driven cases are the sanctioned form. `--exclude-tests` exists to
+focus a run on `src` duplication, **not** because test duplication never matters:
+real test *infrastructure* dup (builders, factories, custom matchers, shared
+setup) is worth its own dedicated scan — just point the tool at the test tree
+without this flag.
+
+The flag merges a curated preset (`**/*.test.*`, `**/*.spec.*`,
+`**/*.e2e-spec.*`, `**/__tests__/**`, `**/__mocks__/**`) into the `--exclude`
+glob list, so it composes with any explicit `--exclude` globs and follows the
+same rules (directory scans only; explicitly-named file arguments are always
+scanned). Bare `test/` / `tests/` / `e2e/` directories are deliberately left out
+of the preset — too many projects use those names for non-test code; add them
+with `--exclude '**/test/**'` if your layout needs it. Default **off**; when off,
+output is byte-for-byte unchanged.
 
 ### Suppressing a single occurrence: `// dry-ignore`
 

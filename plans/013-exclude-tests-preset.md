@@ -11,7 +11,13 @@
 
 ## Status
 
-- **Status**: TODO
+- **Status**: DONE (executed 2026-06-14 on `advisor/013-exclude-tests` off main;
+  opt-in `--exclude-tests` curated preset merged into the `--exclude` glob list at
+  `TypeScriptDuplicateFinder.sourceFiles`, no scan/gate change; exported
+  `TEST_EXCLUDE_GLOBS`; 5 tests incl. compose/off-path/explicit-file; one
+  `// dry-ignore` on an intentional twin test scaffold to keep the self-scan
+  green; `bun run check` green at 138 pass; n8n `cli/src` 1650 → 300 clusters
+  under the flag, off-path byte-for-byte unchanged)
 - **Priority**: P1 (highest-ROI false-positive reducer measured on both corpora)
 - **Effort**: XS-S
 - **Risk**: LOW (pure source-file filter preset over the existing `--exclude`
