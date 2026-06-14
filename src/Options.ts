@@ -18,6 +18,7 @@ export interface OptionsInput {
   readonly excludeKinds?: readonly string[];
   readonly minDistinctKinds?: number;
   readonly exclude?: readonly string[];
+  readonly excludeTaggedTemplates?: boolean;
 }
 
 export class Options {
@@ -38,6 +39,7 @@ export class Options {
     public readonly excludeKinds: readonly string[] = [],
     public readonly minDistinctKinds: number = 0,
     public readonly exclude: readonly string[] = [],
+    public readonly excludeTaggedTemplates: boolean = false,
   ) {
     if (!(threshold > 0 && threshold <= 1)) {
       throw new Error(`threshold must be greater than 0 and at most 1, got ${threshold}`);
@@ -89,6 +91,7 @@ export class Options {
       input.excludeKinds ?? [],
       input.minDistinctKinds ?? defaults.minDistinctKinds,
       input.exclude ?? [],
+      input.excludeTaggedTemplates ?? defaults.excludeTaggedTemplates,
     );
   }
 
@@ -109,6 +112,7 @@ export class Options {
     const excludeKinds: string[] = [];
     let minDistinctKinds = 0;
     const exclude: string[] = [];
+    let excludeTaggedTemplates = false;
 
     for (let i = 0; i < args.length; i += 1) {
       const arg = args[i];
@@ -149,6 +153,9 @@ export class Options {
           break;
         case "--only-new":
           onlyNew = true;
+          break;
+        case "--exclude-tagged-templates":
+          excludeTaggedTemplates = true;
           break;
         case "--exclude-kinds":
           for (const name of valueFor(args, ++i, arg).split(",")) {
@@ -207,6 +214,7 @@ export class Options {
       excludeKinds,
       minDistinctKinds,
       exclude,
+      excludeTaggedTemplates,
     );
   }
 }

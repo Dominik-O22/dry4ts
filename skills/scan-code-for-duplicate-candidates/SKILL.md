@@ -4,7 +4,7 @@ description: >
   Run dry-ts locally or from code to find fuzzy structural duplicate clusters. Load when choosing paths, interpreting score, status, and line-range output, tuning --threshold, --min-lines, --min-nodes, or using TypeScriptDuplicateFinder.findClusters.
 type: core
 library: dry-ts
-library_version: "0.7.0"
+library_version: "0.8.0"
 sources:
   - "dry-ts:README.md"
   - "dry-ts:src/TypeScriptDuplicateFinder.ts"
@@ -93,6 +93,22 @@ explicit instruction, not repo config); explicit file arguments are still always
 scanned. This is the highest-leverage filter for expected duplication — on a large
 frontend codebase, test and story files alone are typically about half of all
 reported clusters.
+
+### Suppress CSS-in-JS / styled-components declarations
+
+```bash
+bunx dry-ts src --exclude-tagged-templates
+```
+
+`--exclude-tagged-templates` drops candidate declarations whose value is a tagged
+template literal — `const X = styled(Button)\`…\``, `styled('span')\`…\``, `css\`…\``,
+`gql\`…\``. These normalize to a near-identical AST and cluster across dozens of
+files despite sharing no logic; the kind/path filters cannot catch them without
+dropping real const-bound function duplicates. The flag matches by structure, not
+by tag name, so it covers `styled`/`css`/`gql` and any alias uniformly. Opt-in,
+default off; on a large frontend codebase it is the single largest remaining
+false-positive class after path and kind filters (~8% of clusters on the Sentry
+corpus).
 
 ### Suppress one occurrence at the source (`// dry-ignore`)
 

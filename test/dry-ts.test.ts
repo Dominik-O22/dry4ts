@@ -2228,3 +2228,80 @@ test("duplicate isRecord type guards are still detected (codexism regression)", 
   const withFloor = new TypeScriptDuplicateFinder().findClusters({ ...scan, minDistinctKinds: 5 });
   assert.equal(withFloor.length, 1, "a modest diversity floor must not hide the real isRecord duplicate");
 });
+
+// --- --exclude-tagged-templates (plan 034, CSS-in-JS FP reducer) ----------
+
+// A styled-components declaration: `const X = styled(Button)`…`` parses as a
+// VariableStatement whose initializer is a TaggedTemplateExpression. These
+// normalize to a near-identical AST across files and are a dominant false
+// positive on frontend codebases, yet share no real logic. One helper builds
+// both twins so the bodies are not themselves a structural duplicate (which the
+// self-scan gate would flag). The CSS body carries no `${...}` interpolations,
+// so the only candidate it produces is the tagged-template-valued declaration
+// itself — letting the test pin that exact candidate is suppressed.
+function styledDecl(name: string): string {
+  return `import styled from "styled-components";
+
+export const ${name} = styled(Button)\`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  color: rebeccapurple;
+\`;
+`;
+}
+
+const taggedScan = { threshold: 0.8, minLines: 1, minNodes: 4 };
+
+// The styled declaration sits on line 3 in every fixture file.
+const clustersStyledDecl = (clusters: readonly Cluster[]) =>
+  clusters.some((cluster) => cluster.locations.some((loc) => loc.startLine === 3));
+
+test("a repeated styled(...) declaration clusters by default but not with --exclude-tagged-templates", async () => {
+  const sources = { "a.tsx": styledDecl("ArchiveButton"), "b.tsx": styledDecl("DismissButton") };
+
+  const off = await writeFixture(sources);
+  const baseline = new TypeScriptDuplicateFinder().findClusters({ paths: [off.dir], ...taggedScan });
+  assert.ok(clustersStyledDecl(baseline), "the styled-components twins should cluster by default");
+
+  const on = await writeFixture(sources);
+  const filtered = new TypeScriptDuplicateFinder().findClusters({
+    paths: [on.dir],
+    ...taggedScan,
+    excludeTaggedTemplates: true,
+  });
+  assert.ok(!clustersStyledDecl(filtered), "the tagged-template declaration should be dropped with the flag");
+});
+
+test("--exclude-tagged-templates leaves a genuine non-tagged duplicate unaffected", async () => {
+  const sources = { "guards-a.ts": isRecordGuard("isRecord"), "guards-b.ts": isRecordGuard("isPlainRecord") };
+  const { dir } = await writeFixture(sources);
+
+  const filtered = new TypeScriptDuplicateFinder().findClusters({
+    paths: [dir],
+    ...taggedScan,
+    excludeTaggedTemplates: true,
+  });
+  assert.equal(filtered.length, 1, "a real function duplicate must survive the tagged-template reducer");
+});
+
+test("--exclude-tagged-templates off (default) leaves output byte-for-byte unchanged", async () => {
+  const sources = { "a.tsx": styledDecl("ArchiveButton"), "b.tsx": styledDecl("DismissButton") };
+  const a = await writeFixture(sources);
+  const b = await writeFixture(sources);
+  const withoutFlag = new TypeScriptDuplicateFinder().findClusters({ paths: [a.dir], ...taggedScan });
+  const withFalse = new TypeScriptDuplicateFinder().findClusters({
+    paths: [b.dir],
+    ...taggedScan,
+    excludeTaggedTemplates: false,
+  });
+  const shape = (clusters: readonly Cluster[]) =>
+    clusters.map((cluster) => cluster.locations.map((loc) => `${loc.startLine}-${loc.endLine}`).sort().join(",")).sort();
+  assert.deepEqual(shape(withFalse), shape(withoutFlag));
+});
+
+test("--exclude-tagged-templates parses as a boolean flag", () => {
+  assert.equal(Options.parse("--exclude-tagged-templates").excludeTaggedTemplates, true);
+  assert.equal(Options.parse().excludeTaggedTemplates, false);
+});

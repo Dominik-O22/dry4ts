@@ -72,6 +72,11 @@ Options:
                 (--exclude-kinds Constructor) or port/interface member
                 signatures (--exclude-kinds PropertySignature,MethodSignature).
                 An unknown or non-candidate kind name is a hard error.
+--exclude-tagged-templates
+                Drop candidate declarations whose value is a tagged template
+                literal (const X = styled(Button)`…`, css`…`, gql`…`). Opt-in,
+                default off. Suppresses CSS-in-JS / styled-components clusters,
+                a dominant false-positive class on frontend codebases.
 ```
 
 Valid `--exclude-kinds` names are the candidate root kinds — the TypeScript AST
@@ -116,6 +121,26 @@ control flow.
 It complements `--min-nodes` (size) with a structure-variety floor. Default
 **off** (`0`); markers do not count toward kind diversity, only node kinds do.
 The off path tracks nothing, so it costs nothing.
+
+### Suppressing CSS-in-JS declarations: `--exclude-tagged-templates`
+
+Styled-components and other tagged-template idioms — `const X = styled(Button)\`…\``,
+`styled('span')\`…\``, `css\`…\``, `gql\`…\`` — normalize to a near-identical AST: a
+`VariableStatement` whose initializer is a `TaggedTemplateExpression`, with
+`${p => p.theme.x}` arrow interpolations that add just enough distinct kinds to
+clear the diversity floor. So they cluster across dozens of files despite sharing
+no logic, and the existing reducers do not catch them (excluding `VariableStatement`
+wholesale would also kill real const-bound function duplicates). On a large frontend
+codebase like the Sentry corpus this is one of the single largest false-positive
+classes.
+
+`--exclude-tagged-templates` drops any candidate declaration whose value is a
+tagged template literal. It matches by structure rather than by tag name, so it
+suppresses `styled`, `css`, `gql`, and any styled alias uniformly, with no tag
+allowlist to maintain. Default **off**; when off, output is byte-for-byte
+unchanged and the check costs nothing. Like the other reducers it never stops
+recursion into children — a genuine duplicate nested inside a tagged template is
+still reported.
 
 ### Suppressing a single occurrence: `// dry-ignore`
 

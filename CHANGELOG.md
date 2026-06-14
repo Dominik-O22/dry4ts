@@ -5,6 +5,24 @@ All notable changes to dry-ts are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-06-14
+
+### Added
+
+- `--exclude-tagged-templates` drops candidate declarations whose value is a
+  tagged template literal (`const X = styled(Button)\`…\``, `styled('span')\`…\``,
+  `css\`…\``, `gql\`…\``). CSS-in-JS and styled-components declarations normalize
+  to a near-identical AST — a `VariableStatement` whose initializer is a
+  `TaggedTemplateExpression`, with `${p => p.theme.x}` arrow interpolations that
+  clear the kind-diversity floor — so they cluster across dozens of files
+  despite sharing no logic, and the existing reducers cannot catch them without
+  also dropping real const-bound function duplicates. The flag matches by
+  structure rather than by tag name, suppressing `styled`/`css`/`gql` and any
+  styled alias uniformly with no allowlist to maintain. On the Sentry corpus it
+  removes 200 of 2574 clusters (~8%), the single largest remaining
+  false-positive class after path and kind filters. Opt-in, default off; when
+  off, output is byte-for-byte unchanged and the check costs nothing.
+
 ## [0.7.0] - 2026-06-14
 
 ### Added
