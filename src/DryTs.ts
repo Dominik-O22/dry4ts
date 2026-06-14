@@ -48,10 +48,12 @@ export const USAGE = [
   "                  near-uniform candidates (e.g. property-only interfaces).",
   "  --min-locations N",
   "                  Minimum locations in a reported cluster, default 2",
-  "  --format F      text, json, or edn, default text",
+  "  --format F      text, json, edn, or sarif, default text",
   "  --edn           Same as --format edn",
   "  --json          Same as --format json",
   "  --text          Same as --format text",
+  "  --sarif         Same as --format sarif. SARIF 2.1.0 for GitHub code",
+  "                  scanning / SARIF consumers. status new -> warning, else note.",
   "  --changed-from REF",
   "                  Mark clusters intersecting changes since merge-base(REF, HEAD)",
   "                  as status new; untracked scanned files count as fully changed",
@@ -156,6 +158,9 @@ function run(options: Options): void {
       break;
     case "json":
       console.log(toJson(visible));
+      break;
+    case "sarif":
+      console.log(toSarif(visible));
       break;
     case "text": {
       printText(visible);
@@ -373,6 +378,172 @@ export function toJson(clusters: readonly Cluster[]): string {
     locations: cluster.locations,
   }));
   return `${JSON.stringify({ clusters: reports }, null, 2)}\n`;
+}
+
+const SARIF_SCHEMA = "https://json.schemastore.org/sarif-2.1.0.json";
+const SARIF_RULE_ID = "dry-ts/structural-duplicate";
+const TOOL_INFO_URI = "https://github.com/Dominik-O22/dry4ts";
+
+interface SarifPhysicalLocation {
+  readonly artifactLocation: { readonly uri: string };
+  readonly region: { readonly startLine: number; readonly endLine: number };
+}
+
+interface SarifLocation {
+  physicalLocation: SarifPhysicalLocation;
+  logicalLocations?: { name: string }[];
+  properties: Record<string, unknown>;
+  relationships?: { target: number; kinds: string[] }[];
+}
+
+interface SarifRelatedLocation {
+  readonly id: number;
+  readonly physicalLocation: SarifPhysicalLocation;
+  readonly message: { text: string };
+}
+
+// SARIF 2.1.0 for GitHub code scanning and other SARIF consumers (issue #47).
+// One `result` per cluster — the finding unit, matching json/edn — with each
+// ClusterLocation as a SARIF location. --counterparts nearest data becomes
+// `relatedLocations`, joined back to its origin location by a `relevant`
+// relationship. The rule keeps "candidate" framing: these are structural
+// candidates, not confirmed duplicates. The scan/gate pipeline is untouched.
+//
+// version defaults to the package version (read once from package.json, which
+// sits one level above this module in both the src and dist layouts); tests pass
+// an explicit value for deterministic output.
+export function toSarif(clusters: readonly Cluster[], version: string = packageVersion()): string {
+  const sarif = {
+    $schema: SARIF_SCHEMA,
+    version: "2.1.0",
+    runs: [
+      {
+        tool: {
+          driver: {
+            name: "dry-ts",
+            informationUri: TOOL_INFO_URI,
+            version,
+            rules: [
+              {
+                id: SARIF_RULE_ID,
+                name: "StructuralDuplicate",
+                shortDescription: { text: "Candidate structural duplicate" },
+                fullDescription: {
+                  text: "Two or more declarations share normalized AST structure above the configured similarity threshold. These are structural candidates for de-duplication, not confirmed duplicates — review before refactoring.",
+                },
+                helpUri: TOOL_INFO_URI,
+                defaultConfiguration: { level: "note" },
+              },
+            ],
+          },
+        },
+        results: clusters.map(sarifResult),
+      },
+    ],
+  };
+  return `${JSON.stringify(sarif, null, 2)}\n`;
+}
+
+function sarifResult(cluster: Cluster) {
+  const status = statusOf(cluster);
+  const shared = crossFileSharedNames(cluster);
+  const locations = cluster.locations.map(sarifLocation);
+  const relatedLocations: SarifRelatedLocation[] = [];
+  cluster.locations.forEach((location, index) => {
+    if (location.nearest === undefined) {
+      return;
+    }
+    // relationships[].target is the array index into relatedLocations (not the
+    // related location's id) — see SARIF 2.1.0 §3.33.3.
+    const target = relatedLocations.length;
+    relatedLocations.push(sarifRelatedLocation(location.nearest, target));
+    locations[index].relationships = [{ target, kinds: ["relevant"] }];
+  });
+  return {
+    ruleId: SARIF_RULE_ID,
+    ruleIndex: 0,
+    level: sarifLevel(status),
+    message: { text: sarifMessage(cluster, status, shared) },
+    locations,
+    // Omitted entirely off --counterparts, keeping the common case clean.
+    ...(relatedLocations.length > 0 ? { relatedLocations } : {}),
+    properties: {
+      status,
+      scoreMin: minScore(cluster),
+      scoreMax: maxScore(cluster),
+      locationCount: cluster.locations.length,
+      ...(shared.length > 0 ? { sameName: shared } : {}),
+    },
+  };
+}
+
+function sarifLocation(location: ClusterLocation): SarifLocation {
+  // The scanner's diagnostic facts ride in properties (mirroring json/edn);
+  // SARIF's own region/uri stay canonical.
+  const properties: Record<string, unknown> = { nodes: location.nodes };
+  if (location.kind !== undefined) {
+    properties.kind = location.kind;
+    properties.name = location.name ?? null;
+  }
+  if (location.changed !== undefined) {
+    properties.changed = location.changed;
+  }
+  const result: SarifLocation = {
+    physicalLocation: {
+      artifactLocation: { uri: location.file },
+      region: { startLine: location.startLine, endLine: location.endLine },
+    },
+    properties,
+  };
+  // A named declaration also gets a logicalLocation so consumers can group by
+  // symbol; anonymous candidates (null name) carry none.
+  if (location.name != null) {
+    result.logicalLocations = [{ name: location.name }];
+  }
+  return result;
+}
+
+function sarifRelatedLocation(nearest: Nearest, id: number): SarifRelatedLocation {
+  return {
+    id,
+    physicalLocation: {
+      artifactLocation: { uri: nearest.file },
+      region: { startLine: nearest.startLine, endLine: nearest.endLine },
+    },
+    message: { text: `nearest counterpart (${nearest.shared}/${nearest.total}, score=${nearest.score})` },
+  };
+}
+
+// A "new" cluster (intersects the active change) is the actionable finding → a
+// warning the gate can surface; "known"/"unscoped" stay informational notes so a
+// full-tree scan does not flood code scanning with errors. (Issue #47: new →
+// warning/error, known/unscoped → note.)
+function sarifLevel(status: ClusterStatus): "warning" | "note" {
+  return status === "new" ? "warning" : "note";
+}
+
+function sarifMessage(cluster: Cluster, status: ClusterStatus, shared: readonly string[]): string {
+  const sameName =
+    shared.length > 0
+      ? ` same-name: ${shared.slice(0, 3).join(", ")}${shared.length > 3 ? ` (+${shared.length - 3})` : ""}`
+      : "";
+  return `Structural duplicate candidate: ${cluster.locations.length} locations, score ${scoreRange(cluster)}, status ${status}.${sameName}`;
+}
+
+let cachedVersion: string | undefined;
+
+function packageVersion(): string {
+  if (cachedVersion === undefined) {
+    try {
+      const raw = fs.readFileSync(new URL("../package.json", import.meta.url), "utf8");
+      cachedVersion = (JSON.parse(raw) as { version?: string }).version ?? "0.0.0";
+    } catch {
+      // Never let a missing/garbled package.json sink a scan: SARIF stays valid
+      // with a placeholder version rather than throwing mid-pipeline.
+      cachedVersion = "0.0.0";
+    }
+  }
+  return cachedVersion;
 }
 
 // Built by appending each optional field group independently — never nested
