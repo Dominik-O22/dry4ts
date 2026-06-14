@@ -4,7 +4,7 @@ description: >
   Run dry-ts after AI-generated edits to catch structural duplication before it accumulates. Load when building autonomous review loops, gating only on duplication an edit introduced with --changed/--changed-from, triaging duplicate clusters by status, using JSON output after generated changes, or deciding when local duplicate checks should become CI gates.
 type: core
 library: dry-ts
-library_version: "0.5.0"
+library_version: "0.7.0"
 sources:
   - "dry-ts:README.md"
   - "dry-ts:AGENTS.md"
@@ -64,6 +64,14 @@ bunx dry-ts --fail-on-duplicates --changed-from HEAD --only-new src
 `--only-new` filters the report to `status: "new"` clusters (requires a
 changed-scope flag); the exit code is unchanged and suppressed totals go to
 stderr, so the agent sees only what it must act on without losing the debt count.
+
+For false positives the agent should never chase, stack two more opt-in filters:
+`--exclude '**/*.spec.*' '**/*.stories.*'` drops whole categories of expected
+duplication by path (test and story files are often about half of all clusters on
+a frontend codebase), and `--min-distinct-kinds N` drops near-uniform candidates
+(property-only interfaces, flat config objects) that clear `--min-nodes` but carry
+little structure. For a single idiomatic repetition, a `// dry-ignore` comment in
+the declaration's leading trivia suppresses just that occurrence at the source.
 
 ### Run a local guard after generated edits
 

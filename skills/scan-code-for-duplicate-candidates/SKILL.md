@@ -4,7 +4,7 @@ description: >
   Run dry-ts locally or from code to find fuzzy structural duplicate clusters. Load when choosing paths, interpreting score, status, and line-range output, tuning --threshold, --min-lines, --min-nodes, or using TypeScriptDuplicateFinder.findClusters.
 type: core
 library: dry-ts
-library_version: "0.5.0"
+library_version: "0.7.0"
 sources:
   - "dry-ts:README.md"
   - "dry-ts:src/TypeScriptDuplicateFinder.ts"
@@ -68,6 +68,47 @@ non-candidate kind name is a hard error (exit `2`); valid names are the
 candidate root kinds listed in the README. Excluding a kind never hides a
 longer child candidate, since children are always visited.
 
+### Drop near-uniform candidates (kind-diversity floor)
+
+```bash
+bunx dry-ts src --min-distinct-kinds 8
+```
+
+`--min-distinct-kinds N` drops a candidate whose subtree spans fewer than `N`
+distinct node kinds. It complements `--min-nodes` (size) with a structure-variety
+floor: a property-only interface or a flat config object can clear the node-count
+bar yet reach the threshold against any similarly-shaped block. Opt-in, default
+`0` (off); markers do not count, only node kinds. The off path tracks nothing, so
+it costs nothing.
+
+### Exclude whole files by path glob
+
+```bash
+bunx dry-ts src --exclude '**/*.spec.*' --exclude '**/*.stories.*'
+```
+
+`--exclude GLOB` skips files/directories matching a `.gitignore`-style glob during
+directory scans. Repeatable; applies regardless of `--no-gitignore` (it is an
+explicit instruction, not repo config); explicit file arguments are still always
+scanned. This is the highest-leverage filter for expected duplication — on a large
+frontend codebase, test and story files alone are typically about half of all
+reported clusters.
+
+### Suppress one occurrence at the source (`// dry-ignore`)
+
+```ts
+// dry-ignore
+export function knownDuplicate(): void {
+  // ...
+}
+```
+
+A `// dry-ignore` (or `// dry-ignore-next-line`, or `/* dry-ignore */`) comment in
+a declaration's leading trivia drops that declaration as a candidate. No flag
+required. Suppression is scoped to the node whose comment carries the directive —
+a directive on a wrapping `const` statement does not reach a nested arrow function,
+and suppressing a parent never hides unrelated child candidates inside it.
+
 ### Read cluster locations before refactoring
 
 ```text
@@ -98,6 +139,8 @@ const clusters = finder.findClusters({
   minLines: 4,
   minNodes: 20,
   excludeKinds: ["Constructor", "PropertySignature"],
+  minDistinctKinds: 8,
+  exclude: ["**/*.spec.*", "**/*.stories.*"],
 });
 
 for (const cluster of clusters) {
