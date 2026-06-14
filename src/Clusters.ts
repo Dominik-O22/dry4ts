@@ -108,11 +108,16 @@ function mergeScores(left: ScoreRange | undefined, right: ScoreRange | undefined
   };
 }
 
-function locationKey(location: Location): string {
+// Exported so the nearest-counterpart join (plan 014) keys by the SAME canonical
+// location key the collector dedupes on — a divergent key would silently miss the
+// join. Single source of truth.
+export function locationKey(location: Location): string {
   return `${location.file}:${location.startLine}-${location.endLine}`;
 }
 
-function compareLocations(left: Location, right: Location): number {
+// Exported as the deterministic location tie-break for the nearest-counterpart
+// total order (plan 014, DD 2) — reused rather than duplicated so the two never drift.
+export function compareLocations(left: Location, right: Location): number {
   return left.file.localeCompare(right.file) || left.startLine - right.startLine || left.endLine - right.endLine;
 }
 

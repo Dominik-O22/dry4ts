@@ -3,12 +3,16 @@ import path from "node:path";
 
 import ignore from "ignore";
 
-import { ClusterCollector } from "./Clusters.js";
+import { ClusterCollector, compareLocations, locationKey } from "./Clusters.js";
 import { type Entry, FileScanner, resolveExcludeKinds } from "./FileScanner.js";
 import { Options, type OptionsInput } from "./Options.js";
-import type { Cluster, ClusterLocation } from "./types.js";
+import type { Cluster, ClusterLocation, Nearest } from "./types.js";
 
-type MatchingPair = readonly [Entry, Entry, number];
+// [left, right, score, shared]: shared is the pairwise fingerprint-intersection
+// count from the single similarity walk (full fingerprint length for an
+// identical-fingerprint edge). Carried so --counterparts can report shared/total
+// without a second pass; ignored entirely when the flag is off.
+type MatchingPair = readonly [Entry, Entry, number, number];
 
 type IgnoreMatcher = (filePath: string, isDirectory: boolean) => boolean;
 
@@ -56,13 +60,25 @@ export class TypeScriptDuplicateFinder {
   private clustersFor(entries: readonly Entry[], options: Options): Cluster[] {
     // FileScanner already enforces minNodes; entries arrive pre-filtered.
     const collector = new ClusterCollector();
-    for (const [left, right, score] of this.matchingPairs(entries, options.threshold)) {
+    // Off the flag this stays null and no per-location bookkeeping happens, so
+    // the off path does exactly what it did before. On, it accumulates each
+    // location's running-max nearest partner keyed by canonical locationKey —
+    // O(locations) memory, never the O(edges) full edge list (plan DD 1).
+    const nearest = options.counterparts ? new Map<string, NearestAccumulator>() : null;
+    // The nearest map (when present) is populated inside matchingPairs as edges
+    // are found; the pair's shared count is consumed there, not here.
+    for (const [left, right, score] of this.matchingPairs(entries, options.threshold, nearest)) {
       collector.addMatch(clusterLocation(left), clusterLocation(right), score);
     }
-    return collector.clusters().filter((cluster) => cluster.locations.length >= options.minLocations);
+    const clusters = collector.clusters().filter((cluster) => cluster.locations.length >= options.minLocations);
+    return nearest ? clusters.map((cluster) => joinNearest(cluster, nearest)) : clusters;
   }
 
-  private matchingPairs(entries: readonly Entry[], threshold: number): MatchingPair[] {
+  private matchingPairs(
+    entries: readonly Entry[],
+    threshold: number,
+    nearest: Map<string, NearestAccumulator> | null,
+  ): MatchingPair[] {
     const pairs: MatchingPair[] = [];
     const fingerprintKeys = new Map<Entry, string>();
     const identicalGroups = new Map<string, Entry[]>();
@@ -118,11 +134,14 @@ export class TypeScriptDuplicateFinder {
         if (overlaps(left, right)) {
           continue;
         }
-        const score = similarity(left, right);
+        const { score, shared } = similarity(left, right);
         if (score >= threshold) {
-          pairs.push([left, right, score]);
+          pairs.push([left, right, score, shared]);
         }
       }
+    }
+    if (nearest) {
+      aggregateNearest(pairs, identicalGroups, nearest);
     }
     return pairs;
   }
@@ -243,6 +262,199 @@ function overlaps(left: Entry, right: Entry): boolean {
   return left.file === right.file && left.startLine <= right.endLine && right.startLine <= left.endLine;
 }
 
+// The running-max nearest counterpart for one location: the partner Entry (so its
+// canonical location key resolves at join time) plus the exact-integer shared/total
+// and the score, before the cluster `index` is known (resolved in joinNearest).
+interface NearestAccumulator {
+  readonly counterpart: Entry;
+  readonly shared: number;
+  readonly total: number;
+  readonly score: number;
+}
+
+// Strict-greater replacement under the total tie-break (plan DD 2): max score,
+// then max shared, then min total, then compareLocations(counterpart). `>`/`<`
+// only — never `>=` — so iteration order never leaks into the result.
+function isBetterNearest(candidate: NearestAccumulator, existing: NearestAccumulator): boolean {
+  if (candidate.score !== existing.score) {
+    return candidate.score > existing.score;
+  }
+  if (candidate.shared !== existing.shared) {
+    return candidate.shared > existing.shared;
+  }
+  if (candidate.total !== existing.total) {
+    return candidate.total < existing.total;
+  }
+  return compareLocations(candidate.counterpart, existing.counterpart) < 0;
+}
+
+function updateNearest(
+  nearest: Map<string, NearestAccumulator>,
+  location: Entry,
+  counterpart: Entry,
+  score: number,
+  shared: number,
+  total: number,
+): void {
+  const key = locationKey(location);
+  const candidate: NearestAccumulator = { counterpart, shared, total, score };
+  const existing = nearest.get(key);
+  if (!existing || isBetterNearest(candidate, existing)) {
+    nearest.set(key, candidate);
+  }
+}
+
+// Aggregate each rendered location's nearest counterpart from the fully-built edge
+// set, AFTER pairs are known. Computed here (not inline) because the correct nearest
+// is the strongest edge between two RENDERED locations, and "rendered" is only known
+// once we can take the max-nodes entry per locationKey across all edge endpoints —
+// the same keep-rule ClusterCollector applies (Clusters.ts:59).
+//
+// Why this matters (Codex adversarial, plan 014 collision findings): multiple candidate
+// roots can share one line-based locationKey — a one-line `const x = (...) => ...` emits
+// both a VariableStatement and its inner ArrowFunction at the same file:start-end. The
+// collector renders only the max-nodes entry; an inner sibling's edge must NOT be
+// reported as the rendered node's similarity (it would mislabel a partial match as an
+// exact one) on EITHER endpoint.
+function aggregateNearest(
+  pairs: readonly MatchingPair[],
+  identicalGroups: ReadonlyMap<string, Entry[]>,
+  nearest: Map<string, NearestAccumulator>,
+): void {
+  // The rendered (canonical) entry per key, mirroring ClusterCollector EXACTLY
+  // (Clusters.ts:59): among edge endpoints sharing a key, the strictly-max-nodes one,
+  // ties broken first-seen in the SAME add order the collector uses (it walks the same
+  // pairs array, each pair contributing left then right). Tracked by Entry IDENTITY,
+  // not by node count: two distinct candidate roots can share a line-based key at equal
+  // node count (e.g. two statements on one physical line under --min-lines 1), and only
+  // the one the collector actually keeps may source the rendered location's nearest.
+  // Every entry that reaches a cluster is an edge endpoint, so this set is complete.
+  const canonicalByKey = new Map<string, Entry>();
+  const note = (entry: Entry): void => {
+    const key = locationKey(entry);
+    const seen = canonicalByKey.get(key);
+    if (seen === undefined || entry.nodes > seen.nodes) {
+      canonicalByKey.set(key, entry);
+    }
+  };
+  for (const [left, right] of pairs) {
+    note(left);
+    note(right);
+  }
+  const isCanonical = (entry: Entry): boolean => canonicalByKey.get(locationKey(entry)) === entry;
+
+  // Tier 1 — edges between two rendered locations. These describe the rendered-to-
+  // rendered similarity exactly, so they are always preferred.
+  for (const group of identicalGroups.values()) {
+    if (group.length > 1 && group[0].fingerprints.length > 0) {
+      updateIdenticalGroupNearest(group, nearest, isCanonical);
+    }
+  }
+  for (const [left, right, score, shared] of pairs) {
+    // Identical-group edges (score exactly 1) are handled in full by the group pass
+    // above; similarity edges are always < 1 (identical sets are filtered before the
+    // similarity walk), so this cleanly skips the duplicates.
+    if (score >= 1) {
+      continue;
+    }
+    if (!isCanonical(left) || !isCanonical(right)) {
+      continue;
+    }
+    const total = left.fingerprints.length + right.fingerprints.length - shared;
+    updateNearest(nearest, left, right, score, shared, total);
+    updateNearest(nearest, right, left, score, shared, total);
+  }
+
+  // Tier 2 — throw-safe fallback. A rendered owner whose ONLY edges go to non-rendered
+  // sub-nodes (e.g. it matches the inner body of a larger declaration but not the whole
+  // declaration) has no Tier-1 nearest. Give it the strongest owner-side edge; joinNearest
+  // resolves the counterpart to its rendered representative by key. This is the one place
+  // the reported score reflects an edge to a substructure of the pointed location — rare,
+  // and documented. The orphan key set is frozen before the loop so the running-max picks
+  // the strongest edge deterministically (not the first one seen).
+  const orphanKeys = new Set<string>();
+  for (const key of canonicalByKey.keys()) {
+    if (!nearest.has(key)) {
+      orphanKeys.add(key);
+    }
+  }
+  if (orphanKeys.size > 0) {
+    const isOrphan = (entry: Entry): boolean => isCanonical(entry) && orphanKeys.has(locationKey(entry));
+    for (const [left, right, score, shared] of pairs) {
+      const total = left.fingerprints.length + right.fingerprints.length - shared;
+      if (isOrphan(left)) {
+        updateNearest(nearest, left, right, score, shared, total);
+      }
+      if (isOrphan(right)) {
+        updateNearest(nearest, right, left, score, shared, total);
+      }
+    }
+  }
+}
+
+// A1: register each identical-group member's true nearest among ALL other group
+// members (not just the spanning-tree partners). Every pair is score 1 with
+// shared == total == fingerprint length, so the tie-break reduces to
+// compareLocations. Overlapping members never edge together, so they are skipped
+// as candidate counterparts (an overlapping pair is not a real co-located match).
+// Only rendered (canonical) members participate — a non-canonical inner sibling is
+// neither an owner (it is not rendered) nor a counterpart (its key renders the
+// canonical entry). Cost note: O(group²) per identical group (the running-max map
+// is O(locations) memory); real code keeps identical groups small, so the quadratic
+// walk is only noticeable on a synthetic all-identical corpus, and it is opt-in.
+function updateIdenticalGroupNearest(
+  group: readonly Entry[],
+  nearest: Map<string, NearestAccumulator>,
+  isCanonical: (entry: Entry) => boolean,
+): void {
+  for (const location of group) {
+    if (!isCanonical(location)) {
+      continue;
+    }
+    const len = location.fingerprints.length;
+    for (const counterpart of group) {
+      if (counterpart === location || overlaps(location, counterpart) || !isCanonical(counterpart)) {
+        continue;
+      }
+      updateNearest(nearest, location, counterpart, 1, len, len);
+    }
+  }
+}
+
+// Post-clusters() join: attach `nearest` to each canonical location by its key.
+// A join miss is a bug (every rendered location was unioned via ≥1 edge), so this
+// asserts presence rather than silently dropping (plan DD 4). `index` is resolved
+// against THIS cluster's locations array, which makes the intra-cluster invariant
+// self-enforcing.
+function joinNearest(cluster: Cluster, nearest: Map<string, NearestAccumulator>): Cluster {
+  const indexByKey = new Map<string, number>();
+  cluster.locations.forEach((location, index) => {
+    indexByKey.set(locationKey(location), index);
+  });
+  const locations = cluster.locations.map((location) => {
+    const accumulator = nearest.get(locationKey(location));
+    if (!accumulator) {
+      throw new Error(`nearest counterpart missing for ${locationKey(location)} (join miss — see plan 014)`);
+    }
+    const counterpartKey = locationKey(accumulator.counterpart);
+    const index = indexByKey.get(counterpartKey);
+    if (index === undefined) {
+      throw new Error(`nearest counterpart ${counterpartKey} is not a member of its own cluster`);
+    }
+    const nearestPayload: Nearest = {
+      index,
+      file: accumulator.counterpart.file,
+      startLine: accumulator.counterpart.startLine,
+      endLine: accumulator.counterpart.endLine,
+      shared: accumulator.shared,
+      total: accumulator.total,
+      score: accumulator.score,
+    };
+    return { ...location, nearest: nearestPayload };
+  });
+  return { ...cluster, locations };
+}
+
 function addIdenticalFingerprintPairs(group: readonly Entry[], pairs: MatchingPair[]): void {
   const components: Entry[][] = [];
   for (const entry of group) {
@@ -259,13 +471,17 @@ function addIdenticalFingerprintPairs(group: readonly Entry[], pairs: MatchingPa
       continue;
     }
 
+    // Identical fingerprints: shared == total == fingerprint length for the edge
+    // (both endpoints share the whole set). The per-location nearest for these
+    // groups is computed separately in updateIdenticalGroupNearest (A1).
+    const sharedLen = entry.fingerprints.length;
     const primary = connectors[0];
-    pairs.push([primary.entry, entry, 1]);
+    pairs.push([primary.entry, entry, 1, sharedLen]);
     components[primary.componentIndex].push(entry);
 
     for (let i = connectors.length - 1; i >= 1; i -= 1) {
       const connector = connectors[i];
-      pairs.push([connector.entry, entry, 1]);
+      pairs.push([connector.entry, entry, 1, sharedLen]);
       components[primary.componentIndex].push(...components[connector.componentIndex]);
       components.splice(connector.componentIndex, 1);
     }
@@ -371,11 +587,16 @@ function indexOf(sorted: Float64Array, value: number): number {
   return low;
 }
 
-function similarity(left: Entry, right: Entry): number {
+// The single similarity walk, now also surfacing the integer `shared` count so
+// --counterparts can report shared/total without a second pass. `score` is the
+// SAME float the threshold compared before (shared / (a+b-shared)) — the
+// arithmetic is unchanged, so the off-path borderline-pair decision is bit-
+// identical. See Step 1 / STOP conditions in plan 014.
+function similarity(left: Entry, right: Entry): { score: number; shared: number } {
   const a = left.fingerprints;
   const b = right.fingerprints;
   if (a.length === 0 && b.length === 0) {
-    return 0;
+    return { score: 0, shared: 0 };
   }
   let i = 0;
   let j = 0;
@@ -393,5 +614,5 @@ function similarity(left: Entry, right: Entry): number {
       j += 1;
     }
   }
-  return shared / (a.length + b.length - shared);
+  return { score: shared / (a.length + b.length - shared), shared };
 }

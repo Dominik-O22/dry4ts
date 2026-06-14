@@ -20,6 +20,7 @@ export interface OptionsInput {
   readonly exclude?: readonly string[];
   readonly excludeTaggedTemplates?: boolean;
   readonly excludeTests?: boolean;
+  readonly counterparts?: boolean;
 }
 
 export class Options {
@@ -42,6 +43,7 @@ export class Options {
     public readonly exclude: readonly string[] = [],
     public readonly excludeTaggedTemplates: boolean = false,
     public readonly excludeTests: boolean = false,
+    public readonly counterparts: boolean = false,
   ) {
     if (!(threshold > 0 && threshold <= 1)) {
       throw new Error(`threshold must be greater than 0 and at most 1, got ${threshold}`);
@@ -95,6 +97,7 @@ export class Options {
       input.exclude ?? [],
       input.excludeTaggedTemplates ?? defaults.excludeTaggedTemplates,
       input.excludeTests ?? defaults.excludeTests,
+      input.counterparts ?? defaults.counterparts,
     );
   }
 
@@ -117,6 +120,7 @@ export class Options {
     const exclude: string[] = [];
     let excludeTaggedTemplates = false;
     let excludeTests = false;
+    let counterparts = false;
 
     for (let i = 0; i < args.length; i += 1) {
       const arg = args[i];
@@ -163,6 +167,9 @@ export class Options {
           break;
         case "--exclude-tests":
           excludeTests = true;
+          break;
+        case "--counterparts":
+          counterparts = true;
           break;
         case "--exclude-kinds":
           for (const name of valueFor(args, ++i, arg).split(",")) {
@@ -223,6 +230,7 @@ export class Options {
       exclude,
       excludeTaggedTemplates,
       excludeTests,
+      counterparts,
     );
   }
 }

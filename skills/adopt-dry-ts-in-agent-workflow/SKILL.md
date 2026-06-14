@@ -4,7 +4,7 @@ description: >
   Run dry-ts after AI-generated edits to catch structural duplication before it accumulates. Load when building autonomous review loops, gating only on duplication an edit introduced with --changed/--changed-from, triaging duplicate clusters by status, using JSON output after generated changes, or deciding when local duplicate checks should become CI gates.
 type: core
 library: dry-ts
-library_version: "0.9.0"
+library_version: "0.10.0"
 sources:
   - "dry-ts:README.md"
   - "dry-ts:AGENTS.md"
@@ -40,6 +40,29 @@ those clusters (extract a shared helper) and re-run until it exits `0`. `--chang
 <file>` scopes the *whole file*, so a `new` finding can point at pre-existing code
 you copied; the wording is "intersects your change", never "you created this".
 This keeps the loop honest without a full-codebase zero-tolerance gate.
+
+### Route a `new` finding with nearest-counterpart provenance (`--counterparts`)
+
+```bash
+# Line-precise self-catch: which block did the edit re-implement, and how do I fix it?
+bunx dry-ts --counterparts --only-new --fail-on-duplicates --changed-from HEAD --json src test
+```
+
+`--counterparts` adds, per location, its nearest matching counterpart (`{ index,
+file, startLine, endLine, shared, total, score }`) and — under the active change
+scope — a per-location `changed` boolean. A cluster-level `status: "new"` alone
+does not say *which* location to edit; `changed` does, and the counterpart says
+*what it duplicates* and *how strongly* (`shared`/`total`, with `score =
+shared/total`). The `changed` flag on both sides routes the fix:
+
+- counterpart `changed: true` ⇒ **new/new** — the edit reimplemented itself within
+  its own diff; refactor the new code (highest-confidence, lowest-risk fix).
+- counterpart `changed: false` ⇒ **new/old** — the new code duplicates existing
+  code; extract toward the existing definition.
+
+The nearest is the absolute strongest partner and is always a member of the same
+cluster, so `index` always dereferences within that cluster's `locations` and
+`--only-new` never orphans it. Opt-in, default off; off-path output is unchanged.
 
 ### Cut framework boilerplate out of the loop
 

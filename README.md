@@ -12,6 +12,44 @@ score = shared fingerprints / all fingerprints seen in either candidate
 
 Names and literal values normalize away, while TypeScript syntax shape remains. Classes, interfaces, type aliases, enums, functions, methods, constructors, properties, variable statements, accessors, enum members, arrow functions, and function expressions can all become candidates.
 
+## How dry-ts differs from token and line matchers
+
+Most duplicate-code tools match **tokens** or **lines**. dry-ts matches
+**normalized AST structure**. The difference is which kind of clone each can see,
+in the standard Type 1–4 clone taxonomy:
+
+- **Type 1** — identical code, modulo whitespace and comments.
+- **Type 2** — Type 1 with renamed identifiers and changed literals; same structure.
+- **Type 3** — near-miss: statements added, removed, or reordered.
+- **Type 4** — semantically equivalent but structurally different.
+
+| Tool | Method | Catches |
+| --- | --- | --- |
+| Simian | line hashing (ignores whitespace, braces, comments) | mostly Type 1 |
+| jscpd | contiguous token-sequence matching (Rabin–Karp over Prism tokens) | Type 1 |
+| PMD CPD | contiguous token-sequence matching (Rabin–Karp / suffix tree); can normalize identifiers and literals | Type 1, Type 2 |
+| **dry-ts** | **set similarity over normalized-AST fingerprints (Jaccard)** | **Type 2 and Type 3** |
+
+Two properties follow from comparing *sets* of structural fingerprints instead of
+contiguous token runs:
+
+1. **Rename- and reorder-tolerant.** Names and literals normalize away before
+   fingerprinting, and Jaccard scores *partial* overlap, so two blocks with the
+   same shape but added, removed, or reordered statements still score high. Token-
+   and line-sequence matchers need a contiguous run, so a single insertion splits
+   the match. (PMD CPD's `ignore-identifiers` / `ignore-literals` reach Type 2, but
+   still match contiguous token sequences — not fuzzy structural overlap.)
+2. **Graded, not binary.** The output is a similarity score (default ≥ 0.82), not
+   "≥ N identical tokens" — you tune by structural similarity, not run length.
+
+dry-ts does **not** target Type 4 (semantic) clones; it compares structure, not
+behavior. What it adds over token/line matchers is the Type-2/Type-3 middle:
+same shape, different names, slight variations. That is exactly the class an LLM
+produces when it reimplements existing structure — and dry-ts is built for
+**agents as the primary consumer** of its output (catching their own
+reimplementations, or gating others' in CI), not for humans reading copy-paste
+reports.
+
 ## Usage
 
 Run without installing after the package is published:
@@ -82,6 +120,14 @@ Options:
                 literal (const X = styled(Button)`…`, css`…`, gql`…`). Opt-in,
                 default off. Suppresses CSS-in-JS / styled-components clusters,
                 a dominant false-positive class on frontend codebases.
+--counterparts  Add, per cluster location, its nearest matching counterpart
+                ({index, file, startLine, endLine, shared, total, score}) and —
+                under an active change scope (--changed-from/--changed) — a
+                per-location "changed" boolean. The nearest is the absolute
+                strongest AST-similar partner in the same cluster (intra-cluster
+                reference, so --only-new never orphans it). Opt-in, default off;
+                off-path output is byte-for-byte unchanged. Note: --only-new
+                filters whole clusters, never individual locations or counterparts.
 ```
 
 Valid `--exclude-kinds` names are the candidate root kinds — the TypeScript AST
@@ -353,6 +399,102 @@ an unreadable source file, or zero files scanned under `--fail-on-duplicates` al
 exit 2 with a message — never a silent green or a 1 that reads as "findings".
 
 The JSON shape is intentionally small and stable: `{ "clusters": ClusterReport[] }`. Each cluster includes a `score` range, a `status` (`"new" | "known" | "unscoped"`), `locationCount`, and grouped `locations`. Each location includes `nodes` (the normalized syntax node count for that duplicated block), `kind` (the candidate root SyntaxKind name), and `name` (the declaration identifier, or `null` when anonymous). `kind` and `name` let an agent triage a finding — e.g. skip a `Constructor` in a `*.spec.ts` as dependency-injection boilerplate — without a second read of the source.
+
+### Nearest-counterpart provenance: `--counterparts`
+
+A cluster's `score` range and member list do not say, for a given location,
+*which* member it actually matches and *how strongly* — in a transitive cluster
+(>2 members) the range hides the edge structure. `--counterparts` adds that
+missing payload: per location, its nearest matching counterpart (the absolute
+strongest AST-similar partner in the same cluster) as `{ index, file, startLine,
+endLine, shared, total, score }`, plus — under an active change scope — a
+per-location `changed` boolean. `index` is the counterpart's position in the same
+cluster's `locations` array (an O(1) deref); `file`/`startLine`/`endLine` are the
+self-contained reference; `shared`/`total` are the exact pairwise
+fingerprint-intersection and union counts; `score` is `shared / total`, the same
+similarity value the cluster reports, so you never recompute a float.
+
+```json
+{
+  "clusters": [
+    {
+      "score": { "min": 0.8205128205128205, "max": 1 },
+      "status": "new",
+      "locationCount": 3,
+      "locations": [
+        {
+          "file": "new_a.ts", "startLine": 1, "endLine": 4, "nodes": 41,
+          "kind": "FunctionDeclaration", "name": "summarizeRows",
+          "nearest": {
+            "index": 2, "file": "old.ts", "startLine": 1, "endLine": 4,
+            "shared": 34, "total": 34, "score": 1
+          },
+          "changed": true
+        },
+        {
+          "file": "new_b.ts", "startLine": 1, "endLine": 5, "nodes": 46,
+          "kind": "FunctionDeclaration", "name": "reduceEntries",
+          "nearest": {
+            "index": 0, "file": "new_a.ts", "startLine": 1, "endLine": 4,
+            "shared": 32, "total": 39, "score": 0.8205128205128205
+          },
+          "changed": true
+        },
+        {
+          "file": "old.ts", "startLine": 1, "endLine": 4, "nodes": 41,
+          "kind": "FunctionDeclaration", "name": "normalizeRecord",
+          "nearest": {
+            "index": 0, "file": "new_a.ts", "startLine": 1, "endLine": 4,
+            "shared": 34, "total": 34, "score": 1
+          },
+          "changed": false
+        }
+      ]
+    }
+  ]
+}
+```
+
+Reading this: `new_a` re-implements `old` exactly (`score 1`, a tight pair),
+while `new_b` chains in more loosely (`shared 32/39`, `score 0.82`). The
+`changed` flag on both sides tells an agent how to route the fix:
+
+- counterpart `changed: true` ⇒ **new/new** — the agent reimplemented itself
+  within its own diff; refactor the new code (highest-confidence, lowest-risk fix,
+  nothing stable depends on it yet).
+- counterpart `changed: false` ⇒ **new/old** — the new code duplicates existing
+  code; extract toward the existing definition.
+
+The nearest is always a member of the *same* cluster, so the `index` always
+dereferences within that cluster's `locations`, and `--only-new` (which filters
+whole clusters, never individual locations or counterparts) never orphans it.
+The reported `score`/`shared`/`total` describe the edge between the two **rendered**
+locations. (One rare exception: when a location's only structural match is to a
+substructure *inside* a larger member — e.g. it matches another declaration's inner
+body but not the whole declaration — the counterpart resolves to that enclosing
+rendered member, and the score reflects the substructure edge.)
+
+The **full payload** (`index` + `score` included) lives in `json` and `edn`. The
+`text` format keeps one scannable line per location and appends an **abbreviated**
+counterpart — `→ nearest <file>:<start>-<end> (<shared>/<total>)` — without `index`
+or `score`; read `--format json`/`edn` when an agent needs those fields.
+
+Copy-paste recipes:
+
+```bash
+# Self-catch: did the block I just wrote re-implement existing structure?
+dry-ts --counterparts --json --changed src/foo.ts src test
+
+# Line-precise self-catch against the last commit, gated.
+dry-ts --counterparts --only-new --fail-on-duplicates --changed-from HEAD src test
+
+# CI fixer: gate a PR and hand a reviewer/fixer agent the routed JSON.
+dry-ts --counterparts --only-new --fail-on-duplicates --changed-from origin/main --json src test
+```
+
+On a finding, exit `1` still emits the parseable JSON above on stdout — read it.
+Exit `2` is an infra/config failure (see the exit-code table) and must **not** be
+read as duplicate findings.
 
 ## Publishing
 

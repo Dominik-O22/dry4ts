@@ -6,7 +6,7 @@ import { candidateKindNames } from "./FileScanner.js";
 import { GitProvider } from "./GitProvider.js";
 import { Options } from "./Options.js";
 import { TypeScriptDuplicateFinder } from "./TypeScriptDuplicateFinder.js";
-import type { Cluster, ClusterLocation, ClusterReport, ClusterStatus, Location } from "./types.js";
+import type { Cluster, ClusterLocation, ClusterReport, ClusterStatus, Location, Nearest } from "./types.js";
 
 // Wrap a comma-joined list to fit under the usage column.
 function wrapKinds(names: readonly string[], indent: string, width: number): string[] {
@@ -67,6 +67,11 @@ export const USAGE = [
   "                  composes with it. Opt-in, default off. (Excludes tests for a",
   "                  focused src scan — not because test duplication never matters;",
   "                  test-infra dup is still worth a dedicated run.)",
+  "  --counterparts  Add each location's nearest matching counterpart (file,",
+  "                  line range, index, shared/total, score) and — under an",
+  "                  active change scope — a per-location changed flag. Opt-in,",
+  "                  default off; off-path output is byte-identical. --only-new",
+  "                  filters clusters, not locations or counterparts.",
   "  --exclude-tagged-templates",
   "                  Drop candidate declarations whose value is a tagged template",
   "                  literal, e.g. `const X = styled(Button)`…`` / `css`…`` /",
@@ -115,9 +120,18 @@ function run(options: Options): void {
     console.error(scope ? scope.regions.describe() : "  (no changed scope active)");
   }
 
+  // Per-location `changed` is added only under --counterparts AND an active
+  // scope (GATE C/C1). Without it the default path and existing
+  // --changed-without-counterparts output stay byte-identical: no `changed`
+  // own-property is created. It is a run-layer concern — run owns the scope —
+  // computed from the SAME intersection statusFor uses, but per location.
   const reported: Cluster[] = clusters.map((cluster) => ({
     ...cluster,
     status: scope ? statusFor(cluster, scope) : "unscoped",
+    locations:
+      scope && options.counterparts
+        ? cluster.locations.map((location) => ({ ...location, changed: locationChanged(location, scope) }))
+        : cluster.locations,
   }));
 
   // --only-new scopes the OUTPUT only; the exit code below still considers the
@@ -220,10 +234,18 @@ function listedScope(options: Options, files: readonly string[]): ChangedScope {
 }
 
 function statusFor(cluster: Cluster, scope: ChangedScope): ClusterStatus {
-  const intersects = cluster.locations.some((location) =>
-    scope.regions.intersectsLocation(canonicalPath(scope.root, location.file), location.startLine, location.endLine),
-  );
+  const intersects = cluster.locations.some((location) => locationChanged(location, scope));
   return intersects ? "new" : "known";
+}
+
+// Per-location changed-scope membership — the same intersection statusFor reduces
+// over the whole cluster, applied to one location (plan 014 Step 4.5).
+function locationChanged(location: ClusterLocation, scope: ChangedScope): boolean {
+  return scope.regions.intersectsLocation(
+    canonicalPath(scope.root, location.file),
+    location.startLine,
+    location.endLine,
+  );
 }
 
 function statusOf(cluster: Cluster): ClusterStatus {
@@ -278,13 +300,26 @@ export function toJson(clusters: readonly Cluster[]): string {
   return `${JSON.stringify({ clusters: reports }, null, 2)}\n`;
 }
 
+// Built by appending each optional field group independently — never nested
+// inside the kind branch — so :changed and :nearest survive for synthetic/API
+// locations that carry no :kind (plan Step 5, Codex DX).
 function locationEdn(location: ClusterLocation): string {
-  const base = `{:file "${escapeEdn(location.file)}", :start-line ${location.startLine}, :end-line ${location.endLine}, :nodes ${location.nodes}`;
-  if (location.kind === undefined) {
-    return `${base}}`;
+  let fields = `{:file "${escapeEdn(location.file)}", :start-line ${location.startLine}, :end-line ${location.endLine}, :nodes ${location.nodes}`;
+  if (location.kind !== undefined) {
+    const name = location.name == null ? "nil" : `"${escapeEdn(location.name)}"`;
+    fields += `, :kind "${escapeEdn(location.kind)}", :name ${name}`;
   }
-  const name = location.name == null ? "nil" : `"${escapeEdn(location.name)}"`;
-  return `${base}, :kind "${escapeEdn(location.kind)}", :name ${name}}`;
+  if (location.changed !== undefined) {
+    fields += `, :changed ${location.changed}`;
+  }
+  if (location.nearest !== undefined) {
+    fields += `, :nearest ${nearestEdn(location.nearest)}`;
+  }
+  return `${fields}}`;
+}
+
+function nearestEdn(nearest: Nearest): string {
+  return `{:index ${nearest.index} :file "${escapeEdn(nearest.file)}" :start-line ${nearest.startLine} :end-line ${nearest.endLine} :shared ${nearest.shared} :total ${nearest.total} :score ${nearest.score}}`;
 }
 
 function escapeEdn(text: string): string {
@@ -302,7 +337,22 @@ function lineRange(location: Location): string {
 }
 
 function clusterLineRange(location: ClusterLocation): string {
-  return `${lineRange(location)} nodes=${location.nodes}${kindSuffix(location)}`;
+  return `${lineRange(location)} nodes=${location.nodes}${kindSuffix(location)}${changedSuffix(location)}${nearestSuffix(location)}`;
+}
+
+// One line per location stays one line: changed and the counterpart append to the
+// location's own line, never a sub-line (plan Step 5, DX). Both omit cleanly when
+// their value is undefined.
+function changedSuffix(location: ClusterLocation): string {
+  return location.changed === undefined ? "" : ` changed=${location.changed}`;
+}
+
+function nearestSuffix(location: ClusterLocation): string {
+  const nearest = location.nearest;
+  if (nearest === undefined) {
+    return "";
+  }
+  return ` → nearest ${nearest.file}:${nearest.startLine}-${nearest.endLine} (${nearest.shared}/${nearest.total})`;
 }
 
 // Appends the diagnostic facts the scanner attaches (kind, and name when the
