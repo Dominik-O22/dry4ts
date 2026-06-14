@@ -119,8 +119,5 @@ function run(command, commandArgs) {
 }
 
 function removeDir(dir) {
-  const result = spawnSync("rm", ["-rf", dir], { stdio: "inherit" });
-  if (result.status !== 0) {
-    process.exit(result.status ?? 1);
-  }
+  fs.rmSync(dir, { recursive: true, force: true });
 }

@@ -70,12 +70,33 @@ Options:
                 An unknown or non-candidate kind name is a hard error.
 ```
 
-Valid `--exclude-kinds` names (the candidate root kinds): `ClassDeclaration`,
-`InterfaceDeclaration`, `TypeAliasDeclaration`, `EnumDeclaration`,
-`ModuleDeclaration`, `FunctionDeclaration`, `MethodDeclaration`, `Constructor`,
-`GetAccessor`, `SetAccessor`, `PropertyDeclaration`, `PropertySignature`,
-`MethodSignature`, `CallSignature`, `ConstructSignature`, `IndexSignature`,
-`VariableStatement`, `EnumMember`, `ArrowFunction`, `FunctionExpression`.
+Valid `--exclude-kinds` names are the candidate root kinds — the TypeScript AST
+node types dry-ts treats as comparable units. The names are TypeScript
+`SyntaxKind`s; what each one is in plain terms:
+
+| Name | What it is |
+| --- | --- |
+| `ClassDeclaration` | a `class Foo {}` declaration |
+| `InterfaceDeclaration` | an `interface Foo {}` declaration |
+| `TypeAliasDeclaration` | a `type Foo = ...` alias |
+| `EnumDeclaration` | an `enum Foo {}` declaration |
+| `ModuleDeclaration` | a `namespace Foo {}` / `module Foo {}` block |
+| `FunctionDeclaration` | a `function foo() {}` declaration |
+| `MethodDeclaration` | a method body in a class or object literal: `foo() {}` |
+| `Constructor` | a class `constructor() {}` |
+| `GetAccessor` | a getter: `get foo() {}` |
+| `SetAccessor` | a setter: `set foo(v) {}` |
+| `PropertyDeclaration` | a class field: `foo = ...` / `foo: T` |
+| `PropertySignature` | a property in an interface/type: `foo: T` |
+| `MethodSignature` | a method signature in an interface/type: `foo(): T` |
+| `CallSignature` | a callable signature in a type: `(arg: T): U` |
+| `ConstructSignature` | a constructable signature in a type: `new (): T` |
+| `IndexSignature` | an index signature: `[key: string]: T` |
+| `VariableStatement` | a `const` / `let` / `var` statement (the whole declaration line) |
+| `EnumMember` | a single member inside an enum |
+| `ArrowFunction` | an arrow function used as a value: `() => {}` |
+| `FunctionExpression` | a `function () {}` used as a value |
+
 Excluding a kind never hides a longer child candidate — children are always
 visited regardless.
 
@@ -257,8 +278,10 @@ Three corpus tiers, all scanned with `bun run bench -- <paths>`:
 2. **Pinned large repositories** — `bun run bench:setup` fetches two pinned
    real-world corpora into `.bench/` (gitignored). Pass a name
    (`bun run bench:setup sentry`) to fetch just one.
-   - `microsoft/TypeScript` at the tag matching the installed `typescript`
-     dependency. Scan `.bench/TypeScript/src/compiler` for a worst-case stress:
+   - `microsoft/TypeScript` at a statically pinned tag (`v5.9.3`, chosen by
+     maintainers to match the current `typescript` dependency — bumped by hand,
+     not resolved automatically). Scan `.bench/TypeScript/src/compiler` for a
+     worst-case stress:
      very large files, deeply nested ASTs, and high structural self-similarity.
      Already pushed quite low (~1.5s), so it has little regression headroom.
    - `getsentry/sentry` (sparse blobless clone of `static/app` only). Scan

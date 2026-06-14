@@ -1938,3 +1938,11 @@ test("--exclude-kinds parses comma-separated and repeated values", () => {
   const options = Options.parse("--exclude-kinds", "Constructor,PropertySignature", "--exclude-kinds", "MethodSignature");
   assert.deepEqual(options.excludeKinds, ["Constructor", "PropertySignature", "MethodSignature"]);
 });
+
+test("--exclude-kinds accepts the canonical VariableStatement name, not the TS marker alias", () => {
+  // ts.SyntaxKind[VariableStatement] reverse-maps to the marker alias
+  // "FirstStatement"; users type the canonical name, which must be accepted and
+  // the alias rejected.
+  assert.doesNotThrow(() => Options.parse("--exclude-kinds", "VariableStatement"));
+  assert.throws(() => Options.parse("--exclude-kinds", "FirstStatement"), /Unknown candidate kind: FirstStatement/);
+});

@@ -122,40 +122,51 @@ function sortedUnique(hashes: readonly number[], start: number): Float64Array {
   return sorted.slice(0, writeIndex);
 }
 
-const candidateRootKinds = new Set<ts.SyntaxKind>([
-  ts.SyntaxKind.ClassDeclaration,
-  ts.SyntaxKind.InterfaceDeclaration,
-  ts.SyntaxKind.TypeAliasDeclaration,
-  ts.SyntaxKind.EnumDeclaration,
-  ts.SyntaxKind.ModuleDeclaration,
-  ts.SyntaxKind.FunctionDeclaration,
-  ts.SyntaxKind.MethodDeclaration,
-  ts.SyntaxKind.Constructor,
-  ts.SyntaxKind.GetAccessor,
-  ts.SyntaxKind.SetAccessor,
-  ts.SyntaxKind.PropertyDeclaration,
-  ts.SyntaxKind.PropertySignature,
-  ts.SyntaxKind.MethodSignature,
-  ts.SyntaxKind.CallSignature,
-  ts.SyntaxKind.ConstructSignature,
-  ts.SyntaxKind.IndexSignature,
-  ts.SyntaxKind.VariableStatement,
-  ts.SyntaxKind.EnumMember,
-  ts.SyntaxKind.ArrowFunction,
-  ts.SyntaxKind.FunctionExpression,
-]);
+// Single source of truth for the candidate root kinds: the declaration shapes
+// dry-ts treats as comparable units. Each entry carries the canonical name a
+// user types for --exclude-kinds plus a plain-English blurb for the help/README
+// docs. The name is spelled out explicitly rather than derived from
+// ts.SyntaxKind[kind]: TS reverse-enum lookup returns the marker alias for
+// boundary kinds (e.g. ts.SyntaxKind[VariableStatement] is "FirstStatement"),
+// which is not the name users expect or that the docs advertise. Order here is
+// the order shown to users.
+const candidateKinds: readonly { name: string; kind: ts.SyntaxKind; blurb: string }[] = [
+  { name: "ClassDeclaration", kind: ts.SyntaxKind.ClassDeclaration, blurb: "a `class Foo {}` declaration" },
+  { name: "InterfaceDeclaration", kind: ts.SyntaxKind.InterfaceDeclaration, blurb: "an `interface Foo {}` declaration" },
+  { name: "TypeAliasDeclaration", kind: ts.SyntaxKind.TypeAliasDeclaration, blurb: "a `type Foo = ...` alias" },
+  { name: "EnumDeclaration", kind: ts.SyntaxKind.EnumDeclaration, blurb: "an `enum Foo {}` declaration" },
+  { name: "ModuleDeclaration", kind: ts.SyntaxKind.ModuleDeclaration, blurb: "a `namespace Foo {}` / `module Foo {}` block" },
+  { name: "FunctionDeclaration", kind: ts.SyntaxKind.FunctionDeclaration, blurb: "a `function foo() {}` declaration" },
+  { name: "MethodDeclaration", kind: ts.SyntaxKind.MethodDeclaration, blurb: "a method body in a class or object literal: `foo() {}`" },
+  { name: "Constructor", kind: ts.SyntaxKind.Constructor, blurb: "a class `constructor() {}`" },
+  { name: "GetAccessor", kind: ts.SyntaxKind.GetAccessor, blurb: "a getter: `get foo() {}`" },
+  { name: "SetAccessor", kind: ts.SyntaxKind.SetAccessor, blurb: "a setter: `set foo(v) {}`" },
+  { name: "PropertyDeclaration", kind: ts.SyntaxKind.PropertyDeclaration, blurb: "a class field: `foo = ...` / `foo: T`" },
+  { name: "PropertySignature", kind: ts.SyntaxKind.PropertySignature, blurb: "a property in an interface/type: `foo: T`" },
+  { name: "MethodSignature", kind: ts.SyntaxKind.MethodSignature, blurb: "a method signature in an interface/type: `foo(): T`" },
+  { name: "CallSignature", kind: ts.SyntaxKind.CallSignature, blurb: "a callable signature in a type: `(arg: T): U`" },
+  { name: "ConstructSignature", kind: ts.SyntaxKind.ConstructSignature, blurb: "a constructable signature in a type: `new (): T`" },
+  { name: "IndexSignature", kind: ts.SyntaxKind.IndexSignature, blurb: "an index signature: `[key: string]: T`" },
+  { name: "VariableStatement", kind: ts.SyntaxKind.VariableStatement, blurb: "a `const` / `let` / `var` statement (the whole declaration line)" },
+  { name: "EnumMember", kind: ts.SyntaxKind.EnumMember, blurb: "a single member inside an enum" },
+  { name: "ArrowFunction", kind: ts.SyntaxKind.ArrowFunction, blurb: "an arrow function used as a value: `() => {}`" },
+  { name: "FunctionExpression", kind: ts.SyntaxKind.FunctionExpression, blurb: "a `function () {}` used as a value" },
+];
+
+const candidateRootKinds = new Set<ts.SyntaxKind>(candidateKinds.map((entry) => entry.kind));
 
 const EMPTY_KIND_SET: ReadonlySet<ts.SyntaxKind> = new Set();
 
-// Maps every excludable name to its SyntaxKind. Derived from candidateRootKinds
-// so the two can never drift: only kinds actually promoted to candidate roots
-// are excludable.
+// Derived from candidateKinds so the two can never drift.
 const candidateKindByName = new Map<string, ts.SyntaxKind>(
-  [...candidateRootKinds].map((kind) => [ts.SyntaxKind[kind], kind]),
+  candidateKinds.map((entry) => [entry.name, entry.kind]),
 );
 
-// The names a user may pass to --exclude-kinds, in declaration order.
-export const candidateKindNames: readonly string[] = [...candidateKindByName.keys()];
+export const candidateKindNames: readonly string[] = candidateKinds.map((entry) => entry.name);
+
+// For help and README docs.
+export const candidateKindDescriptions: readonly { name: string; blurb: string }[] =
+  candidateKinds.map(({ name, blurb }) => ({ name, blurb }));
 
 // Resolves --exclude-kinds names to SyntaxKinds, validating each against the
 // candidate set. An unknown or non-candidate name throws rather than silently

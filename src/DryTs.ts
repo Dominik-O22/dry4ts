@@ -2,10 +2,31 @@ import fs from "node:fs";
 
 import { canonicalPath, ChangedRegions, parseUnifiedDiff } from "./ChangedRegions.js";
 import { maxScore, minScore } from "./Clusters.js";
+import { candidateKindNames } from "./FileScanner.js";
 import { GitProvider } from "./GitProvider.js";
 import { Options } from "./Options.js";
 import { TypeScriptDuplicateFinder } from "./TypeScriptDuplicateFinder.js";
 import type { Cluster, ClusterLocation, ClusterReport, ClusterStatus, Location } from "./types.js";
+
+// Wrap a comma-joined list to fit under the usage column.
+function wrapKinds(names: readonly string[], indent: string, width: number): string[] {
+  const lines: string[] = [];
+  let current = `${indent}Valid kinds: `;
+  for (const [index, name] of names.entries()) {
+    const token = index < names.length - 1 ? `${name},` : name;
+    const candidate = current.trimEnd() === indent.trimEnd() || current.endsWith(": ")
+      ? current + token
+      : `${current} ${token}`;
+    if (candidate.length > width && current.trim() !== "") {
+      lines.push(current.trimEnd());
+      current = `${indent}${token}`;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current.trim() !== "") lines.push(current.trimEnd());
+  return lines;
+}
 
 export const USAGE = [
   "Usage: dry-ts [options] [file-or-directory ...]",
@@ -37,13 +58,7 @@ export const USAGE = [
   "  --exclude-kinds KIND[,KIND...]",
   "                  Drop candidate declarations of these SyntaxKinds; comma-",
   "                  separated, repeatable. Opt-in only (no default exclusions).",
-  "                  Valid kinds: ClassDeclaration, InterfaceDeclaration,",
-  "                  TypeAliasDeclaration, EnumDeclaration, ModuleDeclaration,",
-  "                  FunctionDeclaration, MethodDeclaration, Constructor,",
-  "                  GetAccessor, SetAccessor, PropertyDeclaration,",
-  "                  PropertySignature, MethodSignature, CallSignature,",
-  "                  ConstructSignature, IndexSignature, VariableStatement,",
-  "                  EnumMember, ArrowFunction, FunctionExpression",
+  ...wrapKinds(candidateKindNames, "                  ", 76),
 ].join("\n");
 
 export function main(args: readonly string[] = process.argv.slice(2)): void {
