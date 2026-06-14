@@ -255,6 +255,12 @@ test("PROFILE_NAMES lists the available presets", () => {
   assert.deepEqual([...PROFILE_NAMES].sort(), ["audit", "pr", "src", "tests"]);
 });
 
+test("--help short-circuits profile validation (a bad profile never masks --help)", () => {
+  // `dry-ts --help --profile bogus` should print usage, not fail on the typo.
+  const options = Options.parse("--help", "--profile", "bogus");
+  assert.equal(options.help, true);
+});
+
 test("creates options from partial objects", () => {
   const options = Options.from({ paths: ["lib"], format: "json", failOnDuplicates: true });
 
