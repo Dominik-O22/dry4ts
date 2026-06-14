@@ -37,6 +37,15 @@ console.log(clusters);
 
 ## Core Patterns
 
+### Start from a profile (`--profile`)
+
+```bash
+# PR gate — the recommended workflow. Requires --changed-from.
+bunx dry-ts --profile pr --changed-from origin/main src
+```
+
+`--profile NAME` seeds a curated flag bundle; explicit flags override it (precedence: explicit flag > profile > default; list flags like `--exclude-kinds` union). Profiles: `pr` (PR gate — `--exclude-tests --min-nodes 50 --exclude-kinds ArrowFunction,VariableStatement --only-new --fail-on-duplicates`; needs `--changed-from`), `src` (source-only, `--exclude-tests`), `audit` (broad, `--min-nodes 12`), `tests` (test-infra dup, `--exclude-kinds ArrowFunction --min-nodes 40`). Prefer a profile over hand-assembling flags.
+
 ### Scan changed source and tests
 
 ```bash

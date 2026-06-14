@@ -1,6 +1,54 @@
 import { resolveExcludeKinds } from "./FileScanner.js";
 import type { OutputFormat } from "./types.js";
 
+// Curated flag bundles for `--profile NAME`. A profile only ever *sets* options
+// (turns features on, raises a floor, adds a kind exclusion) — there is no
+// negation flag to turn one back off — so each profile stays at the high-signal
+// defaults its name implies. Resolution precedence is explicit CLI flag >
+// profile > built-in default; list flags (`excludeKinds`) union the profile's
+// entries with the user's rather than replacing them.
+interface ProfileFlags {
+  readonly excludeTests?: boolean;
+  readonly minNodes?: number;
+  readonly excludeKinds?: readonly string[];
+  readonly onlyNew?: boolean;
+  readonly failOnDuplicates?: boolean;
+}
+
+const PROFILES: Record<string, ProfileFlags> = {
+  // PR gate, highest signal. Deliberately requires an explicit --changed-from /
+  // --changed: `onlyNew` without an active scope is a hard error in the Options
+  // constructor, so `--profile pr` alone fails loud rather than silently gating
+  // against the wrong base.
+  pr: {
+    excludeTests: true,
+    minNodes: 50,
+    excludeKinds: ["ArrowFunction", "VariableStatement"],
+    onlyNew: true,
+    failOnDuplicates: true,
+  },
+  // Source-only sane defaults: drop test scaffolding, keep the standard floors.
+  src: { excludeTests: true },
+  // Broad exploratory scan: lower the size floor to surface near-misses the
+  // default would filter out; exclude nothing.
+  audit: { minNodes: 12 },
+  // Test-INFRASTRUCTURE duplication, explicitly not normal test bodies: drop
+  // anonymous arrow bodies (the dominant test-scan noise) and raise the floor.
+  // Point it at your test directories.
+  tests: { excludeKinds: ["ArrowFunction"], minNodes: 40 },
+};
+
+// The profile names a user can pass, for validation and help/docs.
+export const PROFILE_NAMES: readonly string[] = Object.keys(PROFILES);
+
+function resolveProfile(name: string): ProfileFlags {
+  const profile = PROFILES[name];
+  if (profile === undefined) {
+    throw new Error(`Unknown profile: ${name} (valid: ${PROFILE_NAMES.join(", ")})`);
+  }
+  return profile;
+}
+
 export interface OptionsInput {
   readonly paths?: readonly string[];
   readonly threshold?: number;
@@ -103,28 +151,35 @@ export class Options {
 
   static parse(...args: string[]): Options {
     const paths: string[] = [];
-    let threshold = 0.82;
-    let minLines = 4;
-    let minNodes = 20;
-    let minLocations = 2;
-    let format: OutputFormat = "text";
-    let help = false;
-    let failOnDuplicates = false;
-    let respectGitignore = true;
-    let changedFrom: string | undefined;
     const changed: string[] = [];
-    let explainChanged = false;
-    let onlyNew = false;
     const excludeKinds: string[] = [];
-    let minDistinctKinds = 0;
     const exclude: string[] = [];
-    let excludeTaggedTemplates = false;
-    let excludeTests = false;
-    let counterparts = false;
+    // Scalars start undefined so resolution can tell "user set this" from "left
+    // at the default" — the distinction `--profile` precedence needs (explicit >
+    // profile > default). Arrays accumulate; an empty array means "not set".
+    let profileName: string | undefined;
+    let threshold: number | undefined;
+    let minLines: number | undefined;
+    let minNodes: number | undefined;
+    let minLocations: number | undefined;
+    let format: OutputFormat | undefined;
+    let help: boolean | undefined;
+    let failOnDuplicates: boolean | undefined;
+    let respectGitignore: boolean | undefined;
+    let changedFrom: string | undefined;
+    let explainChanged: boolean | undefined;
+    let onlyNew: boolean | undefined;
+    let minDistinctKinds: number | undefined;
+    let excludeTaggedTemplates: boolean | undefined;
+    let excludeTests: boolean | undefined;
+    let counterparts: boolean | undefined;
 
     for (let i = 0; i < args.length; i += 1) {
       const arg = args[i];
       switch (arg) {
+        case "--profile":
+          profileName = valueFor(args, ++i, arg);
+          break;
         case "--threshold":
           threshold = numberValue(args, ++i, arg);
           break;
@@ -208,31 +263,57 @@ export class Options {
       }
     }
 
-    if (paths.length === 0) {
-      paths.push("src");
-    }
+    // `--help` short-circuits before any profile resolution so `dry-ts --help`
+    // never fails on an unrelated profile typo; the resolved Options below are
+    // unused when help is set (main() prints USAGE and returns).
+    const profile = help || profileName === undefined ? {} : resolveProfile(profileName);
+
     return new Options(
-      paths,
-      threshold,
-      minLines,
-      minNodes,
-      format,
-      help,
-      failOnDuplicates,
-      respectGitignore,
-      minLocations,
+      paths.length > 0 ? paths : ["src"],
+      pick(threshold, undefined, 0.82),
+      pick(minLines, undefined, 4),
+      pick(minNodes, profile.minNodes, 20),
+      pick(format, undefined, "text"),
+      help ?? false,
+      pick(failOnDuplicates, profile.failOnDuplicates, false),
+      pick(respectGitignore, undefined, true),
+      pick(minLocations, undefined, 2),
       changedFrom,
       changed,
-      explainChanged,
-      onlyNew,
-      excludeKinds,
-      minDistinctKinds,
+      explainChanged ?? false,
+      pick(onlyNew, profile.onlyNew, false),
+      unionLists(profile.excludeKinds, excludeKinds),
+      pick(minDistinctKinds, undefined, 0),
       exclude,
-      excludeTaggedTemplates,
-      excludeTests,
-      counterparts,
+      pick(excludeTaggedTemplates, undefined, false),
+      pick(excludeTests, profile.excludeTests, false),
+      pick(counterparts, undefined, false),
     );
   }
+}
+
+// Resolution precedence for a scalar option: an explicit CLI value wins, then
+// the active profile's value, then the built-in default.
+function pick<T>(explicit: T | undefined, fromProfile: T | undefined, fallback: T): T {
+  return explicit ?? fromProfile ?? fallback;
+}
+
+// List flags union the profile's entries with the user's (deduped, profile
+// first) rather than letting either replace the other — adding `--exclude-kinds`
+// on top of a profile augments it, it does not discard the profile's kinds.
+function unionLists(fromProfile: readonly string[] | undefined, explicit: readonly string[]): string[] {
+  if (fromProfile === undefined || fromProfile.length === 0) {
+    return [...explicit];
+  }
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of [...fromProfile, ...explicit]) {
+    if (!seen.has(value)) {
+      seen.add(value);
+      result.push(value);
+    }
+  }
+  return result;
 }
 
 function valueFor(args: readonly string[], index: number, option: string): string {
