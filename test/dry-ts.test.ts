@@ -10,6 +10,7 @@ import {
   formatCluster,
   main,
   Options,
+  type OptionsInput,
   printText,
   toEdn,
   toJson,
@@ -634,6 +635,79 @@ function scanFromCwd(projectDir: string) {
     process.chdir(originalCwd);
   }
 }
+
+// --- --exclude <glob> (plan: path filter for test/boilerplate files) -------
+
+// Two duplicate sources, one in a .spec.ts twin, so an --exclude glob can drop
+// the test-file copy while keeping the real one. Files share duplicateBody so
+// they cluster at the loose scan threshold used by the gitignore tests.
+async function excludeFixture(): Promise<string> {
+  const projectDir = await mkdtemp(path.join(tmpdir(), "dry-ts-exclude-"));
+  await writeFile(path.join(projectDir, "a.ts"), duplicateBody);
+  await writeFile(path.join(projectDir, "b.ts"), duplicateBody);
+  await writeFile(path.join(projectDir, "a.spec.ts"), duplicateBody);
+  return projectDir;
+}
+
+function scanWith(projectDir: string, input: OptionsInput) {
+  const originalCwd = process.cwd();
+  try {
+    process.chdir(projectDir);
+    return new TypeScriptDuplicateFinder().findClusters({
+      paths: ["."],
+      threshold: 0.2,
+      minLines: 3,
+      minNodes: 8,
+      ...input,
+    });
+  } finally {
+    process.chdir(originalCwd);
+  }
+}
+
+test("--exclude glob skips matching files during a directory scan", async () => {
+  const projectDir = await excludeFixture();
+  const files = scanWith(projectDir, { exclude: ["**/*.spec.*"] }).flatMap((c) =>
+    c.locations.map((loc) => loc.file),
+  );
+  assert.ok(files.length > 0, "the real a.ts/b.ts duplicate should still cluster");
+  assert.ok(files.every((f) => !f.endsWith(".spec.ts")), `spec file should be excluded, got: ${JSON.stringify(files)}`);
+});
+
+test("--exclude is repeatable and applies even with --no-gitignore", async () => {
+  const projectDir = await excludeFixture();
+  await writeFile(path.join(projectDir, "b.stories.ts"), duplicateBody);
+  const files = scanWith(projectDir, {
+    respectGitignore: false,
+    exclude: ["**/*.spec.*", "**/*.stories.*"],
+  }).flatMap((c) => c.locations.map((loc) => loc.file));
+  assert.ok(
+    files.every((f) => !f.endsWith(".spec.ts") && !f.endsWith(".stories.ts")),
+    `both globs should apply regardless of gitignore, got: ${JSON.stringify(files)}`,
+  );
+});
+
+test("--exclude does not affect an explicitly passed file argument", async () => {
+  const projectDir = await excludeFixture();
+  const originalCwd = process.cwd();
+  try {
+    process.chdir(projectDir);
+    const files = new TypeScriptDuplicateFinder()
+      .findClusters({ paths: ["a.spec.ts", "a.ts"], threshold: 0.2, minLines: 3, minNodes: 8, exclude: ["**/*.spec.*"] })
+      .flatMap((c) => c.locations.map((loc) => loc.file));
+    assert.ok(
+      files.some((f) => f.endsWith("a.spec.ts")),
+      `explicit file arg should scan despite a matching --exclude glob, got: ${JSON.stringify(files)}`,
+    );
+  } finally {
+    process.chdir(originalCwd);
+  }
+});
+
+test("--exclude parses as a repeatable single-value flag (no comma split, trimmed)", () => {
+  const options = Options.parse("--exclude", "**/*.spec.*", "--exclude", "  dist/** ");
+  assert.deepEqual(options.exclude, ["**/*.spec.*", "dist/**"]);
+});
 
 test("scans without error when cwd has no .gitignore", async () => {
   const projectDir = await mkdtemp(path.join(tmpdir(), "dry-ts-no-ignore-file-"));

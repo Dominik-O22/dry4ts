@@ -113,22 +113,39 @@ export class TypeScriptDuplicateFinder {
   }
 
   private sourceFiles(options: Options): string[] {
-    const isIgnored = options.respectGitignore ? this.gitignoreMatcher() : null;
+    // Two ignore sources, both gitignore-syntax globs matched relative to cwd:
+    // .gitignore (when respected) and the user's --exclude globs. A path is
+    // skipped if either matches. --exclude applies regardless of
+    // respectGitignore — it is an explicit instruction, not repo config.
+    const matchers = [
+      options.respectGitignore ? this.gitignoreMatcher() : null,
+      options.exclude.length > 0 ? this.globMatcher(options.exclude) : null,
+    ].filter((matcher): matcher is IgnoreMatcher => matcher !== null);
+    const isIgnored: IgnoreMatcher | null =
+      matchers.length === 0 ? null : (filePath, isDirectory) => matchers.some((m) => m(filePath, isDirectory));
     return this.dedupeFiles(
       options.paths.flatMap((sourcePath) => this.typeScriptFiles(sourcePath, isIgnored)),
     ).sort();
   }
 
   private gitignoreMatcher(): IgnoreMatcher | null {
-    const cwd = process.cwd();
-    const gitignorePath = path.join(cwd, ".gitignore");
+    const gitignorePath = path.join(process.cwd(), ".gitignore");
     let content: string;
     try {
       content = fs.readFileSync(gitignorePath, "utf8");
     } catch {
       return null;
     }
-    const matcher = ignore().add(content);
+    return this.globMatcher([content]);
+  }
+
+  // Builds a relative-to-cwd matcher from gitignore-syntax globs. Shared by
+  // .gitignore (one entry: the file contents) and --exclude (one entry per
+  // glob). Directories are matched with a trailing slash so patterns like
+  // `node_modules/` prune the whole tree during traversal.
+  private globMatcher(globs: readonly string[]): IgnoreMatcher {
+    const cwd = process.cwd();
+    const matcher = ignore().add(globs.join("\n"));
     return (filePath, isDirectory) => {
       const relative = path.relative(cwd, filePath);
       if (relative === "" || relative.startsWith("..") || path.isAbsolute(relative)) {

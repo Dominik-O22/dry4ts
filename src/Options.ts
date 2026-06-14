@@ -17,6 +17,7 @@ export interface OptionsInput {
   readonly onlyNew?: boolean;
   readonly excludeKinds?: readonly string[];
   readonly minDistinctKinds?: number;
+  readonly exclude?: readonly string[];
 }
 
 export class Options {
@@ -36,6 +37,7 @@ export class Options {
     public readonly onlyNew: boolean = false,
     public readonly excludeKinds: readonly string[] = [],
     public readonly minDistinctKinds: number = 0,
+    public readonly exclude: readonly string[] = [],
   ) {
     if (!(threshold > 0 && threshold <= 1)) {
       throw new Error(`threshold must be greater than 0 and at most 1, got ${threshold}`);
@@ -86,6 +88,7 @@ export class Options {
       input.onlyNew ?? defaults.onlyNew,
       input.excludeKinds ?? [],
       input.minDistinctKinds ?? defaults.minDistinctKinds,
+      input.exclude ?? [],
     );
   }
 
@@ -105,6 +108,7 @@ export class Options {
     let onlyNew = false;
     const excludeKinds: string[] = [];
     let minDistinctKinds = 0;
+    const exclude: string[] = [];
 
     for (let i = 0; i < args.length; i += 1) {
       const arg = args[i];
@@ -121,6 +125,13 @@ export class Options {
         case "--min-distinct-kinds":
           minDistinctKinds = integerValue(args, ++i, arg);
           break;
+        case "--exclude": {
+          const glob = valueFor(args, ++i, arg).trim();
+          if (glob.length > 0) {
+            exclude.push(glob);
+          }
+          break;
+        }
         case "--min-locations":
           minLocations = integerValue(args, ++i, arg);
           break;
@@ -195,6 +206,7 @@ export class Options {
       onlyNew,
       excludeKinds,
       minDistinctKinds,
+      exclude,
     );
   }
 }
