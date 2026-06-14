@@ -5,6 +5,54 @@ All notable changes to dry-ts are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-06-14
+
+### Added
+
+- `--counterparts` adds per-location nearest-counterpart provenance, the payload
+  an agent needs to route a finding. For each cluster location it reports its
+  nearest matching counterpart — the absolute strongest AST-similar partner in the
+  same cluster — as `{ index, file, startLine, endLine, shared, total, score }`:
+  `index` is the counterpart's position in that cluster's `locations` array (an
+  O(1) deref), `file`/`startLine`/`endLine` are the self-contained reference,
+  `shared`/`total` are the exact pairwise fingerprint-intersection and union
+  counts, and `score` is `shared / total` (the same similarity value the cluster
+  reports, so a consumer never recomputes a float). In a transitive (>2-member)
+  cluster this exposes the edge structure the score *range* hides — a tight 1.0
+  pair versus a chained 0.82 member. Computed without a second similarity pass
+  (the shared count is captured from the existing pairwise walk).
+- Under `--counterparts` **and** an active change scope (`--changed-from` /
+  `--changed`), each location also carries a per-location `changed` boolean — so an
+  autonomous fixer can tell *which* block in a `new` cluster to edit. With both
+  sides' `changed` visible, a new/new duplicate (the agent reimplemented itself
+  within its own diff) routes to refactoring the new code, and a new/old duplicate
+  routes to extracting toward the existing definition.
+- The new fields render in all three formats: `text` appends an abbreviated
+  `→ nearest <file>:<start>-<end> (<shared>/<total>)` (plus `changed=…`) to the
+  location's own line; `json` and `edn` carry the full payload including `index`
+  and `score`. New exported types `Nearest` and `ClusterLocation` from the library
+  entry point.
+
+### Changed
+
+- `--counterparts` is opt-in and the default path is byte-for-byte unchanged: with
+  the flag off, no `nearest`/`changed` own-property is created on `ClusterLocation`
+  objects (programmatic `findClusters()` consumers see an identical object shape),
+  no per-location map is built, and the threshold-comparison float is bit-identical
+  (the shared count is surfaced from the same walk, the arithmetic is unmoved).
+
+### Fixed
+
+- Nearest-counterpart selection is aggregated over **canonical-to-canonical** edges
+  — both endpoints being the entry the cluster actually renders — identified by
+  identity to mirror `ClusterCollector`'s keep-rule exactly (strictly-greater node
+  count, first-wins on ties). This prevents a nested same-line candidate-root
+  collision (e.g. a one-line `const x = (…) => …`, which emits both a
+  `VariableStatement` and its inner `ArrowFunction` at the same line range) from
+  attaching a non-rendered sibling's score to the rendered location on either the
+  owner or the counterpart side. A throw-safe fallback covers the rare orphan whose
+  only structural match is to a substructure of a larger member.
+
 ## [0.9.0] - 2026-06-14
 
 ### Added

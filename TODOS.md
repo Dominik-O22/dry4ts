@@ -25,15 +25,12 @@ Known deferred work. Performance plans live in `plans/README.md`.
   output. The `status` field from the incremental-gating plan provides all
   data; only formatters needed. (Deferred from incremental-gating CEO
   review, 2026-06-13.)
-- [ ] Pair-level counterpart provenance in output (P3, M→S/M with CC):
-  clusters are transitive components, so cluster-level `status` doesn't tell
-  an agent which counterpart a "new" location actually matches. Expose
-  direct pair edges (or per-location nearest counterpart) in JSON for
-  sharper fix targeting. Caveat: pair provenance is currently discarded in
-  src/TypeScriptDuplicateFinder.ts (perf rework); retention has memory/perf
-  cost — profile against .bench corpora first, retain only on the scoped
-  path. (From Codex outside-voice review of incremental-gating plan,
-  2026-06-13.)
+- [ ] Internal Options object/builder (P3, M): `Options` now carries 19 positional
+  constructor params, including three adjacent transposable booleans
+  (`excludeTaggedTemplates`/`excludeTests`/`counterparts`) that `tsc` cannot tell
+  apart on transposition. The plan-014 Step-6 ordering-pin test mitigates, but the
+  real fix is an internal options object/builder so new flags stop appending
+  positionals. (Filed from plan 014 "Accepted debt", 2026-06-14.)
 
 - [ ] Line-range syntax for `--changed` (P3, S): optional `:start-end` suffix
   (`--changed foo.ts:10-42`) giving non-git callers line-level gating
@@ -67,3 +64,12 @@ Known deferred work. Performance plans live in `plans/README.md`.
   documented nor cycle-guarded. Decide policy (skip symlinks vs. follow with
   cycle detection), implement, and document in README.
   (Deferred from feat/respect-gitignore review, 2026-06-12.)
+
+## Completed
+
+- [x] Pair-level counterpart provenance in output. **Completed:** v0.10.0
+  (2026-06-14) — `--counterparts` exposes each location's nearest matching
+  counterpart (`{index, file, startLine, endLine, shared, total, score}`) plus a
+  per-location `changed` flag under an active scope, in text/json/edn. Aggregated
+  over canonical↔canonical edges so nested same-line candidate-root collisions
+  never mislabel a rendered location's score. Opt-in; off-path byte-identical.
