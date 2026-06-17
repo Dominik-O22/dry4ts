@@ -1,5 +1,6 @@
+import type { ConfigOptions } from "./Config.js";
 import { resolveExcludeKinds } from "./FileScanner.js";
-import type { OutputFormat } from "./types.js";
+import { isOutputFormat, type OutputFormat } from "./types.js";
 
 // Curated flag bundles for `--profile NAME`. A profile only ever *sets* options
 // (turns features on, raises a floor, adds a kind exclusion) — there is no
@@ -226,6 +227,14 @@ export class Options {
   }
 
   static parse(...args: string[]): Options {
+    return Options.fromCli(args);
+  }
+
+  // Resolve CLI args layered over a (possibly empty) config file. Precedence per
+  // option: explicit CLI flag > active --profile > .dry-ts.json > built-in
+  // default. `parse` is the no-config entrypoint; main() calls this with the
+  // loaded config so a committed baseline applies without a flag overriding it.
+  static fromCli(args: readonly string[], config: ConfigOptions = {}): Options {
     const paths: string[] = [];
     const changed: string[] = [];
     const excludeKinds: string[] = [];
@@ -348,48 +357,56 @@ export class Options {
     const profile = help || profileName === undefined ? {} : resolveProfile(profileName);
 
     return new Options({
-      paths: paths.length > 0 ? paths : ["src"],
-      threshold: pick(threshold, undefined, 0.82),
-      minLines: pick(minLines, undefined, 4),
-      minNodes: pick(minNodes, profile.minNodes, 20),
-      format: pick(format, profile.format, "text"),
+      paths: paths.length > 0 ? paths : config.paths && config.paths.length > 0 ? [...config.paths] : ["src"],
+      threshold: pick(threshold, undefined, config.threshold, 0.82),
+      minLines: pick(minLines, undefined, config.minLines, 4),
+      minNodes: pick(minNodes, profile.minNodes, config.minNodes, 20),
+      format: pick(format, profile.format, config.format, "text"),
       help: help ?? false,
-      failOnDuplicates: pick(failOnDuplicates, profile.failOnDuplicates, false),
-      respectGitignore: pick(respectGitignore, undefined, true),
-      minLocations: pick(minLocations, undefined, 2),
+      failOnDuplicates: pick(failOnDuplicates, profile.failOnDuplicates, config.failOnDuplicates, false),
+      respectGitignore: pick(respectGitignore, undefined, config.respectGitignore, true),
+      minLocations: pick(minLocations, undefined, config.minLocations, 2),
       changedFrom,
       changed,
       explainChanged: explainChanged ?? false,
-      onlyNew: pick(onlyNew, profile.onlyNew, false),
-      excludeKinds: unionLists(profile.excludeKinds, excludeKinds),
-      minDistinctKinds: pick(minDistinctKinds, undefined, 0),
-      exclude,
-      excludeTaggedTemplates: pick(excludeTaggedTemplates, undefined, false),
-      excludeTests: pick(excludeTests, profile.excludeTests, false),
-      counterparts: pick(counterparts, profile.counterparts, false),
+      // onlyNew is run-scoped: a profile may set it, but a config file may not (a
+      // committed `onlyNew` would make every plain scan throw on the missing scope).
+      onlyNew: pick(onlyNew, profile.onlyNew, undefined, false),
+      excludeKinds: unionLists(profile.excludeKinds, config.excludeKinds, excludeKinds),
+      minDistinctKinds: pick(minDistinctKinds, undefined, config.minDistinctKinds, 0),
+      // Config `exclude` and its alias `ignore` both feed the --exclude glob list,
+      // unioned ahead of the CLI's own --exclude entries.
+      exclude: unionLists(config.exclude, config.ignore, exclude),
+      excludeTaggedTemplates: pick(excludeTaggedTemplates, undefined, config.excludeTaggedTemplates, false),
+      excludeTests: pick(excludeTests, profile.excludeTests, config.excludeTests, false),
+      counterparts: pick(counterparts, profile.counterparts, config.counterparts, false),
     });
   }
 }
 
 // Resolution precedence for a scalar option: an explicit CLI value wins, then
-// the active profile's value, then the built-in default.
-function pick<T>(explicit: T | undefined, fromProfile: T | undefined, fallback: T): T {
-  return explicit ?? fromProfile ?? fallback;
+// the active profile's value, then the config file's value, then the built-in
+// default. A layer that does not apply to an option passes undefined for its slot.
+function pick<T>(explicit: T | undefined, fromProfile: T | undefined, fromConfig: T | undefined, fallback: T): T {
+  return explicit ?? fromProfile ?? fromConfig ?? fallback;
 }
 
-// List flags union the profile's entries with the user's (deduped, profile
-// first) rather than letting either replace the other — adding `--exclude-kinds`
-// on top of a profile augments it, it does not discard the profile's kinds.
-function unionLists(fromProfile: readonly string[] | undefined, explicit: readonly string[]): string[] {
-  if (fromProfile === undefined || fromProfile.length === 0) {
-    return [...explicit];
-  }
+// List flags union their layers (deduped, earliest layer first) rather than
+// letting a later one replace an earlier — adding `--exclude-kinds` on top of a
+// profile augments it, and config-level globs sit ahead of CLI ones, none discarding
+// the others. Undefined/empty layers are skipped.
+function unionLists(...layers: ReadonlyArray<readonly string[] | undefined>): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
-  for (const value of [...fromProfile, ...explicit]) {
-    if (!seen.has(value)) {
-      seen.add(value);
-      result.push(value);
+  for (const layer of layers) {
+    if (layer === undefined) {
+      continue;
+    }
+    for (const value of layer) {
+      if (!seen.has(value)) {
+        seen.add(value);
+        result.push(value);
+      }
     }
   }
   return result;
@@ -404,7 +421,7 @@ function valueFor(args: readonly string[], index: number, option: string): strin
 
 function formatValue(args: readonly string[], index: number, option: string): OutputFormat {
   const value = valueFor(args, index, option);
-  if (value !== "text" && value !== "edn" && value !== "json" && value !== "sarif") {
+  if (!isOutputFormat(value)) {
     throw new Error(`Unknown format: ${value}`);
   }
   return value;
