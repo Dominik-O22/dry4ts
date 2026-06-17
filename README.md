@@ -714,6 +714,63 @@ produces when it reimplements existing structure — and dry-ts is built for
 reimplementations, or gating others' in CI), not for humans reading copy-paste
 reports.
 
+#### dry-ts vs jscpd on real TypeScript repos (complementary, not a winner)
+
+These are the COMPLEMENTARY zones in numbers. The table below runs dry-ts and
+jscpd — the incumbent token matcher — at their defaults over the same four
+pinned real-world TypeScript corpora (`bun run bench:vs-jscpd`, see
+"Benchmarking"). The two columns count *different units*: a dry-ts **cluster** is
+a group of structurally similar declarations (Jaccard ≥ 0.82 over normalized-AST
+fingerprints — Type-2/Type-3); a jscpd **clone** is a contiguous token-sequence
+pair (default ≥ 5 lines / 50 tokens — Type-1). They are **not** directly
+comparable, and there is no single "winner" number — each tool sees the clone
+class the other largely misses.
+
+| Corpus | dry-ts clusters | dry-ts time | jscpd clones | jscpd time |
+| --- | ---: | ---: | ---: | ---: |
+| TypeScript v5.9.3 `src/compiler` | 246 | ~1.8s | 161 | ~0.4s |
+| Sentry 25.10.0 `static/app` (frontend) | 2574 | ~6.0s | 66 | ~0.3s |
+| n8n 2.25.7 `packages/nodes-base/nodes` | 1720 | ~3.9s | 8812 | ~2.7s |
+| n8n 2.25.7 `packages/cli/src` (backend) | 1650 | ~3.2s | 3149 | ~1.4s |
+
+The two corpora at the extremes tell the story. On the **Sentry frontend**,
+dry-ts surfaces ~2.6k structural candidate clusters (React components and hooks
+that share a shape but rename their props/handlers) where jscpd's literal token
+matcher finds only 66 copy-paste clones. On the **n8n `nodes-base` backend** the
+ratio flips: those declarative integration nodes carry heavy literal boilerplate,
+so jscpd reports ~8.8k token clones to dry-ts's 1720 structural clusters. jscpd
+is consistently the faster pass; dry-ts pays for parsing and structural
+fingerprinting. Neither column dominates — they map different terrain.
+
+These are out-of-the-box numbers on a single cold run, for order-of-magnitude
+framing; `bun run bench:vs-jscpd` prints the full auditable methodology
+alongside the table, and you can re-run it yourself.
+
+**A hand-classified, reproducible sample.** To show concretely what each tool
+catches that the other misses, here is one cluster dry-ts reports in the
+TypeScript compiler corpus, classified by hand against the Type 1–4 taxonomy
+above. It is reproducible: run
+`bun ./dist/bin/dry-ts.js --no-gitignore .bench/TypeScript/src/compiler` after
+`bun run bench:setup typescript` and read the two locations.
+
+`visitCommaListExpression` appears in two transformer files —
+`transformers/es2015.ts:2709` and `transformers/es2018.ts:626` — with bodies that
+are identical except for a single inserted `Debug.assert(visited);` statement in
+the es2015 copy. That one inserted line makes this a **Type-3** near-miss:
+
+- **dry-ts** clusters the two whole declarations at score 0.83 — the inserted
+  statement only drops the Jaccard overlap slightly, so the full structural match
+  is reported as one candidate.
+- **jscpd** cannot match across the insertion: its longest contiguous token run
+  stops at the inserted line, so it reports a *truncated* 20-line clone of the
+  matching prefix, not the declaration as a unit. The remainder of the function
+  after the insertion falls below the clone threshold and is dropped.
+
+This is the Type-3 middle dry-ts is built for, sampled from a real repo so the
+classification can be checked, not asserted. (The procedure generalizes: pick a
+dry-ts cluster, open both locations, and classify the diff as Type-1/2/3 by
+hand.)
+
 ## Publishing
 
 Before publishing:
@@ -793,3 +850,18 @@ must not regress across changes):
   `--exclude-kinds` hot-path change measured against it).
 - n8n 2.25.7 `packages/nodes-base/nodes`: ~3.3s, 1720 clusters (since v0.8.0).
 - n8n 2.25.7 `packages/cli/src`: ~2.9s, 1650 clusters (since v0.8.0).
+
+#### Comparison vs jscpd: `bun run bench:vs-jscpd`
+
+`bun run bench:vs-jscpd` runs dry-ts and jscpd — the incumbent token matcher —
+at their defaults over the same four pinned corpora and prints a side-by-side
+table (clusters/clones found, wall-clock time) plus a written methodology so the
+numbers stay auditable. Pass a name to scope it
+(`bun run bench:vs-jscpd typescript sentry n8n-nodes n8n-cli`). It needs the
+corpora present (`bun run bench:setup` first); missing corpora are skipped with a
+message rather than failing. jscpd is invoked on demand via `bunx jscpd`, never a
+hard dependency — if it cannot be resolved the dry-ts column is still reported and
+the jscpd column reads `n/a`. The framing is COMPLEMENTARY, not a winner: dry-ts
+counts Type-2/Type-3 structural clusters, jscpd counts Type-1 token clones; the
+two are not directly comparable. See "How dry-ts differs from token and line
+matchers" for the results table and a hand-classified sample.

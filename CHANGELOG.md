@@ -5,6 +5,21 @@ All notable changes to dry-ts are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.1] - 2026-06-17
+
+### Added
+
+- **`bun run bench:vs-jscpd`** (#48): an honest, reproducible side-by-side
+  comparison of dry-ts against jscpd (the incumbent token matcher) over the same
+  four pinned real-world corpora, printing clusters/clones found and wall-clock
+  time plus a written methodology so the numbers stay auditable. Pass a corpus
+  name to scope it; missing corpora are skipped with a message. jscpd is invoked
+  on demand via `bunx jscpd` and is never a hard dependency — if it cannot be
+  resolved the dry-ts column is still reported and the jscpd column reads `n/a`.
+  The README documents the results table and a hand-classified Type-3 sample. The
+  framing is complementary, not a winner: dry-ts counts Type-2/Type-3 structural
+  clusters, jscpd counts Type-1 token clones; the two are not directly comparable.
+
 ## [0.14.0] - 2026-06-17
 
 ### Added

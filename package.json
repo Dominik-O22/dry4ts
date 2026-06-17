@@ -1,6 +1,6 @@
 {
   "name": "dry-ts",
-  "version": "0.14.0",
+  "version": "0.14.1",
   "description": "Find candidate duplicate TypeScript code by comparing normalized AST structure.",
   "type": "module",
   "repository": {
@@ -40,6 +40,7 @@
     "bench": "bun run build && bun scripts/benchmark.mjs",
     "bench:corpus": "bun scripts/bench-corpus.mjs",
     "bench:setup": "bun scripts/bench-setup.mjs",
+    "bench:vs-jscpd": "bun run build && bun scripts/bench-vs-jscpd.mjs",
     "pack:dry-run": "bun run build && bun pm pack --dry-run",
     "prepublishOnly": "bun run ci"
   },
