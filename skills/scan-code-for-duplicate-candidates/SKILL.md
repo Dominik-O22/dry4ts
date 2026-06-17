@@ -4,13 +4,14 @@ description: >
   Run dry-ts locally or from code to find fuzzy structural duplicate clusters. Load when choosing paths, interpreting score, status, and line-range output, tuning --threshold, --min-lines, --min-nodes, or using TypeScriptDuplicateFinder.findClusters.
 type: core
 library: dry-ts
-library_version: "0.13.0"
+library_version: "0.14.0"
 sources:
   - "dry-ts:README.md"
   - "dry-ts:src/TypeScriptDuplicateFinder.ts"
   - "dry-ts:src/TypeScriptNormalizer.ts"
   - "dry-ts:src/FileScanner.ts"
   - "dry-ts:src/Options.ts"
+  - "dry-ts:src/Config.ts"
   - "dry-ts:src/types.ts"
 ---
 
@@ -44,7 +45,7 @@ console.log(clusters);
 bunx dry-ts --profile pr --changed-from origin/main src
 ```
 
-`--profile NAME` seeds a curated flag bundle; explicit flags override it (precedence: explicit flag > profile > default; list flags like `--exclude-kinds` union). Profiles: `pr` (PR gate — `--exclude-tests --min-nodes 50 --exclude-kinds ArrowFunction,VariableStatement --only-new --fail-on-duplicates`; needs `--changed-from`), `src` (source-only, `--exclude-tests`), `audit` (broad, `--min-nodes 12`), `tests` (test-infra dup, `--exclude-kinds ArrowFunction --min-nodes 40`). Prefer a profile over hand-assembling flags.
+`--profile NAME` seeds a curated flag bundle; explicit flags override it (precedence: explicit flag > profile > `.dry-ts.json` > default; list flags like `--exclude-kinds` union across all layers). Profiles: `pr` (PR gate — `--exclude-tests --min-nodes 50 --exclude-kinds ArrowFunction,VariableStatement --only-new --fail-on-duplicates`; needs `--changed-from`), `src` (source-only, `--exclude-tests`), `audit` (broad, `--min-nodes 12`), `tests` (test-infra dup, `--exclude-kinds ArrowFunction --min-nodes 40`). Prefer a profile over hand-assembling flags. To make a repo's baseline permanent, commit a `.dry-ts.json` with the persistable options (`threshold`, `minNodes`, `excludeKinds`, `exclude`/`ignore` globs, …); it sits below `--profile` and any explicit flag, and a broken or unreadable config fails the run loud at exit `2`. See `wire-duplicate-checks-into-ci` for the full key list and the `--fail-on-duplicates` gate note.
 
 ### Scan changed source and tests
 

@@ -200,10 +200,10 @@ the kind filters below.
 
 Rather than rediscover the right flag combination per run, start from a curated
 preset. `--profile NAME` seeds a bundle of defaults; any explicit flag you pass
-overrides it. Precedence is **explicit flag > profile > built-in default**, and
-list flags (`--exclude-kinds`) **union** the profile's entries with yours rather
-than replacing them — so `--profile pr --exclude-kinds Constructor` excludes
-`ArrowFunction`, `VariableStatement`, *and* `Constructor`.
+overrides it. Precedence is **explicit flag > profile > [`.dry-ts.json`](#config-file-dry-tsjson) >
+built-in default**, and list flags (`--exclude-kinds`) **union** the profile's
+entries with yours rather than replacing them — so `--profile pr --exclude-kinds
+Constructor` excludes `ArrowFunction`, `VariableStatement`, *and* `Constructor`.
 
 | Profile | Expands to | For |
 | --- | --- | --- |
@@ -251,9 +251,10 @@ error — only a genuinely absent config is the silent no-op). It never silently
 scans with the wrong policy.
 
 > **Gate sharp edge.** A committed config's `paths`, `exclude`/`ignore`,
-> `respectGitignore`, `excludeTests`, or the numeric floors change *what*
-> `--fail-on-duplicates` sees — a committed `exclude` or a higher `minNodes` can
-> shrink the gate so a real duplicate slips through and the gate exits 0. This is
+> `respectGitignore`, `excludeTests`, `excludeTaggedTemplates`, `excludeKinds`, or
+> the `threshold`/numeric floors change *what* `--fail-on-duplicates` sees — a
+> committed `exclude` or a higher `minNodes` can shrink the gate so a real
+> duplicate slips through and the gate exits 0. This is
 > the config doing its job (committed policy), but to keep it from being silent,
 > under `--fail-on-duplicates` dry-ts prints the config-derived gate inputs to
 > stderr (`.dry-ts.json shapes this --fail-on-duplicates run: …`), like the
@@ -355,8 +356,9 @@ whole path with `--exclude '<glob>'` (or `.gitignore`), accepting that it also
 hides any real duplicate that later lands there.
 
 For file- or glob-level ignores, exclude the path via `--exclude`/`.gitignore`
-(or `--no-gitignore` to override). Persisting *flags* in config (so you do not
-retype `--exclude-tests --min-nodes 40 …` every run) is [planned](https://github.com/Dominik-O22/dry4ts/issues/23) — config state, not a findings baseline — and does not exist yet.
+(or `--no-gitignore` to override). To stop retyping `--exclude-tests --min-nodes
+40 …` every run, commit a [`.dry-ts.json`](#config-file-dry-tsjson) — it persists
+*flags* (config state), not a findings baseline.
 
 ## Incremental gating
 

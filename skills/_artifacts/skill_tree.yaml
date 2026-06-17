@@ -1,7 +1,7 @@
 # skills/_artifacts/skill_tree.yaml
 library:
   name: "dry-ts"
-  version: "0.13.0"
+  version: "0.14.0"
   repository: "unknown"
   description: "Find candidate duplicate TypeScript code by comparing normalized AST structure."
 generated_from:
@@ -15,7 +15,7 @@ skills:
     type: "core"
     domain: "finding-duplicate-code"
     path: "skills/scan-code-for-duplicate-candidates/SKILL.md"
-    description: "Run dry-ts locally or from code to find fuzzy structural duplicate candidates. Load when choosing paths, interpreting score/line output, tuning threshold/min-lines/min-nodes, or using TypeScriptDuplicateFinder.findDuplicates."
+    description: "Run dry-ts locally or from code to find fuzzy structural duplicate candidates. Load when choosing paths, interpreting score/line output, tuning threshold/min-lines/min-nodes, or using TypeScriptDuplicateFinder.findClusters."
     sources:
       - "dry-ts:README.md"
       - "dry-ts:src/TypeScriptDuplicateFinder.ts"
@@ -35,6 +35,7 @@ skills:
       - "dry-ts:README.md"
       - "dry-ts:AGENTS.md"
       - "dry-ts:src/DryTs.ts"
+      - "dry-ts:src/Config.ts"
       - "dry-ts:.github/workflows/ci.yml"
     references:
       - "references/output-contract.md"
@@ -50,4 +51,5 @@ skills:
       - "dry-ts:AGENTS.md"
       - "dry-ts:src/TypeScriptDuplicateFinder.ts"
       - "dry-ts:src/DryTs.ts"
+      - "dry-ts:src/Config.ts"
       - "dry-ts:test/dry-ts.test.ts"
