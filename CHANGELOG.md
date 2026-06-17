@@ -5,6 +5,37 @@ All notable changes to dry-ts are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2026-06-17
+
+### Added
+
+- **`.dry-ts.json` config file** (#23): a repo-checked-in baseline so a project's
+  scan policy lives in one committed file instead of being retyped on every run —
+  the top v0.12 adoption blocker. Supports the persistable options (`threshold`,
+  `minLines`, `minNodes`, `minLocations`, `minDistinctKinds`, `format`,
+  `failOnDuplicates`, `respectGitignore`, `excludeKinds`, `exclude`,
+  `excludeTaggedTemplates`, `excludeTests`, `counterparts`, `paths`) plus an
+  `ignore` glob list (unioned into `--exclude`, applied alongside `.gitignore`).
+  Precedence is explicit CLI flag > `--profile` > `.dry-ts.json` > built-in
+  default. Run-scoped inputs (`--changed-from`/`--changed`/`--only-new`) stay
+  CLI-only. A malformed config fails the run loud (exit 2, naming the file); an
+  absent one is a no-op. `--help` still prints usage even with a broken config.
+  New exports: `loadConfig`, `parseConfig`, `ConfigOptions`, `CONFIG_FILENAME`,
+  and `Options.fromCli(args, config)`.
+
+  The config never silently runs the wrong policy: a present-but-unreadable
+  `.dry-ts.json` (a directory, a permission error) fails loud like a malformed
+  one — only a genuinely absent file is the no-op; the integer-count keys
+  (`minLines`/`minNodes`/`minLocations`/`minDistinctKinds`) reject a fractional
+  value, matching the integer CLI flags; and under `--fail-on-duplicates` dry-ts
+  prints the config-derived gate inputs to stderr
+  (`.dry-ts.json shapes this --fail-on-duplicates run: …`) so a committed
+  `exclude`/`paths`/floor that narrows what the gate sees is never silent.
+
+  Per-path `overrides` (different thresholds for `tests/**` vs `src/**`) are not
+  in this slice — they touch the global pair phase and are tracked separately on
+  #23.
+
 ## [0.13.0] - 2026-06-15
 
 ### Added
