@@ -1,6 +1,6 @@
 {
   "name": "dry-ts",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "Find candidate duplicate TypeScript code by comparing normalized AST structure.",
   "type": "module",
   "repository": {

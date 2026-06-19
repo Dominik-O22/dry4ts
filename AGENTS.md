@@ -30,6 +30,31 @@ By default, directory scans skip files and directories matched by `.gitignore`. 
 bun ./dist/bin/dry-ts.js --format json --no-gitignore src test
 ```
 
+## Committed Config: `.dry-ts.json`
+
+A `.dry-ts.json` in the working directory sets a committed baseline so a repo's
+scan policy lives in one file instead of a flag list every run. dry-ts reads it
+automatically; precedence is **explicit CLI flag > `--profile` > `.dry-ts.json` >
+built-in default**, so a flag you pass for one run still wins. It accepts the
+persistable options (`threshold`, `minNodes`, `excludeKinds`, `excludeTests`,
+`exclude`/`ignore` globs, …) but **not** the run-scoped `--changed-from`,
+`--changed`, `--only-new`, or the diagnostic `--explain-changed` — those describe
+one invocation, not a baseline.
+
+A broken or present-but-unreadable config (bad JSON, unknown key, wrong type, a
+directory, a permission error) fails the run loud at exit `2`, naming the file —
+it never silently scans with the wrong policy. Only a genuinely absent file is a
+no-op. See the README "Config file" section for the full key list.
+
+**Gate sharp edge.** A committed `paths`, `exclude`/`ignore`, `respectGitignore`,
+`excludeTests`, `excludeTaggedTemplates`, `excludeKinds`, or a `threshold`/numeric
+floor changes *what* `--fail-on-duplicates` gates against — a committed `exclude`
+or higher `minNodes` can shrink the gate so a
+real duplicate slips through and the gate exits `0`. To keep that from being
+silent, under `--fail-on-duplicates` dry-ts prints the config-derived gate inputs
+to stderr (`.dry-ts.json shapes this --fail-on-duplicates run: …`), like the
+`--only-new` totals line. Keep a CI-gating config narrow, and read that note.
+
 ## Self-Correcting Edit Loop
 
 After editing, gate only on duplication *your edit* introduced instead of the
@@ -78,7 +103,8 @@ Exit codes:
   a changed-scope; any cluster otherwise)
 - `2`: usage/configuration error (unknown flag/format, out-of-range value, both
   scope flags, an ungateable `--changed` file under the gate, not a git repo
-  with `--changed-from`, bad ref) **or** any git/scanner failure. The gate fails
-  closed: it never exits `0` or `1` on an error it could not interpret.
+  with `--changed-from`, bad ref, a broken or unreadable `.dry-ts.json`) **or**
+  any git/scanner failure. The gate fails closed: it never exits `0` or `1` on an
+  error it could not interpret.
 
 The JSON output shape is `{ "clusters": ClusterReport[] }`. Each cluster groups all locations that share structural similarity above the threshold, with a `score` range, a `status` (`"new" | "known" | "unscoped"`), `locationCount`, and `locations` array. Use `--min-locations N` to only report clusters with at least `N` locations; the default is 2. Each location has `file`, `startLine`, `endLine`, and `nodes`. Use `--explain-changed` to dump the resolved changed-region map to stderr when a gate result is surprising.

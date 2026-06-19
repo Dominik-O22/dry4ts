@@ -63,4 +63,13 @@ export interface ClusterReport {
   readonly status: ClusterStatus;
 }
 
-export type OutputFormat = "text" | "edn" | "json" | "sarif";
+// Single source of truth for the output formats. The CLI's --format validator
+// (Options.formatValue) and the config validator (Config.outputFormat) both test
+// membership against this array, so adding a format never silently diverges
+// between the two surfaces.
+export const OUTPUT_FORMATS = ["text", "edn", "json", "sarif"] as const;
+export type OutputFormat = (typeof OUTPUT_FORMATS)[number];
+
+export function isOutputFormat(value: unknown): value is OutputFormat {
+  return (OUTPUT_FORMATS as readonly unknown[]).includes(value);
+}

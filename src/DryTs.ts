@@ -2,6 +2,7 @@ import fs from "node:fs";
 
 import { ChangedRegions, canonicalPath, parseUnifiedDiff } from "./ChangedRegions.js";
 import { crossFileSharedNames, maxScore, minScore } from "./Clusters.js";
+import { CONFIG_FILENAME, type ConfigOptions, loadConfig } from "./Config.js";
 import { candidateKindNames } from "./FileScanner.js";
 import { GitProvider } from "./GitProvider.js";
 import { Options, PROFILE_NAMES } from "./Options.js";
@@ -93,12 +94,25 @@ export const USAGE = [
   "                  Drop candidate declarations of these SyntaxKinds; comma-",
   "                  separated, repeatable. Opt-in only (no default exclusions).",
   ...wrapKinds(candidateKindNames, "                  ", 76),
+  "",
+  "Config file:",
+  "  .dry-ts.json in the working directory sets a committed baseline for the",
+  "  options above (threshold, minNodes, exclude, excludeKinds, excludeTests, …),",
+  "  plus an `ignore` glob list. Precedence: CLI flag > --profile > .dry-ts.json >",
+  "  default. Run-scoped flags (--changed-from/--changed/--only-new) are CLI-only.",
 ].join("\n");
 
 export function main(args: readonly string[] = process.argv.slice(2)): void {
   let options: Options;
+  let config: ConfigOptions = {};
   try {
-    options = Options.parse(...args);
+    // .dry-ts.json (when present in cwd) layers under the CLI args; a malformed
+    // config throws here and is reported as exit 2, like any other option error.
+    // --help is read straight from argv so `dry-ts --help` still prints usage even
+    // when the repo's config is broken — the one command that must never fail.
+    const wantsHelp = args.includes("--help") || args.includes("-h");
+    config = wantsHelp ? {} : loadConfig();
+    options = Options.fromCli(args, config);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 2;
@@ -110,7 +124,7 @@ export function main(args: readonly string[] = process.argv.slice(2)): void {
   }
 
   try {
-    run(options);
+    run(options, config);
   } catch (error) {
     // Fail closed: any error in the scan/gate pipeline is exit 2, never an
     // uncaught throw (which would exit 1 and read as "findings" to CI).
@@ -119,10 +133,22 @@ export function main(args: readonly string[] = process.argv.slice(2)): void {
   }
 }
 
-function run(options: Options): void {
+function run(options: Options, config: ConfigOptions = {}): void {
   const { files, clusters } = new TypeScriptDuplicateFinder().scan(options);
   if (options.failOnDuplicates && files.length === 0) {
     throw new Error("No files were scanned; refusing to exit 0 under --fail-on-duplicates");
+  }
+
+  // A committed .dry-ts.json silently shaping WHAT the gate sees (scan scope,
+  // file skips, floors) is the sharpest config footgun: a valid config can flip a
+  // red gate green at exit 0 (the empty-scan guard above misses it — a redirected
+  // scan is non-empty-but-wrong). Surface the config-derived gate inputs to stderr
+  // (like --only-new's totals) so a config-narrowed gate is never silent.
+  if (options.failOnDuplicates) {
+    const note = configGateNote(config);
+    if (note) {
+      console.error(note);
+    }
   }
 
   const scope = resolveChangedScope(options, files);
@@ -180,6 +206,40 @@ function run(options: Options): void {
   if (options.failOnDuplicates && failing) {
     process.exitCode = 1;
   }
+}
+
+// The committed-config keys whose value changes WHAT a --fail-on-duplicates run
+// gates against: scan scope (paths), file skips (exclude/ignore/respectGitignore/
+// excludeTests/excludeTaggedTemplates/excludeKinds), and the floors/threshold that
+// decide which clusters survive. failOnDuplicates/format/counterparts do not
+// narrow scope, so they are excluded from the note.
+const GATE_SHAPING_KEYS: readonly (keyof ConfigOptions)[] = [
+  "paths",
+  "exclude",
+  "ignore",
+  "respectGitignore",
+  "excludeTests",
+  "excludeTaggedTemplates",
+  "excludeKinds",
+  "threshold",
+  "minLines",
+  "minNodes",
+  "minLocations",
+  "minDistinctKinds",
+];
+
+function configGateNote(config: ConfigOptions): string | null {
+  const parts: string[] = [];
+  for (const key of GATE_SHAPING_KEYS) {
+    const value = config[key];
+    if (value !== undefined) {
+      parts.push(`${key}=${JSON.stringify(value)}`);
+    }
+  }
+  if (parts.length === 0) {
+    return null;
+  }
+  return `${CONFIG_FILENAME} shapes this --fail-on-duplicates run: ${parts.join(", ")} (a committed config narrows what the gate sees)`;
 }
 
 interface ChangedScope {

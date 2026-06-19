@@ -4,13 +4,14 @@ description: >
   Run dry-ts after AI-generated edits to catch structural duplication before it accumulates. Load when building autonomous review loops, gating only on duplication an edit introduced with --changed/--changed-from, triaging duplicate clusters by status, using JSON output after generated changes, or deciding when local duplicate checks should become CI gates.
 type: core
 library: dry-ts
-library_version: "0.13.0"
+library_version: "0.14.0"
 sources:
   - "dry-ts:README.md"
   - "dry-ts:AGENTS.md"
   - "dry-ts:src/TypeScriptDuplicateFinder.ts"
   - "dry-ts:src/DryTs.ts"
   - "dry-ts:src/Options.ts"
+  - "dry-ts:src/Config.ts"
   - "dry-ts:test/dry-ts.test.ts"
 ---
 
@@ -105,8 +106,8 @@ changed-scope flag); the exit code is unchanged and suppressed totals go to
 stderr, so the agent sees only what it must act on without losing the debt count.
 
 For false positives the agent should never chase, stack two more opt-in filters:
-`--exclude '**/*.spec.*' '**/*.stories.*'` drops whole categories of expected
-duplication by path (test and story files are often about half of all clusters on
+`--exclude '**/*.spec.*' --exclude '**/*.stories.*'` drops whole categories of
+expected duplication by path (test and story files are often about half of all clusters on
 a frontend codebase), and `--min-distinct-kinds N` drops near-uniform candidates
 (property-only interfaces, flat config objects) that clear `--min-nodes` but carry
 little structure. On a frontend codebase add `--exclude-tagged-templates`, which
@@ -147,6 +148,29 @@ console.log(JSON.stringify({ reviewItems }, null, 2));
 ```
 
 Cluster output should drive a review decision before any abstraction is extracted.
+
+### Persist the loop's filters in `.dry-ts.json`
+
+```json
+{
+  "excludeTests": true,
+  "minNodes": 50,
+  "excludeKinds": ["ArrowFunction", "VariableStatement"],
+  "ignore": ["**/*.gen.ts"]
+}
+```
+
+Once the agent loop's boilerplate filters settle (`--exclude-kinds`,
+`--exclude-tests`, floors), commit them to a `.dry-ts.json` so the loop command
+stays short — `bunx dry-ts --profile agent --changed-from HEAD src`. Precedence
+is **explicit CLI flag > `--profile` > `.dry-ts.json` > built-in default**, and
+list options union across layers, so a profile and a committed config stack
+rather than fight. The run-scoped `--changed-from`/`--changed`/`--only-new` stay
+on the command (config rejects them by design). A broken or unreadable config
+fails loud at exit `2` naming the file — never read that as findings. Under
+`--fail-on-duplicates` a committed `exclude`/`paths`/floor that narrows the gate
+prints a `.dry-ts.json shapes this --fail-on-duplicates run: …` note to stderr,
+so a config-narrowed gate is never silent.
 
 ### Escalate repeated local checks into CI
 

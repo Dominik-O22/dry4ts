@@ -10,16 +10,19 @@ import { FileScanner } from "../src/FileScanner.js";
 import {
   ChangedRegions,
   type Cluster,
+  CONFIG_FILENAME,
   canonicalPath,
   crossFileSharedNames,
   formatCluster,
   hasCrossFileSharedName,
   isTestFile,
+  loadConfig,
   main,
   noiseSummary,
   Options,
   type OptionsInput,
   PROFILE_NAMES,
+  parseConfig,
   parseUnifiedDiff,
   printText,
   TypeScriptDuplicateFinder,
@@ -3324,4 +3327,326 @@ test("--counterparts: the COUNTERPART side of a collision reports the rendered-t
     assert.notEqual(location.nearest.file, location.file);
     assert.equal(cluster.locations[location.nearest.index].file, location.nearest.file);
   }
+});
+
+test("parseConfig maps known keys to typed values and trims string lists", () => {
+  const config = parseConfig(
+    JSON.stringify({
+      threshold: 0.7,
+      minNodes: 30,
+      excludeTests: true,
+      format: "json",
+      excludeKinds: [" Constructor ", ""],
+      ignore: ["**/*.gen.ts"],
+    }),
+  );
+  assert.equal(config.threshold, 0.7);
+  assert.equal(config.minNodes, 30);
+  assert.equal(config.excludeTests, true);
+  assert.equal(config.format, "json");
+  // Blank entries are dropped and surviving ones trimmed, like the CLI parsers.
+  assert.deepEqual(config.excludeKinds, ["Constructor"]);
+  assert.deepEqual(config.ignore, ["**/*.gen.ts"]);
+});
+
+test("parseConfig rejects an unknown key, naming the valid set", () => {
+  assert.throws(() => parseConfig(JSON.stringify({ onlyNew: true })), /unknown key "onlyNew"/);
+  assert.throws(() => parseConfig(JSON.stringify({ changedFrom: "HEAD" })), /unknown key "changedFrom"/);
+});
+
+test("parseConfig rejects malformed JSON, a non-object top level, and wrong value types", () => {
+  assert.throws(() => parseConfig("{not json"), /invalid JSON/);
+  assert.throws(() => parseConfig("[1, 2]"), /expected a JSON object/);
+  assert.throws(() => parseConfig("42"), /expected a JSON object/);
+  assert.throws(() => parseConfig(JSON.stringify({ threshold: "high" })), /"threshold" must be a number/);
+  assert.throws(() => parseConfig(JSON.stringify({ excludeTests: "yes" })), /"excludeTests" must be a boolean/);
+  assert.throws(() => parseConfig(JSON.stringify({ ignore: "nope" })), /"ignore" must be an array of strings/);
+  assert.throws(() => parseConfig(JSON.stringify({ format: "yaml" })), /"format" must be one of/);
+});
+
+test("config values apply under defaults but below an explicit CLI flag and an active profile", () => {
+  // Config above the built-in default.
+  assert.equal(Options.fromCli([], { minNodes: 33 }).minNodes, 33);
+  assert.equal(Options.fromCli([], { threshold: 0.5 }).threshold, 0.5);
+  // Explicit CLI flag wins over config.
+  assert.equal(Options.fromCli(["--min-nodes", "10"], { minNodes: 33 }).minNodes, 10);
+  // An active profile's value wins over config (pr sets minNodes 50).
+  const profiled = Options.fromCli(["--profile", "pr", "--changed-from", "HEAD"], { minNodes: 33 });
+  assert.equal(profiled.minNodes, 50);
+});
+
+test("config paths set the default scan roots; a CLI path argument overrides them", () => {
+  assert.deepEqual(Options.fromCli([], { paths: ["lib"] }).paths, ["lib"]);
+  assert.deepEqual(Options.fromCli(["src"], { paths: ["lib"] }).paths, ["src"]);
+  // No config and no CLI path keeps the built-in default.
+  assert.deepEqual(Options.fromCli([]).paths, ["src"]);
+});
+
+test("config excludeKinds union profile-first then config then CLI, deduped", () => {
+  const options = Options.fromCli(["--profile", "pr", "--changed-from", "HEAD", "--exclude-kinds", "Constructor"], {
+    excludeKinds: ["EnumDeclaration", "ArrowFunction"],
+  });
+  // pr's ArrowFunction/VariableStatement first, then config's new EnumDeclaration
+  // (ArrowFunction already seen is dropped), then the CLI's Constructor.
+  assert.deepEqual(options.excludeKinds, ["ArrowFunction", "VariableStatement", "EnumDeclaration", "Constructor"]);
+});
+
+test("config exclude and its ignore alias both feed the --exclude glob list, config ahead of CLI", () => {
+  const options = Options.fromCli(["--exclude", "cli/**"], {
+    exclude: ["vendor/**"],
+    ignore: ["**/*.gen.ts"],
+  });
+  assert.deepEqual(options.exclude, ["vendor/**", "**/*.gen.ts", "cli/**"]);
+});
+
+test("loadConfig returns an empty config when no file is present and reads .dry-ts.json when it is", async () => {
+  const projectDir = await mkdtemp(path.join(tmpdir(), "dry-ts-config-"));
+  const originalCwd = process.cwd();
+  try {
+    process.chdir(projectDir);
+    assert.deepEqual(loadConfig(), {});
+    await writeFile(path.join(projectDir, CONFIG_FILENAME), JSON.stringify({ minNodes: 42, ignore: ["gen/**"] }));
+    assert.deepEqual(loadConfig(), { minNodes: 42, ignore: ["gen/**"] });
+  } finally {
+    process.chdir(originalCwd);
+  }
+});
+
+test("a committed .dry-ts.json ignore glob excludes matching files from a directory scan", async () => {
+  const projectDir = await mkdtemp(path.join(tmpdir(), "dry-ts-config-ignore-"));
+  const keptDir = path.join(projectDir, "kept");
+  const generatedDir = path.join(projectDir, "generated");
+  await mkdir(keptDir);
+  await mkdir(generatedDir);
+  await writeFile(
+    path.join(projectDir, CONFIG_FILENAME),
+    JSON.stringify({ ignore: ["generated/**"], threshold: 0.2, minLines: 3, minNodes: 8 }),
+  );
+  await writeFile(path.join(keptDir, "one.ts"), duplicateBody);
+  await writeFile(path.join(keptDir, "two.ts"), duplicateBody);
+  await writeFile(path.join(generatedDir, "three.ts"), duplicateBody);
+
+  const originalCwd = process.cwd();
+  try {
+    process.chdir(projectDir);
+    const options = Options.fromCli(["."], loadConfig());
+    const clusters = new TypeScriptDuplicateFinder().findClusters(options);
+    const allFiles = clusters.flatMap((cluster) => cluster.locations.map((loc) => loc.file));
+    assert.ok(
+      allFiles.every((f) => !f.includes("generated")),
+      `Expected no generated/ files in results, got: ${JSON.stringify(allFiles)}`,
+    );
+    assert.ok(
+      allFiles.some((f) => f.includes("kept")),
+      "Expected kept/ duplicates to still be reported",
+    );
+  } finally {
+    process.chdir(originalCwd);
+  }
+});
+
+test("loadConfig fails loud on a present-but-broken .dry-ts.json (malformed JSON and unreadable file)", async () => {
+  const originalCwd = process.cwd();
+  try {
+    // Malformed-but-readable JSON → invalid-JSON error, not a silent {}.
+    const malformed = await mkdtemp(path.join(tmpdir(), "dry-ts-config-bad-"));
+    await writeFile(path.join(malformed, CONFIG_FILENAME), "{not json");
+    process.chdir(malformed);
+    assert.throws(() => loadConfig(), /invalid JSON/);
+
+    // A present-but-unreadable config (here a DIRECTORY → readFileSync throws
+    // EISDIR, not ENOENT) must ALSO fail loud, never downgrade to {} (default
+    // policy at exit 0) — that would silently weaken a committed gate.
+    const unreadable = await mkdtemp(path.join(tmpdir(), "dry-ts-config-eisdir-"));
+    await mkdir(path.join(unreadable, CONFIG_FILENAME));
+    process.chdir(unreadable);
+    assert.throws(() => loadConfig(), /cannot read/);
+  } finally {
+    process.chdir(originalCwd);
+  }
+});
+
+test("parseConfig accepts every persistable scalar and the exclude/respectGitignore policy slice", () => {
+  const config = parseConfig(
+    JSON.stringify({
+      paths: ["lib", "  ", "app"],
+      minLines: 6,
+      minLocations: 3,
+      minDistinctKinds: 2,
+      failOnDuplicates: true,
+      respectGitignore: false,
+      excludeTaggedTemplates: true,
+      counterparts: true,
+      exclude: ["vendor/**"],
+    }),
+  );
+  // paths trims and drops the blank entry like every other string list.
+  assert.deepEqual(config.paths, ["lib", "app"]);
+  assert.equal(config.minLines, 6);
+  assert.equal(config.minLocations, 3);
+  assert.equal(config.minDistinctKinds, 2);
+  assert.equal(config.failOnDuplicates, true);
+  assert.equal(config.respectGitignore, false);
+  assert.equal(config.excludeTaggedTemplates, true);
+  assert.equal(config.counterparts, true);
+  assert.deepEqual(config.exclude, ["vendor/**"]);
+});
+
+test("config supplies every persistable scalar under the default when no CLI flag is given", () => {
+  const options = Options.fromCli([], {
+    minLines: 7,
+    minLocations: 4,
+    minDistinctKinds: 3,
+    failOnDuplicates: true,
+    respectGitignore: false,
+    excludeTaggedTemplates: true,
+    counterparts: true,
+    format: "edn",
+  });
+  assert.equal(options.minLines, 7);
+  assert.equal(options.minLocations, 4);
+  assert.equal(options.minDistinctKinds, 3);
+  assert.equal(options.failOnDuplicates, true);
+  assert.equal(options.respectGitignore, false);
+  assert.equal(options.excludeTaggedTemplates, true);
+  assert.equal(options.counterparts, true);
+  assert.equal(options.format, "edn");
+});
+
+test("an explicit CLI flag overrides the config for boolean and list options too", () => {
+  // --no-gitignore flips respectGitignore false even though config asks for true.
+  assert.equal(Options.fromCli(["--no-gitignore"], { respectGitignore: true }).respectGitignore, false);
+  // --format text overrides a config format.
+  assert.equal(Options.fromCli(["--text"], { format: "json" }).format, "text");
+  // --counterparts on top of a config that omits it.
+  assert.equal(Options.fromCli(["--counterparts"], {}).counterparts, true);
+});
+
+test("an empty config paths array falls through to the built-in default scan root", () => {
+  // stringList drops blanks, so paths:[""] resolves to an empty list -> "src".
+  assert.deepEqual(Options.fromCli([], { paths: [] }).paths, ["src"]);
+  assert.deepEqual(Options.fromCli([], parseConfig(JSON.stringify({ paths: [""] }))).paths, ["src"]);
+});
+
+test("a config value out of range is rejected by the downstream Options validator", () => {
+  // Config.parse only checks types; ranges are the Options constructor's job.
+  assert.throws(() => Options.fromCli([], { threshold: 5 }), /threshold must be greater than 0 and at most 1/);
+  assert.throws(() => Options.fromCli([], { minNodes: 0 }), /minNodes must be at least 1/);
+  assert.throws(() => Options.fromCli([], { minLocations: 1 }), /minLocations must be at least 2/);
+});
+
+test("parseConfig rejects a non-integer count, a non-finite number, and a mixed-type list", () => {
+  // Count keys mirror the integer CLI flags, so a fractional floor the CLI cannot
+  // express is rejected — a committed config can't quietly mean "effectively 3".
+  assert.throws(() => parseConfig(JSON.stringify({ minNodes: 1.9 })), /"minNodes" must be an integer/);
+  assert.throws(() => parseConfig(JSON.stringify({ minLocations: 2.5 })), /"minLocations" must be an integer/);
+  // 1e999 (as raw JSON text, not a JS literal) parses to Infinity: rejected as a
+  // non-finite number (threshold) and a non-integer (count) — exercising the
+  // !Number.isFinite / !Number.isInteger halves.
+  assert.throws(() => parseConfig('{"threshold": 1e999}'), /"threshold" must be a number/);
+  assert.throws(() => parseConfig('{"minNodes": 1e999}'), /"minNodes" must be an integer/);
+  // A list with a non-string element (a plausible hand-edit slip), not just a non-array.
+  assert.throws(() => parseConfig(JSON.stringify({ ignore: ["ok", 5] })), /"ignore" must be an array of strings/);
+  assert.throws(
+    () => parseConfig(JSON.stringify({ excludeKinds: ["Constructor", null] })),
+    /"excludeKinds" must be an array of strings/,
+  );
+});
+
+test("a config-sourced unknown excludeKind is rejected by the downstream validator", () => {
+  // parseConfig only type-checks the list; an invalid kind NAME is caught once,
+  // downstream, by the Options constructor — verify that guard fires via the config path.
+  assert.throws(() => Options.fromCli([], { excludeKinds: ["Nope"] }), /Unknown candidate kind: Nope/);
+});
+
+test("an active profile's scalar wins over a config value (format)", () => {
+  // agent profile sets format json; a config format must not win over it.
+  const options = Options.fromCli(["--profile", "agent", "--changed-from", "HEAD"], { format: "text" });
+  assert.equal(options.format, "json");
+});
+
+// Runs main() from a fresh temp dir that holds a malformed .dry-ts.json, with
+// stdout/stderr captured. Both config-failure-mode tests share it so the scaffold
+// is not duplicated (dry-ts dogfoods its own duplicate scan over test/).
+async function runMainInTempProject(
+  configText: string,
+  args: readonly string[],
+  files: Record<string, string> = {},
+): Promise<{ exitCode: number | string | undefined; out: string[]; err: string[] }> {
+  const projectDir = await mkdtemp(path.join(tmpdir(), "dry-ts-config-main-"));
+  await writeFile(path.join(projectDir, CONFIG_FILENAME), configText);
+  for (const [name, body] of Object.entries(files)) {
+    await writeFile(path.join(projectDir, name), body);
+  }
+  const out: string[] = [];
+  const err: string[] = [];
+  const originalCwd = process.cwd();
+  const originalLog = console.log;
+  const originalError = console.error;
+  const sink =
+    (target: string[]) =>
+    (...a: unknown[]) =>
+      target.push(a.map(String).join(" "));
+  console.log = sink(out);
+  console.error = sink(err);
+  try {
+    process.chdir(projectDir);
+    process.exitCode = 0;
+    await main([...args]);
+    return { exitCode: process.exitCode, out, err };
+  } finally {
+    console.log = originalLog;
+    console.error = originalError;
+    process.chdir(originalCwd);
+    process.exitCode = 0;
+  }
+}
+
+const runMainWithBrokenConfig = (args: readonly string[]) => runMainInTempProject("{not json", args);
+
+test("main: a malformed working-directory .dry-ts.json fails a scan (exit 2) but never blocks --help", async () => {
+  // A real scan loads the broken config and reports it as an option error.
+  const scan = await runMainWithBrokenConfig(["."]);
+  assert.equal(scan.exitCode, 2);
+  assert.ok(
+    scan.err.some((line) => line.includes("invalid JSON")),
+    `Expected an invalid-JSON message on stderr, got: ${JSON.stringify(scan.err)}`,
+  );
+
+  // --help bypasses loadConfig entirely — the one command that must never fail.
+  const usage = await runMainWithBrokenConfig(["--help"]);
+  assert.notEqual(usage.exitCode, 2);
+  assert.ok(
+    usage.out.some((line) => line.includes("Usage: dry-ts")),
+    `Expected USAGE in stdout despite the broken config, got: ${JSON.stringify(usage.out)}`,
+  );
+});
+
+test("main: a committed config that shapes the gate prints a scope note under --fail-on-duplicates", async () => {
+  // A VALID config that narrows what --fail-on-duplicates sees is the sharpest
+  // footgun (it can flip a red gate green at exit 0). The run surfaces the
+  // config-derived gate inputs on stderr so the narrowing is never silent.
+  const gated = await runMainInTempProject(
+    JSON.stringify({ exclude: ["vendor/**"], minNodes: 200 }),
+    ["--fail-on-duplicates", "."],
+    { "a.ts": "export const a = 1;\n" },
+  );
+  assert.ok(
+    gated.err.some((line) => line.includes(".dry-ts.json shapes this --fail-on-duplicates run")),
+    `Expected a gate-scope note on stderr, got: ${JSON.stringify(gated.err)}`,
+  );
+  assert.ok(
+    gated.err.some((line) => line.includes("minNodes=200") && line.includes('exclude=["vendor/**"]')),
+    `Expected the config-derived gate inputs in the note, got: ${JSON.stringify(gated.err)}`,
+  );
+
+  // Without --fail-on-duplicates the note does not fire: config narrowing is
+  // visible in normal output, so the note is a gate-only safety surfacing.
+  const ungated = await runMainInTempProject(JSON.stringify({ exclude: ["vendor/**"], minNodes: 200 }), ["."], {
+    "a.ts": "export const a = 1;\n",
+  });
+  assert.ok(
+    !ungated.err.some((line) => line.includes("shapes this --fail-on-duplicates run")),
+    `Expected no gate-scope note without the gate, got: ${JSON.stringify(ungated.err)}`,
+  );
 });

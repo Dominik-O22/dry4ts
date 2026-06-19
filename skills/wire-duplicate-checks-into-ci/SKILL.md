@@ -4,12 +4,13 @@ description: >
   Use dry-ts as a CI or automated review gate with --format json and --fail-on-duplicates. Load when writing GitHub Actions, gating a PR only on new duplication with --changed-from, parsing cluster JSON status, or handling dry-ts exit codes 0, 1, and 2.
 type: core
 library: dry-ts
-library_version: "0.13.0"
+library_version: "0.14.0"
 sources:
   - "dry-ts:README.md"
   - "dry-ts:AGENTS.md"
   - "dry-ts:src/DryTs.ts"
   - "dry-ts:src/Options.ts"
+  - "dry-ts:src/Config.ts"
   - "dry-ts:.github/workflows/ci.yml"
 ---
 
@@ -75,6 +76,42 @@ comment or annotation shows only the duplication the change introduced, not the
 full known-debt list. It requires `--changed-from`/`--changed` and is an output
 filter only: the exit code is unchanged (still `1` when new clusters exist), and
 the suppressed-cluster totals go to stderr so nothing is silently lost.
+
+### Commit the gate policy in `.dry-ts.json`
+
+```json
+{
+  "paths": ["src", "test"],
+  "excludeTests": true,
+  "minNodes": 50,
+  "excludeKinds": ["ArrowFunction", "VariableStatement"],
+  "ignore": ["**/*.gen.ts"]
+}
+```
+
+A `.dry-ts.json` in the repo root sets a committed baseline so the CI command
+stays one line (`bunx dry-ts --fail-on-duplicates --changed-from origin/main`)
+instead of carrying the whole flag list. Precedence is **explicit CLI flag >
+`--profile` > `.dry-ts.json` > built-in default**, and list options
+(`excludeKinds`, `exclude`/`ignore`) union across layers. The run-scoped
+`--changed-from`/`--changed`/`--only-new` are CLI-only — keep them on the command.
+A broken or unreadable config (bad JSON, unknown key, wrong type, a directory, a
+permission error) fails the run loud at exit `2` naming the file; only an absent
+file is a no-op. Persistable keys: `threshold`, `minLines`, `minNodes`,
+`minLocations`, `minDistinctKinds`, `format`, `failOnDuplicates`,
+`respectGitignore`, `excludeKinds`, `exclude`/`ignore`, `excludeTaggedTemplates`,
+`excludeTests`, `counterparts`, `paths`.
+
+**Gate sharp edge — a committed config can narrow the gate.** A committed
+`paths`, `exclude`/`ignore`, `respectGitignore`, `excludeTests`,
+`excludeTaggedTemplates`, `excludeKinds`, or a `threshold`/numeric floor changes
+*what* `--fail-on-duplicates` sees: a too-broad `exclude` or a high
+`minNodes` can shrink the scan so a real duplicate slips through and the gate
+exits `0`. To keep that from being silent, under `--fail-on-duplicates` dry-ts
+prints the config-derived gate inputs to stderr
+(`.dry-ts.json shapes this --fail-on-duplicates run: …`), like the `--only-new`
+totals line. Keep a CI-gating config narrow, and surface that stderr note in CI
+logs.
 
 ### Emit JSON for agent consumers
 

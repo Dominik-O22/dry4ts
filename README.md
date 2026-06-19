@@ -23,7 +23,7 @@ bunx dry-ts --sarif --changed-from origin/main src > dry-ts.sarif
 
 `--profile pr` and `--profile agent` are curated presets (see [Profiles](#profiles---profile-name)). Both **require** a changed-scope flag and fail loud without one, so they never gate against the wrong base.
 
-- **Config:** persisting flags in a committed config file (`.dry-ts.json`) so a repo sets policy once is [planned](https://github.com/Dominik-O22/dry4ts/issues/23), not shipped. Until then, encode policy in a profile + a short flag list.
+- **Config:** commit a [`.dry-ts.json`](#config-file-dry-tsjson) so the repo sets its scan policy once instead of retyping flags. CLI flags and `--profile` still override it.
 - **Suppress an intentional repetition:** annotate it with [`// dry-ignore`](#suppressing-a-single-occurrence--dry-ignore), or exclude a whole path with `--exclude`.
 - **Full flag reference:** [Usage](#usage). **Cutting noise:** [Curating results](#curating-results).
 
@@ -200,10 +200,10 @@ the kind filters below.
 
 Rather than rediscover the right flag combination per run, start from a curated
 preset. `--profile NAME` seeds a bundle of defaults; any explicit flag you pass
-overrides it. Precedence is **explicit flag > profile > built-in default**, and
-list flags (`--exclude-kinds`) **union** the profile's entries with yours rather
-than replacing them — so `--profile pr --exclude-kinds Constructor` excludes
-`ArrowFunction`, `VariableStatement`, *and* `Constructor`.
+overrides it. Precedence is **explicit flag > profile > [`.dry-ts.json`](#config-file-dry-tsjson) >
+built-in default**, and list flags (`--exclude-kinds`) **union** the profile's
+entries with yours rather than replacing them — so `--profile pr --exclude-kinds
+Constructor` excludes `ArrowFunction`, `VariableStatement`, *and* `Constructor`.
 
 | Profile | Expands to | For |
 | --- | --- | --- |
@@ -215,6 +215,55 @@ than replacing them — so `--profile pr --exclude-kinds Constructor` excludes
 
 A profile only ever *turns things on* (there is no negation flag to switch one
 back off), so each stays at the high-signal defaults its name implies.
+
+### Config file: `.dry-ts.json`
+
+Commit a `.dry-ts.json` to the repo root so its scan policy lives in one file
+instead of a flag list every run (and so a [CI action](#ci) or
+[agent loop](#ai-agents) stays one line). dry-ts reads it from the working
+directory; it is plain JSON:
+
+```json
+{
+  "minNodes": 40,
+  "excludeTests": true,
+  "excludeKinds": ["ArrowFunction"],
+  "ignore": ["**/*.gen.ts", "src/generated/**"]
+}
+```
+
+Precedence is **explicit CLI flag > `--profile` > `.dry-ts.json` > built-in
+default**: the config sets the repo's baseline, and anything you type for a
+single run still wins. List options (`excludeKinds`, `exclude`/`ignore`) **union**
+across the layers rather than replacing. `ignore` is an alias for `exclude` —
+both add `.gitignore`-style globs applied on top of `.gitignore`.
+
+Every persistable option is accepted: `threshold`, `minLines`, `minNodes`,
+`minLocations`, `minDistinctKinds`, `format`, `failOnDuplicates`,
+`respectGitignore`, `excludeKinds`, `exclude`, `ignore`,
+`excludeTaggedTemplates`, `excludeTests`, `counterparts`, and `paths`. The
+run-scoped flags `--changed-from`, `--changed`, and `--only-new` are CLI-only by
+design — they describe one invocation, not a committed baseline. The config fails
+the run loud (exit 2, naming the file) on an unknown key, a wrong value type, a
+fractional value for an integer count (`minLines`/`minNodes`/`minLocations`/
+`minDistinctKinds`), or a present-but-unreadable file (a directory or a permission
+error — only a genuinely absent config is the silent no-op). It never silently
+scans with the wrong policy.
+
+> **Gate sharp edge.** A committed config's `paths`, `exclude`/`ignore`,
+> `respectGitignore`, `excludeTests`, `excludeTaggedTemplates`, `excludeKinds`, or
+> the `threshold`/numeric floors change *what* `--fail-on-duplicates` sees — a
+> committed `exclude` or a higher `minNodes` can shrink the gate so a real
+> duplicate slips through and the gate exits 0. This is
+> the config doing its job (committed policy), but to keep it from being silent,
+> under `--fail-on-duplicates` dry-ts prints the config-derived gate inputs to
+> stderr (`.dry-ts.json shapes this --fail-on-duplicates run: …`), like the
+> `--only-new` totals line. Keep CI-gating config narrow, and read that note.
+
+> Per-path overrides (a looser `threshold`/`minNodes` for `tests/**` than
+> `src/**` in one run) are not yet supported — tracked on
+> [#23](https://github.com/Dominik-O22/dry4ts/issues/23). Run separate scans, or
+> use `--profile` per tree, until then.
 
 ### Dropping near-uniform candidates: `--min-distinct-kinds`
 
@@ -307,8 +356,9 @@ whole path with `--exclude '<glob>'` (or `.gitignore`), accepting that it also
 hides any real duplicate that later lands there.
 
 For file- or glob-level ignores, exclude the path via `--exclude`/`.gitignore`
-(or `--no-gitignore` to override). Persisting *flags* in config (so you do not
-retype `--exclude-tests --min-nodes 40 …` every run) is [planned](https://github.com/Dominik-O22/dry4ts/issues/23) — config state, not a findings baseline — and does not exist yet.
+(or `--no-gitignore` to override). To stop retyping `--exclude-tests --min-nodes
+40 …` every run, commit a [`.dry-ts.json`](#config-file-dry-tsjson) — it persists
+*flags* (config state), not a findings baseline.
 
 ## Incremental gating
 
