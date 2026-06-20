@@ -208,7 +208,7 @@ Constructor` excludes `ArrowFunction`, `VariableStatement`, *and* `Constructor`.
 | Profile | Expands to | For |
 | --- | --- | --- |
 | `pr` | `--exclude-tests --min-nodes 50 --exclude-kinds ArrowFunction,VariableStatement --only-new --fail-on-duplicates` | PR gate, highest signal. **Requires** `--changed-from`/`--changed` (it sets `--only-new`, which errors without a scope — so it fails loud rather than gating against the wrong base). |
-| `agent` | `pr` **+** `--counterparts --format json` | After-edit agent loop. The PR gate plus per-location [counterpart routing](#nearest-counterpart-provenance---counterparts) and JSON output, so an agent reads each new finding's nearest existing match. Inherits `pr`'s scope requirement. See [AI Agents](#ai-agents). |
+| `agent` | `pr` **+** `--counterparts --format json --demote-boilerplate` | After-edit agent loop. The PR gate plus per-location [counterpart routing](#nearest-counterpart-provenance---counterparts), JSON output, and boilerplate demotion (work-free clusters like the classic DI constructor sink below real candidates, so the agent reads likely-real duplicates first). Inherits `pr`'s scope requirement. See [AI Agents](#ai-agents). |
 | `src` | `--exclude-tests` | Source-only scan with test scaffolding dropped. |
 | `audit` | `--min-nodes 12` | Broad exploratory scan — lower the floor to surface near-misses the default filters out. |
 | `tests` | `--exclude-kinds ArrowFunction --min-nodes 40` | Test-*infrastructure* duplication (shared setup/fixtures/builders), explicitly **not** the anonymous arrow bodies that dominate a raw test scan. Point it at your test directories. |
@@ -528,7 +528,7 @@ bunx dry-ts --profile agent --changed-from HEAD src test
 
 The loop:
 
-1. **Run after edits** with `--profile agent` (= `--only-new --counterparts --fail-on-duplicates --format json` over the `pr` floors).
+1. **Run after edits** with `--profile agent` (= `--only-new --counterparts --fail-on-duplicates --format json --demote-boilerplate` over the `pr` floors).
 2. **Read the exit code.** `0` = clean. `1` = new duplication found, with the JSON below on stdout. `2` = infra/config failure — do **not** read it as findings.
 3. **Per cluster, read `locations[].nearest`** — the nearest existing match — and its `changed` flag to route the fix:
    - counterpart `changed: false` ⇒ the new code duplicates **existing** code → reuse / extract toward the existing definition.

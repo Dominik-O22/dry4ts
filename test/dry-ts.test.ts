@@ -240,9 +240,10 @@ test("--profile agent is the pr gate plus counterparts and json output", () => {
   assert.deepEqual(options.excludeKinds, ["ArrowFunction", "VariableStatement"]);
   assert.equal(options.onlyNew, true);
   assert.equal(options.failOnDuplicates, true);
-  // ...and adds the two agent-loop fields the profile mechanism now carries.
+  // ...and adds the agent-loop fields the profile mechanism now carries.
   assert.equal(options.counterparts, true);
   assert.equal(options.format, "json");
+  assert.equal(options.demoteBoilerplate, true);
 });
 
 test("--profile agent without a changed scope fails loud (inherits pr's only-new)", () => {

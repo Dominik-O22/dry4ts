@@ -16,6 +16,7 @@ interface ProfileFlags {
   readonly failOnDuplicates?: boolean;
   readonly format?: OutputFormat;
   readonly counterparts?: boolean;
+  readonly demoteBoilerplate?: boolean;
 }
 
 // PR gate, highest signal. Deliberately requires an explicit --changed-from /
@@ -41,11 +42,13 @@ const PROFILES: Record<string, ProfileFlags> = {
   // anonymous arrow bodies (the dominant test-scan noise) and raise the floor.
   // Point it at your test directories.
   tests: { excludeKinds: ["ArrowFunction"], minNodes: 40 },
-  // After-edit agent loop: the PR gate plus per-location counterpart routing and
-  // JSON output, so an agent reads each new finding's nearest existing match and
-  // either reuses it or justifies the duplication. Inherits pr's onlyNew, so it
-  // too fails loud without a --changed-from/--changed scope.
-  agent: { ...PR_PROFILE, counterparts: true, format: "json" },
+  // After-edit agent loop: the PR gate plus per-location counterpart routing,
+  // JSON output, and boilerplate demotion (work-free clusters — the classic DI
+  // constructor — sink below real candidates so the agent reads the likely-real
+  // duplicates first). An agent reads each new finding's nearest existing match
+  // and either reuses it or justifies the duplication. Inherits pr's onlyNew, so
+  // it too fails loud without a --changed-from/--changed scope.
+  agent: { ...PR_PROFILE, counterparts: true, format: "json", demoteBoilerplate: true },
 };
 
 // The profile names a user can pass, for validation and help/docs.
@@ -390,8 +393,9 @@ export class Options {
       excludeTaggedTemplates: pick(excludeTaggedTemplates, undefined, config.excludeTaggedTemplates, false),
       excludeTests: pick(excludeTests, profile.excludeTests, config.excludeTests, false),
       counterparts: pick(counterparts, profile.counterparts, config.counterparts, false),
-      // Prototype: CLI-only (no profile/config layer yet).
-      demoteBoilerplate: demoteBoilerplate ?? false,
+      // Set by --profile agent; an explicit --demote-boilerplate still wins. No
+      // config-file layer yet (not persistable until the signal graduates).
+      demoteBoilerplate: pick(demoteBoilerplate, profile.demoteBoilerplate, undefined, false),
     });
   }
 }
