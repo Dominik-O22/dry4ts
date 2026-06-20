@@ -67,6 +67,7 @@ export class TypeScriptDuplicateFinder {
       excludeKinds,
       resolvedOptions.minDistinctKinds,
       resolvedOptions.excludeTaggedTemplates,
+      resolvedOptions.demoteBoilerplate,
     );
     return { files, clusters: this.clustersFor(entries, resolvedOptions) };
   }
@@ -269,6 +270,9 @@ function clusterLocation(entry: Entry): ClusterLocation {
     nodes: entry.nodes,
     kind: entry.kind,
     name: entry.name,
+    // Carried only under --demote-boilerplate (absent otherwise), so the default
+    // location shape — and the JSON output — is byte-identical.
+    ...(entry.boilerplate !== undefined ? { boilerplate: entry.boilerplate } : {}),
   };
 }
 

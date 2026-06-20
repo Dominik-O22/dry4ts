@@ -3650,3 +3650,62 @@ test("main: a committed config that shapes the gate prints a scope note under --
     `Expected no gate-scope note without the gate, got: ${JSON.stringify(ungated.err)}`,
   );
 });
+
+test("--demote-boilerplate flag parses; default off", () => {
+  assert.equal(Options.parse(".").demoteBoilerplate, false);
+  assert.equal(Options.parse("--demote-boilerplate", ".").demoteBoilerplate, true);
+});
+
+test("--demote-boilerplate sinks work-free clusters below real-work ones, even cross-file-named", async () => {
+  // Each file holds a wiring-only function (assignments only — no control flow, no
+  // call, no real operator) and a real-work function (loop + arithmetic). Both recur
+  // cross-file with identical structure, so both clusters are cross-file-named and
+  // score 1.0; `wire` is declared first, so the default location tiebreak ranks it
+  // ahead. With the flag, the work-free `wire` cluster must sink below `total`.
+  const source = `
+export function wire(target: Target, a: Value, b: Value, c: Value): void {
+  target.first = a;
+  target.second = b;
+  target.third = c;
+}
+
+export function total(values: number[]): number {
+  let sum = 0;
+  for (const value of values) {
+    sum = sum + value;
+  }
+  return sum;
+}
+`;
+  const { dir } = await writeFixture({ "a.ts": source, "b.ts": source });
+  const scan: OptionsInput = { paths: [dir], threshold: 0.8, minLines: 1, minNodes: 5 };
+  const nameOf = (cluster: Cluster) => cluster.locations[0].name;
+
+  const baseline = new TypeScriptDuplicateFinder().findClusters(scan);
+  assert.deepEqual(
+    baseline.map(nameOf),
+    ["wire", "total"],
+    "off the flag, the first-declared `wire` wins the location tiebreak",
+  );
+  assert.ok(
+    baseline.every((cluster) => cluster.locations.every((location) => !("boilerplate" in location))),
+    "off the flag, no location carries a boilerplate own-property (byte-identical shape)",
+  );
+
+  const demoted = new TypeScriptDuplicateFinder().findClusters({ ...scan, demoteBoilerplate: true });
+  assert.deepEqual(
+    demoted.map(nameOf),
+    ["total", "wire"],
+    "on the flag, the work-free cluster sinks below the real one",
+  );
+  const wire = demoted.find((cluster) => nameOf(cluster) === "wire");
+  const work = demoted.find((cluster) => nameOf(cluster) === "total");
+  assert.ok(
+    wire?.locations.every((location) => location.boilerplate === true),
+    "`wire` candidates flagged boilerplate",
+  );
+  assert.ok(
+    work?.locations.every((location) => location.boilerplate === false),
+    "`total` does real work (loop + arithmetic)",
+  );
+});

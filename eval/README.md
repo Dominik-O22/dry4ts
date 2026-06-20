@@ -168,6 +168,28 @@ the output hits real dups first. It plateaus at p@20 0.65 because data-shape /
 coincidental FPs (which *do* real work) survive — the semantic residual. sentry is
 untouched (0 demoted): its FPs are the semantic kind, correctly left as candidates.
 
+### Engine prototype (`--demote-boilerplate`)
+
+The rerank above is a harness. The same demote, implemented in the engine
+(`FileScanner.doesRealWork` computes "no control flow / no non-`super` call / no
+real operator" from the raw AST; `rankClusters` sinks all-boilerplate clusters),
+re-scored via `dry-ts … --demote-boilerplate --format json` + `eval-precision
+--ranking`:
+
+| corpus  | p@5 base → engine | p@10 | p@20 | flagged |
+|---------|-------------------|------|------|---------|
+| n8n-cli | **0.20 → 0.80**   | 0.50 → **0.80** | 0.50 → 0.60 | 9 |
+| sentry  | 0.80 → 0.80       | 0.80 | 0.80 | 0 |
+
+The engine uses **only** the principled signal (does-no-work), not the harness's
+blunt "all-Constructor" clause — and is *more correct* for it: the real constructor
+dup `n8n-cli-9` (which does work) stays in the top, where the harness wrongly sank
+it (that's why harness p@5 hit 1.0 — it demoted a real dup too). The one FP left in
+the engine's top-5 (`n8n-cli-7`) is a constructor that does a little work — a
+borderline/semantic case dry-ts correctly leaves as a candidate. p@10 0.80 > harness
+0.70 confirms the principled signal is the better one. `super()` and decorators
+(`@Inject(...)`) are skipped so they don't count as work.
+
 ### Conclusion
 
 The "kill the knobs → tiers" idea, narrowed by evidence: a full weighted score
