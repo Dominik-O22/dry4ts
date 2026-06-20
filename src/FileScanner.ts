@@ -340,11 +340,13 @@ function isTaggedTemplateValued(node: ts.Node): boolean {
 
 // Boilerplate demote (--demote-boilerplate). A candidate "does real work" if its
 // subtree contains any control flow, a call other than super(), a construction, a
-// real operator (anything but plain `=` / `,`), or await/yield. The classic
-// negative is a DI constructor that only wires fields (or a TS param-property
-// constructor with no body): identical across many classes, but logic-free, so a
-// near-certain false positive. Decorators and type nodes are skipped — they are
-// annotations, not logic, so a `@Inject(TOKEN)` param does not count as work.
+// tagged template (the tag function runs), a real operator (anything but plain
+// `=` / `,`), or await/yield. The classic negative is a DI constructor that only
+// wires fields (or a TS param-property constructor with no body): identical across
+// many classes, but logic-free, so a near-certain false positive. Decorators and
+// type nodes are skipped — they are annotations, not logic, so a `@Inject(TOKEN)`
+// param does not count as work. (Styling FPs — styled-components etc. — are a
+// separate concern handled by --exclude-tagged-templates, not demoted here.)
 const CONTROL_FLOW_KINDS: ReadonlySet<ts.SyntaxKind> = new Set([
   ts.SyntaxKind.IfStatement,
   ts.SyntaxKind.ForStatement,
@@ -364,7 +366,7 @@ function isWorkNode(node: ts.Node): boolean {
   if (ts.isCallExpression(node)) {
     return node.expression.kind !== ts.SyntaxKind.SuperKeyword;
   }
-  if (ts.isNewExpression(node)) {
+  if (ts.isNewExpression(node) || ts.isTaggedTemplateExpression(node)) {
     return true;
   }
   if (ts.isBinaryExpression(node)) {

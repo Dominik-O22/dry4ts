@@ -3709,3 +3709,25 @@ export function total(values: number[]): number {
     "`total` does real work (loop + arithmetic)",
   );
 });
+
+test("--demote-boilerplate treats a tagged template as real work, not boilerplate", async () => {
+  // A no-substitution tagged template has no inner call/operator nodes, but the tag
+  // function still runs — so it must NOT be classified as work-free boilerplate.
+  // (Styling false positives are handled by --exclude-tagged-templates, not here.)
+  const source = `
+export const query = sql\`SELECT id, name, email FROM users WHERE active = true\`;
+`;
+  const { dir } = await writeFixture({ "a.ts": source, "b.ts": source });
+  const [cluster] = new TypeScriptDuplicateFinder().findClusters({
+    paths: [dir],
+    threshold: 0.8,
+    minLines: 1,
+    minNodes: 1,
+    demoteBoilerplate: true,
+  });
+  assert.ok(cluster, "expected a cross-file cluster for the duplicated tagged-template const");
+  assert.ok(
+    cluster.locations.every((location) => location.boilerplate === false),
+    "a tagged template executes its tag function — real work",
+  );
+});
