@@ -1,0 +1,1022 @@
+[
+  {
+    "id": "n8n-cli-1",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 1,
+    "label": "fp",
+    "confidence": 0.95,
+    "fpClass": "framework-boilerplate",
+    "reasoning": "All six constructors are NestJS/n8n DI constructors injecting completely different sets of services into unrelated classes (InvitationController, AgentTaskService, AgentsController, etc.) — the structural similarity is purely an artifact of the DI pattern, not shared logic.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 7,
+    "sameName": [
+      "constructor"
+    ],
+    "maxShared": 8,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/controllers/invitation.controller.ts:25-36|.bench/n8n/packages/cli/src/modules/agents/agent-task.service.ts:52-63|.bench/n8n/packages/cli/src/modules/agents/agents.controller.ts:116-127|.bench/n8n/packages/cli/src/modules/agents/builder/agents-builder-tools.service.ts:182-193|.bench/n8n/packages/cli/src/modules/agents/integrations/n8n-memory.ts:74-85|.bench/n8n/packages/cli/src/modules/dynamic-credentials.ee/dynamic-credentials.controller.ts:28-39|.bench/n8n/packages/cli/src/modules/sso-oidc/oidc.service.ee.ts:66-77",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/controllers/invitation.controller.ts:25-36 Constructor constructor",
+      ".bench/n8n/packages/cli/src/modules/agents/agent-task.service.ts:52-63 Constructor constructor",
+      ".bench/n8n/packages/cli/src/modules/agents/agents.controller.ts:116-127 Constructor constructor",
+      ".bench/n8n/packages/cli/src/modules/agents/builder/agents-builder-tools.service.ts:182-193 Constructor constructor",
+      ".bench/n8n/packages/cli/src/modules/agents/integrations/n8n-memory.ts:74-85 Constructor constructor",
+      ".bench/n8n/packages/cli/src/modules/dynamic-credentials.ee/dynamic-credentials.controller.ts:28-39 Constructor constructor",
+      ".bench/n8n/packages/cli/src/modules/sso-oidc/oidc.service.ee.ts:66-77 Constructor constructor"
+    ]
+  },
+  {
+    "id": "n8n-cli-2",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 2,
+    "label": "fp",
+    "confidence": 0.95,
+    "fpClass": "framework-boilerplate",
+    "reasoning": "MeController, EnterpriseCredentialsService, ExecutionRecoveryService, AgentsBuilderService, ChatIntegrationService, and SourceControlStatusService all have 9-dependency DI constructors injecting entirely different services into unrelated classes — this is standard framework-mandated DI boilerplate.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 8,
+    "sameName": [
+      "constructor"
+    ],
+    "maxShared": 8,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/controllers/me.controller.ts:32-42|.bench/n8n/packages/cli/src/credentials/credentials.service.ee.ts:24-34|.bench/n8n/packages/cli/src/executions/execution-recovery.service.ts:33-43|.bench/n8n/packages/cli/src/modules/agents/builder/agents-builder.service.ts:39-49|.bench/n8n/packages/cli/src/modules/agents/integrations/chat-integration.service.ts:96-106|.bench/n8n/packages/cli/src/modules/source-control.ee/source-control-status.service.ee.ts:50-60|.bench/n8n/packages/cli/src/modules/sso-saml/saml.service.ee.ts:95-105|.bench/n8n/packages/cli/src/services/import.service.ts:67-77",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/controllers/me.controller.ts:32-42 Constructor constructor",
+      ".bench/n8n/packages/cli/src/credentials/credentials.service.ee.ts:24-34 Constructor constructor",
+      ".bench/n8n/packages/cli/src/executions/execution-recovery.service.ts:33-43 Constructor constructor",
+      ".bench/n8n/packages/cli/src/modules/agents/builder/agents-builder.service.ts:39-49 Constructor constructor",
+      ".bench/n8n/packages/cli/src/modules/agents/integrations/chat-integration.service.ts:96-106 Constructor constructor",
+      ".bench/n8n/packages/cli/src/modules/source-control.ee/source-control-status.service.ee.ts:50-60 Constructor constructor",
+      ".bench/n8n/packages/cli/src/modules/sso-saml/saml.service.ee.ts:95-105 Constructor constructor",
+      ".bench/n8n/packages/cli/src/services/import.service.ts:67-77 Constructor constructor"
+    ]
+  },
+  {
+    "id": "n8n-cli-3",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 3,
+    "label": "fp",
+    "confidence": 0.9,
+    "fpClass": "framework-boilerplate",
+    "reasoning": "PasswordResetController and CredentialsController both have ~10-dependency DI constructors that happen to share a handful of common services (Logger, ExternalHooks, etc.) but serve completely different domains, making this a coincidental structural match driven by DI boilerplate rather than a reimplementation.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [
+      "constructor"
+    ],
+    "maxShared": 8,
+    "split": "holdout",
+    "locationKey": ".bench/n8n/packages/cli/src/controllers/password-reset.controller.ts:44-56|.bench/n8n/packages/cli/src/credentials/credentials.controller.ts:53-65",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/controllers/password-reset.controller.ts:44-56 Constructor constructor",
+      ".bench/n8n/packages/cli/src/credentials/credentials.controller.ts:53-65 Constructor constructor"
+    ]
+  },
+  {
+    "id": "n8n-cli-4",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 4,
+    "label": "real",
+    "confidence": 0.9,
+    "fpClass": "none",
+    "reasoning": "credentials.service.ts and workflow.service.ts both implement an identically-structured transferAll method with the same algorithm (fetch shared records for both projects, transfer owner records, delete from-project entries, insert non-owner shared records for those not already shared with to-project) — the only differences are the entity names (SharedCredentials/credentialsId vs SharedWorkflow/workflowId), making this a textbook candidate for a shared generic resource transfer utility.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [
+      "transferAll"
+    ],
+    "maxShared": 73,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/credentials/credentials.service.ts:1252-1300|.bench/n8n/packages/cli/src/workflows/workflow.service.ts:1114-1161",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/credentials/credentials.service.ts:1252-1300 MethodDeclaration transferAll",
+      ".bench/n8n/packages/cli/src/workflows/workflow.service.ts:1114-1161 MethodDeclaration transferAll"
+    ]
+  },
+  {
+    "id": "n8n-cli-5",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 5,
+    "label": "fp",
+    "confidence": 0.95,
+    "fpClass": "framework-boilerplate",
+    "reasoning": "EvaluationCollectionService, ExecutionPersistence, SlackAppSetupService, CommunityPackagesLifecycleService, DynamicCredentialService, and WorkflowDependencyQueryService all have 8-dependency DI constructors injecting entirely unrelated sets of services — purely framework-mandated boilerplate with no shared logic.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 7,
+    "sameName": [
+      "constructor"
+    ],
+    "maxShared": 8,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/evaluation.ee/evaluation-collection.service.ts:55-64|.bench/n8n/packages/cli/src/executions/execution-persistence.ts:53-62|.bench/n8n/packages/cli/src/modules/agents/integrations/slack-app-setup.service.ts:132-141|.bench/n8n/packages/cli/src/modules/community-packages/community-packages.lifecycle.service.ts:47-56|.bench/n8n/packages/cli/src/modules/dynamic-credentials.ee/services/dynamic-credential.service.ts:40-49|.bench/n8n/packages/cli/src/modules/workflow-index/workflow-dependency-query.service.ts:37-46|.bench/n8n/packages/cli/src/services/project.service.ee.ts:69-78",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/evaluation.ee/evaluation-collection.service.ts:55-64 Constructor constructor",
+      ".bench/n8n/packages/cli/src/executions/execution-persistence.ts:53-62 Constructor constructor",
+      ".bench/n8n/packages/cli/src/modules/agents/integrations/slack-app-setup.service.ts:132-141 Constructor constructor",
+      ".bench/n8n/packages/cli/src/modules/community-packages/community-packages.lifecycle.service.ts:47-56 Constructor constructor",
+      ".bench/n8n/packages/cli/src/modules/dynamic-credentials.ee/services/dynamic-credential.service.ts:40-49 Constructor constructor",
+      ".bench/n8n/packages/cli/src/modules/workflow-index/workflow-dependency-query.service.ts:37-46 Constructor constructor",
+      ".bench/n8n/packages/cli/src/services/project.service.ee.ts:69-78 Constructor constructor"
+    ]
+  },
+  {
+    "id": "n8n-cli-6",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 6,
+    "label": "real",
+    "confidence": 0.92,
+    "fpClass": "none",
+    "reasoning": "Both `assertFlagEnabled` methods are identical line-for-line — same PostHog flag name, same try/catch warn pattern, same NotFoundError throw — copied between two controllers serving different endpoints, with no meaningful distinction in logic or intent.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [
+      "assertFlagEnabled"
+    ],
+    "maxShared": 54,
+    "split": "holdout",
+    "locationKey": ".bench/n8n/packages/cli/src/evaluation.ee/evaluation-collections.controller.ee.ts:60-71|.bench/n8n/packages/cli/src/evaluation.ee/insights/eval-insights.controller.ee.ts:38-49",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/evaluation.ee/evaluation-collections.controller.ee.ts:60-71 MethodDeclaration assertFlagEnabled",
+      ".bench/n8n/packages/cli/src/evaluation.ee/insights/eval-insights.controller.ee.ts:38-49 MethodDeclaration assertFlagEnabled"
+    ]
+  },
+  {
+    "id": "n8n-cli-7",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 7,
+    "label": "fp",
+    "confidence": 0.9,
+    "fpClass": "framework-boilerplate",
+    "reasoning": "These are DI constructors across six distinct services in the chat-hub module; each injects a different set of dependencies for its own domain, and the only structural similarity is the `this.logger = this.logger.scoped('chat-hub')` tail — mandated by the framework pattern, not accidental duplication.",
+    "scoreMin": 0.8333333333333334,
+    "scoreMax": 1,
+    "locationCount": 14,
+    "sameName": [
+      "constructor"
+    ],
+    "maxShared": 16,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/instance-settings-loader/instance-settings-loader.service.ts:15-25|.bench/n8n/packages/cli/src/modules/chat-hub/chat-hub-agent.service.ts:37-50|.bench/n8n/packages/cli/src/modules/chat-hub/chat-hub-execution-watcher.service.ts:31-41|.bench/n8n/packages/cli/src/modules/chat-hub/chat-hub-execution.service.ts:50-64|.bench/n8n/packages/cli/src/modules/chat-hub/chat-hub-title.service.ts:38-50|.bench/n8n/packages/cli/src/modules/chat-hub/chat-hub-workflow.service.ts:85-98|.bench/n8n/packages/cli/src/modules/chat-hub/chat-hub.service.ts:55-73|.bench/n8n/packages/cli/src/modules/data-table/data-table.service.ts:51-63|.bench/n8n/packages/cli/src/modules/dynamic-credentials.ee/services/credential-resolver.service.ts:47-57|.bench/n8n/packages/cli/src/modules/external-secrets.ee/external-secrets-manager.ee.ts:37-52|.bench/n8n/packages/cli/src/modules/external-secrets.ee/secrets-providers-connections.service.ee.ts:39-51|.bench/n8n/packages/cli/src/scaling/job-processor.ts:62-73|.bench/n8n/packages/cli/src/scaling/scaling.service.ts:38-49|.bench/n8n/packages/cli/src/services/pruning/workflow-history-compaction.service.ts:51-61",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/instance-settings-loader/instance-settings-loader.service.ts:15-25 Constructor constructor",
+      ".bench/n8n/packages/cli/src/modules/chat-hub/chat-hub-agent.service.ts:37-50 Constructor constructor",
+      ".bench/n8n/packages/cli/src/modules/chat-hub/chat-hub-execution-watcher.service.ts:31-41 Constructor constructor",
+      ".bench/n8n/packages/cli/src/modules/chat-hub/chat-hub-execution.service.ts:50-64 Constructor constructor",
+      ".bench/n8n/packages/cli/src/modules/chat-hub/chat-hub-title.service.ts:38-50 Constructor constructor",
+      ".bench/n8n/packages/cli/src/modules/chat-hub/chat-hub-workflow.service.ts:85-98 Constructor constructor",
+      ".bench/n8n/packages/cli/src/modules/chat-hub/chat-hub.service.ts:55-73 Constructor constructor",
+      ".bench/n8n/packages/cli/src/modules/data-table/data-table.service.ts:51-63 Constructor constructor",
+      ".bench/n8n/packages/cli/src/modules/dynamic-credentials.ee/services/credential-resolver.service.ts:47-57 Constructor constructor",
+      ".bench/n8n/packages/cli/src/modules/external-secrets.ee/external-secrets-manager.ee.ts:37-52 Constructor constructor",
+      ".bench/n8n/packages/cli/src/modules/external-secrets.ee/secrets-providers-connections.service.ee.ts:39-51 Constructor constructor",
+      ".bench/n8n/packages/cli/src/scaling/job-processor.ts:62-73 Constructor constructor",
+      ".bench/n8n/packages/cli/src/scaling/scaling.service.ts:38-49 Constructor constructor",
+      ".bench/n8n/packages/cli/src/services/pruning/workflow-history-compaction.service.ts:51-61 Constructor constructor"
+    ]
+  },
+  {
+    "id": "n8n-cli-8",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 8,
+    "label": "real",
+    "confidence": 0.97,
+    "fpClass": "none",
+    "reasoning": "The two `hasUpdateIssueField` functions are byte-for-byte identical — same parameter shape, same boolean OR chain — yet duplicated in two separate files, one being a general integration-tools file and the other a platform-specific file, with no distinction in logic.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [
+      "hasUpdateIssueField"
+    ],
+    "maxShared": 34,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/agents/integrations/integration-tools.ts:948-971|.bench/n8n/packages/cli/src/modules/agents/integrations/platforms/linear-operations.ts:728-751",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/agents/integrations/integration-tools.ts:948-971 FunctionDeclaration hasUpdateIssueField",
+      ".bench/n8n/packages/cli/src/modules/agents/integrations/platforms/linear-operations.ts:728-751 FunctionDeclaration hasUpdateIssueField"
+    ]
+  },
+  {
+    "id": "n8n-cli-9",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 9,
+    "label": "real",
+    "confidence": 0.75,
+    "fpClass": "none",
+    "reasoning": "Both constructors inject the exact same six dependencies in the same order and share the scoped-logger tail, Redis detection, prefix construction, and TTL computation pattern, differing only in the redis prefix string key and TTL config property — a refactoring candidate into a shared base class.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [
+      "constructor"
+    ],
+    "maxShared": 45,
+    "split": "holdout",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/chat-hub/chat-hub-execution-store.service.ts:58-74|.bench/n8n/packages/cli/src/modules/chat-hub/chat-stream-state.service.ts:68-84",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/chat-hub/chat-hub-execution-store.service.ts:58-74 Constructor constructor",
+      ".bench/n8n/packages/cli/src/modules/chat-hub/chat-stream-state.service.ts:68-84 Constructor constructor"
+    ]
+  },
+  {
+    "id": "n8n-cli-10",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 10,
+    "label": "real",
+    "confidence": 0.82,
+    "fpClass": "none",
+    "reasoning": "The two `resolve` methods share identical cache-key construction, cache-check, TTL logic, and cache-set structure; the only difference is the delegation call (`resolveBasedOnTokenIntrospection` vs `resolveBasedOnUserInfo`), indicating accidental structural duplication that should be extracted to a shared base resolver.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [
+      "resolve"
+    ],
+    "maxShared": 64,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/dynamic-credentials.ee/credential-resolvers/identifiers/oauth2-introspection-identifier.ts:107-134|.bench/n8n/packages/cli/src/modules/dynamic-credentials.ee/credential-resolvers/identifiers/oauth2-userinfo-identifier.ts:75-102",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/dynamic-credentials.ee/credential-resolvers/identifiers/oauth2-introspection-identifier.ts:107-134 MethodDeclaration resolve",
+      ".bench/n8n/packages/cli/src/modules/dynamic-credentials.ee/credential-resolvers/identifiers/oauth2-userinfo-identifier.ts:75-102 MethodDeclaration resolve"
+    ]
+  },
+  {
+    "id": "n8n-cli-11",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 11,
+    "label": "real",
+    "confidence": 0.88,
+    "fpClass": "none",
+    "reasoning": "Both `fetchMetadata` methods are structurally identical — same cache-key pattern, same skipCache branch, same axios.get call, same status-check and error-throw, same metadata parse and cache-set — differing only in the options type parameter name, making this a clear copy-paste reimplementation.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [
+      "fetchMetadata"
+    ],
+    "maxShared": 85,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/dynamic-credentials.ee/credential-resolvers/identifiers/oauth2-introspection-identifier.ts:149-185|.bench/n8n/packages/cli/src/modules/dynamic-credentials.ee/credential-resolvers/identifiers/oauth2-userinfo-identifier.ts:117-153",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/dynamic-credentials.ee/credential-resolvers/identifiers/oauth2-introspection-identifier.ts:149-185 MethodDeclaration fetchMetadata",
+      ".bench/n8n/packages/cli/src/modules/dynamic-credentials.ee/credential-resolvers/identifiers/oauth2-userinfo-identifier.ts:117-153 MethodDeclaration fetchMetadata"
+    ]
+  },
+  {
+    "id": "n8n-cli-12",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 12,
+    "label": "fp",
+    "confidence": 0.7,
+    "fpClass": "framework-boilerplate",
+    "reasoning": "Both `setCredentialData` implementations follow the TypeORM upsert pattern (findOne → create if missing → assign fields → save), but they operate on distinct entity types with a different key field (`subjectId` vs `userId`), representing intentionally parallel storage strategies for credential-level vs user-level data.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [
+      "setCredentialData"
+    ],
+    "maxShared": 39,
+    "split": "holdout",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/dynamic-credentials.ee/credential-resolvers/storage/dynamic-credential-entry-storage.ts:31-51|.bench/n8n/packages/cli/src/modules/dynamic-credentials.ee/credential-resolvers/storage/dynamic-credential-user-entry-storage.ts:52-72",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/dynamic-credentials.ee/credential-resolvers/storage/dynamic-credential-entry-storage.ts:31-51 MethodDeclaration setCredentialData",
+      ".bench/n8n/packages/cli/src/modules/dynamic-credentials.ee/credential-resolvers/storage/dynamic-credential-user-entry-storage.ts:52-72 MethodDeclaration setCredentialData"
+    ]
+  },
+  {
+    "id": "n8n-cli-13",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 13,
+    "label": "fp",
+    "confidence": 0.92,
+    "fpClass": "framework-boilerplate",
+    "reasoning": "Three DI constructors in unrelated services (ProvisioningService, WorkflowRunner, EnterpriseWorkflowService) each injecting different sets of dependencies — structurally alike only because NestJS/n8n DI mandates this constructor shape.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 3,
+    "sameName": [
+      "constructor"
+    ],
+    "maxShared": 8,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/provisioning.ee/provisioning.service.ee.ts:37-52|.bench/n8n/packages/cli/src/workflow-runner.ts:77-92|.bench/n8n/packages/cli/src/workflows/workflow.service.ee.ts:43-58",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/provisioning.ee/provisioning.service.ee.ts:37-52 Constructor constructor",
+      ".bench/n8n/packages/cli/src/workflow-runner.ts:77-92 Constructor constructor",
+      ".bench/n8n/packages/cli/src/workflows/workflow.service.ee.ts:43-58 Constructor constructor"
+    ]
+  },
+  {
+    "id": "n8n-cli-14",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 14,
+    "label": "real",
+    "confidence": 0.72,
+    "fpClass": "none",
+    "reasoning": "TaskRunnerDisconnectedError and TaskRunnerOomError share near-identical constructor logic (same fixSuggestions object, same suggestions array selection, same formatting) with differences only in error message and subtitle; the shared logic is substantial enough that a reviewer would extract a common base or factory.",
+    "scoreMin": 0.8823529411764706,
+    "scoreMax": 1,
+    "locationCount": 4,
+    "sameName": [
+      "constructor"
+    ],
+    "maxShared": 68,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/task-runners/errors/task-runner-disconnected-error.ts:4-34|.bench/n8n/packages/cli/src/task-runners/errors/task-runner-disconnected-error.ts:7-33|.bench/n8n/packages/cli/src/task-runners/errors/task-runner-oom-error.ts:5-35|.bench/n8n/packages/cli/src/task-runners/errors/task-runner-oom-error.ts:8-34",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/task-runners/errors/task-runner-disconnected-error.ts:4-34 ClassDeclaration TaskRunnerDisconnectedError",
+      ".bench/n8n/packages/cli/src/task-runners/errors/task-runner-disconnected-error.ts:7-33 Constructor constructor",
+      ".bench/n8n/packages/cli/src/task-runners/errors/task-runner-oom-error.ts:5-35 ClassDeclaration TaskRunnerOomError",
+      ".bench/n8n/packages/cli/src/task-runners/errors/task-runner-oom-error.ts:8-34 Constructor constructor"
+    ]
+  },
+  {
+    "id": "n8n-cli-15",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 15,
+    "label": "real",
+    "confidence": 0.95,
+    "fpClass": "none",
+    "reasoning": "Two truncateNodeOutput functions with identical names and near-identical logic; the comment in workflow-tool-factory.ts explicitly states 'following Instance AI patterns', confirming it was copied from instance-ai.adapter.service.ts and should be a shared utility instead.",
+    "scoreMin": 0.9122807017543859,
+    "scoreMax": 0.9122807017543859,
+    "locationCount": 2,
+    "sameName": [
+      "truncateNodeOutput"
+    ],
+    "maxShared": 52,
+    "split": "holdout",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/agents/tools/workflow-tool-factory.ts:510-530|.bench/n8n/packages/cli/src/modules/instance-ai/instance-ai.adapter.service.ts:2855-2877",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/agents/tools/workflow-tool-factory.ts:510-530 FunctionDeclaration truncateNodeOutput",
+      ".bench/n8n/packages/cli/src/modules/instance-ai/instance-ai.adapter.service.ts:2855-2877 FunctionDeclaration truncateNodeOutput"
+    ]
+  },
+  {
+    "id": "n8n-cli-16",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 16,
+    "label": "fp",
+    "confidence": 0.82,
+    "fpClass": "framework-boilerplate",
+    "reasoning": "Source control export and import service constructors both set up folder path fields from instanceSettings, but inject different repositories and services appropriate to their distinct domain responsibilities (exporting vs importing).",
+    "scoreMin": 0.9047619047619048,
+    "scoreMax": 0.9047619047619048,
+    "locationCount": 2,
+    "sameName": [
+      "constructor"
+    ],
+    "maxShared": 19,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/source-control.ee/source-control-export.service.ee.ts:70-92|.bench/n8n/packages/cli/src/modules/source-control.ee/source-control-import.service.ee.ts:117-152",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/source-control.ee/source-control-export.service.ee.ts:70-92 Constructor constructor",
+      ".bench/n8n/packages/cli/src/modules/source-control.ee/source-control-import.service.ee.ts:117-152 Constructor constructor"
+    ]
+  },
+  {
+    "id": "n8n-cli-17",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 17,
+    "label": "fp",
+    "confidence": 0.7,
+    "fpClass": "framework-boilerplate",
+    "reasoning": "detectWorkflow in DisabledNodesRule and RemovedNodesRule implement the same breaking-changes rule interface but with intentionally different node lists, messages, and guard logic (disabled-nodes has an env-check absent from removed-nodes), making de-duplication wrong.",
+    "scoreMin": 0.8793103448275862,
+    "scoreMax": 0.8793103448275862,
+    "locationCount": 2,
+    "sameName": [
+      "detectWorkflow"
+    ],
+    "maxShared": 51,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/breaking-changes/rules/v2/disabled-nodes.rule.ts:52-73|.bench/n8n/packages/cli/src/modules/breaking-changes/rules/v2/removed-nodes.rule.ts:46-63",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/breaking-changes/rules/v2/disabled-nodes.rule.ts:52-73 MethodDeclaration detectWorkflow",
+      ".bench/n8n/packages/cli/src/modules/breaking-changes/rules/v2/removed-nodes.rule.ts:46-63 MethodDeclaration detectWorkflow"
+    ]
+  },
+  {
+    "id": "n8n-cli-18",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 18,
+    "label": "fp",
+    "confidence": 0.9,
+    "fpClass": "framework-boilerplate",
+    "reasoning": "EventMessage subclasses (AiNode, Audit, Execution, Generic, Node, Queue) are intentionally separate domain-specific event types sharing the same AbstractEventMessage extension pattern; their structural similarity is mandated by the eventbus framework, not accidental.",
+    "scoreMin": 0.9545454545454546,
+    "scoreMax": 1,
+    "locationCount": 8,
+    "sameName": [],
+    "maxShared": 43,
+    "split": "holdout",
+    "locationKey": ".bench/n8n/packages/cli/src/eventbus/event-message-classes/event-message-ai-node.ts:27-54|.bench/n8n/packages/cli/src/eventbus/event-message-classes/event-message-audit.ts:44-71|.bench/n8n/packages/cli/src/eventbus/event-message-classes/event-message-execution.ts:19-46|.bench/n8n/packages/cli/src/eventbus/event-message-classes/event-message-generic.ts:18-43|.bench/n8n/packages/cli/src/eventbus/event-message-classes/event-message-node.ts:28-55|.bench/n8n/packages/cli/src/eventbus/event-message-classes/event-message-queue.ts:19-44|.bench/n8n/packages/cli/src/eventbus/event-message-classes/event-message-runner.ts:19-44|.bench/n8n/packages/cli/src/eventbus/event-message-classes/event-message-workflow.ts:29-56",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/eventbus/event-message-classes/event-message-ai-node.ts:27-54 ClassDeclaration EventMessageAiNode",
+      ".bench/n8n/packages/cli/src/eventbus/event-message-classes/event-message-audit.ts:44-71 ClassDeclaration EventMessageAudit",
+      ".bench/n8n/packages/cli/src/eventbus/event-message-classes/event-message-execution.ts:19-46 ClassDeclaration EventMessageExecution",
+      ".bench/n8n/packages/cli/src/eventbus/event-message-classes/event-message-generic.ts:18-43 ClassDeclaration EventMessageGeneric",
+      ".bench/n8n/packages/cli/src/eventbus/event-message-classes/event-message-node.ts:28-55 ClassDeclaration EventMessageNode",
+      ".bench/n8n/packages/cli/src/eventbus/event-message-classes/event-message-queue.ts:19-44 ClassDeclaration EventMessageQueue",
+      ".bench/n8n/packages/cli/src/eventbus/event-message-classes/event-message-runner.ts:19-44 ClassDeclaration EventMessageRunner",
+      ".bench/n8n/packages/cli/src/eventbus/event-message-classes/event-message-workflow.ts:29-56 ClassDeclaration EventMessageWorkflow"
+    ]
+  },
+  {
+    "id": "n8n-cli-19",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 19,
+    "label": "real",
+    "confidence": 0.93,
+    "fpClass": "none",
+    "reasoning": "getExpiringInDays and getTerminatingInDays in the same file are identical in structure, differing only in which date getter they call and variable names; a reviewer would immediately extract a shared private helper taking the date as a parameter.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 46,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/license.ts:475-488|.bench/n8n/packages/cli/src/license.ts:490-503",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/license.ts:475-488 MethodDeclaration getExpiringInDays",
+      ".bench/n8n/packages/cli/src/license.ts:490-503 MethodDeclaration getTerminatingInDays"
+    ]
+  },
+  {
+    "id": "n8n-cli-20",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 20,
+    "label": "real",
+    "confidence": 0.9,
+    "fpClass": "none",
+    "reasoning": "pickPreferredRemote and pickRemote are identical algorithms (prefer streamable-http over sse, return null otherwise) operating on the same McpRegistryServer type, differing only in property names of the returned object (type/url vs transport/endpointUrl) — a clear accidental duplication across two modules that should share a single helper.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 30,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/agents/builder/search-mcp-servers.tool.ts:38-48|.bench/n8n/packages/cli/src/modules/mcp-registry/node-description-transform.ts:97-107",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/agents/builder/search-mcp-servers.tool.ts:38-48 FunctionDeclaration pickPreferredRemote",
+      ".bench/n8n/packages/cli/src/modules/mcp-registry/node-description-transform.ts:97-107 FunctionDeclaration pickRemote"
+    ]
+  },
+  {
+    "id": "n8n-cli-21",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 21,
+    "label": "real",
+    "confidence": 0.85,
+    "fpClass": "none",
+    "reasoning": "buildContextInputSchema and buildActionInputSchema are structurally identical Zod schema builders with the same batch/single-item validation logic, superRefine shape, and error messages, differing only in the domain noun (query/queries vs action/actions) — a reviewer would merge them into one generic builder parameterized by the enum and field name.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 78,
+    "split": "holdout",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/agents/integrations/integration-tools.ts:481-521|.bench/n8n/packages/cli/src/modules/agents/integrations/integration-tools.ts:683-723",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/agents/integrations/integration-tools.ts:481-521 FunctionDeclaration buildContextInputSchema",
+      ".bench/n8n/packages/cli/src/modules/agents/integrations/integration-tools.ts:683-723 FunctionDeclaration buildActionInputSchema"
+    ]
+  },
+  {
+    "id": "n8n-cli-22",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 22,
+    "label": "fp",
+    "confidence": 0.75,
+    "fpClass": "framework-boilerplate",
+    "reasoning": "editMessageManual and regenerateMessageManual are distinct HTTP controller endpoints (edit vs regenerate) with different routes, request/response types, and service calls; the shared structure (pushRef guard, manual model payload assembly, streaming response) is framework-mandated boilerplate for manual-execution variants, not accidental reimplementation.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 50,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/chat-hub/chat-hub.controller.ts:230-262|.bench/n8n/packages/cli/src/modules/chat-hub/chat-hub.controller.ts:289-321",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/chat-hub/chat-hub.controller.ts:230-262 MethodDeclaration editMessageManual",
+      ".bench/n8n/packages/cli/src/modules/chat-hub/chat-hub.controller.ts:289-321 MethodDeclaration regenerateMessageManual"
+    ]
+  },
+  {
+    "id": "n8n-cli-23",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 23,
+    "label": "fp",
+    "confidence": 0.8,
+    "fpClass": "declarative-config",
+    "reasoning": "fetchNvidiaModels and fetchMistralCloudModels each call the same generic getOptionsViaLoadOptions API with declarative routing/postReceive config objects tailored to their respective providers (different filter expressions, node type constants), making them intentionally distinct provider adapters rather than accidental duplicates.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 32,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/chat-hub/chat-hub.models.service.ts:412-459|.bench/n8n/packages/cli/src/modules/chat-hub/chat-hub.models.service.ts:461-508",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/chat-hub/chat-hub.models.service.ts:412-459 MethodDeclaration fetchNvidiaModels",
+      ".bench/n8n/packages/cli/src/modules/chat-hub/chat-hub.models.service.ts:461-508 MethodDeclaration fetchMistralCloudModels"
+    ]
+  },
+  {
+    "id": "n8n-cli-24",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 24,
+    "label": "fp",
+    "confidence": 0.75,
+    "fpClass": "framework-boilerplate",
+    "reasoning": "moveColumn and renameColumn are distinct REST endpoints with different routes, DTOs, and delegated service calls; the identical structural scaffold (projectId param, checkInstanceWriteAccess, try/catch error handler) is controller framework boilerplate, not duplicated logic.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 33,
+    "split": "holdout",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/data-table/data-table.controller.ts:238-258|.bench/n8n/packages/cli/src/modules/data-table/data-table.controller.ts:260-280",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/data-table/data-table.controller.ts:238-258 MethodDeclaration moveColumn",
+      ".bench/n8n/packages/cli/src/modules/data-table/data-table.controller.ts:260-280 MethodDeclaration renameColumn"
+    ]
+  },
+  {
+    "id": "n8n-cli-25",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 25,
+    "label": "real",
+    "confidence": 0.8,
+    "fpClass": "none",
+    "reasoning": "upsertDataTableRow and updateDataTableRows share an identical dryRun/returnData branching pattern, identical error-handling block, and the same overall structure, differing only in the service method called (upsertRow vs updateRows) and DTO type — a reviewer would extract the shared dispatch+error logic into a single helper.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 50,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/data-table/data-table.controller.ts:407-458|.bench/n8n/packages/cli/src/modules/data-table/data-table.controller.ts:460-511",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/data-table/data-table.controller.ts:407-458 MethodDeclaration upsertDataTableRow",
+      ".bench/n8n/packages/cli/src/modules/data-table/data-table.controller.ts:460-511 MethodDeclaration updateDataTableRows"
+    ]
+  },
+  {
+    "id": "n8n-cli-26",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 26,
+    "label": "real",
+    "confidence": 0.88,
+    "fpClass": "none",
+    "reasoning": "DynamicCredentialEntryStorage and DynamicCredentialUserEntryStorage implement the same ICredentialEntriesStorage interface with identical method bodies, differing only in the entity/repository names and a single field name (subjectId vs userId), making this a clear candidate for a shared generic base class.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 83,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/dynamic-credentials.ee/credential-resolvers/storage/dynamic-credential-entry-storage.ts:8-69|.bench/n8n/packages/cli/src/modules/dynamic-credentials.ee/credential-resolvers/storage/dynamic-credential-user-entry-storage.ts:12-103",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/dynamic-credentials.ee/credential-resolvers/storage/dynamic-credential-entry-storage.ts:8-69 ClassDeclaration DynamicCredentialEntryStorage",
+      ".bench/n8n/packages/cli/src/modules/dynamic-credentials.ee/credential-resolvers/storage/dynamic-credential-user-entry-storage.ts:12-103 ClassDeclaration DynamicCredentialUserEntryStorage"
+    ]
+  },
+  {
+    "id": "n8n-cli-27",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 27,
+    "label": "fp",
+    "confidence": 0.75,
+    "fpClass": "framework-boilerplate",
+    "reasoning": "getLogin and postLogin are HTTP verb handlers for the same embed login flow; they share an identical guard block and delegate to handleLogin, but their structural similarity is dictated by the REST controller pattern (GET vs POST routes) rather than accidental reimplementation.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 38,
+    "split": "holdout",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/token-exchange/controllers/embed-auth.controller.ts:30-46|.bench/n8n/packages/cli/src/modules/token-exchange/controllers/embed-auth.controller.ts:48-64",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/token-exchange/controllers/embed-auth.controller.ts:30-46 MethodDeclaration getLogin",
+      ".bench/n8n/packages/cli/src/modules/token-exchange/controllers/embed-auth.controller.ts:48-64 MethodDeclaration postLogin"
+    ]
+  },
+  {
+    "id": "n8n-cli-28",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 28,
+    "label": "real",
+    "confidence": 0.8,
+    "fpClass": "none",
+    "reasoning": "disableForeignKeyConstraints and enableForeignKeyConstraints share identical structure — look up a command by DB type, throw if unsupported, log, execute — differing only in which command map (disable vs. enable) they access; a shared helper parameterized by mode would eliminate the duplication.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 35,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/services/import.service.ts:967-979|.bench/n8n/packages/cli/src/services/import.service.ts:981-993",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/services/import.service.ts:967-979 MethodDeclaration disableForeignKeyConstraints",
+      ".bench/n8n/packages/cli/src/services/import.service.ts:981-993 MethodDeclaration enableForeignKeyConstraints"
+    ]
+  },
+  {
+    "id": "n8n-cli-29",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 29,
+    "label": "fp",
+    "confidence": 0.8,
+    "fpClass": "data-shape",
+    "reasoning": "DynamicCredentialEntry and DynamicCredentialUserEntry are distinct TypeORM entities representing different domain concepts (per-subject vs. per-user credential storage) with different relations and column names, making their structural similarity a data-shape coincidence.",
+    "scoreMin": 0.9285714285714286,
+    "scoreMax": 0.9285714285714286,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 26,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/dynamic-credentials.ee/database/entities/dynamic-credential-entry.ts:6-39|.bench/n8n/packages/cli/src/modules/dynamic-credentials.ee/database/entities/dynamic-credential-user-entry.ts:9-46",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/dynamic-credentials.ee/database/entities/dynamic-credential-entry.ts:6-39 ClassDeclaration DynamicCredentialEntry",
+      ".bench/n8n/packages/cli/src/modules/dynamic-credentials.ee/database/entities/dynamic-credential-user-entry.ts:9-46 ClassDeclaration DynamicCredentialUserEntry"
+    ]
+  },
+  {
+    "id": "n8n-cli-30",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 30,
+    "label": "real",
+    "confidence": 0.85,
+    "fpClass": "none",
+    "reasoning": "sendChunk, endStream, and sendError follow the exact same pattern — getStreamState, incrementSequence, build a typed message object with sessionId/messageId/sequenceNumber/timestamp/payload, call sendPushMessage — differing only in message type and one payload field, a clear candidate for a shared private helper.",
+    "scoreMin": 0.8461538461538461,
+    "scoreMax": 0.9148936170212766,
+    "locationCount": 3,
+    "sameName": [],
+    "maxShared": 44,
+    "split": "holdout",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/chat-hub/chat-stream.service.ts:162-193|.bench/n8n/packages/cli/src/modules/chat-hub/chat-stream.service.ts:198-230|.bench/n8n/packages/cli/src/modules/chat-hub/chat-stream.service.ts:235-266",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/chat-hub/chat-stream.service.ts:162-193 MethodDeclaration sendChunk",
+      ".bench/n8n/packages/cli/src/modules/chat-hub/chat-stream.service.ts:198-230 MethodDeclaration endStream",
+      ".bench/n8n/packages/cli/src/modules/chat-hub/chat-stream.service.ts:235-266 MethodDeclaration sendError"
+    ]
+  },
+  {
+    "id": "n8n-cli-31",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 31,
+    "label": "fp",
+    "confidence": 0.7,
+    "fpClass": "framework-boilerplate",
+    "reasoning": "deleteDataTable, getColumns, and getDataTableRows share the same try/catch error-mapping pattern (DataTableNotFoundError → NotFoundError, Error → InternalServerError) which is a standard controller error-handling convention in this codebase, not accidental reimplementation of business logic.",
+    "scoreMin": 0.8222222222222222,
+    "scoreMax": 0.9047619047619048,
+    "locationCount": 3,
+    "sameName": [],
+    "maxShared": 38,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/data-table/data-table.controller.ts:165-184|.bench/n8n/packages/cli/src/modules/data-table/data-table.controller.ts:186-204|.bench/n8n/packages/cli/src/modules/data-table/data-table.controller.ts:282-305",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/data-table/data-table.controller.ts:165-184 MethodDeclaration deleteDataTable",
+      ".bench/n8n/packages/cli/src/modules/data-table/data-table.controller.ts:186-204 MethodDeclaration getColumns",
+      ".bench/n8n/packages/cli/src/modules/data-table/data-table.controller.ts:282-305 MethodDeclaration getDataTableRows"
+    ]
+  },
+  {
+    "id": "n8n-cli-32",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 32,
+    "label": "fp",
+    "confidence": 0.8,
+    "fpClass": "data-shape",
+    "reasoning": "AgentObservationEntity and InstanceAiObservation are independent TypeORM entities in separate modules (agents vs. instance-ai) tracking observations for different domain concepts; their shared column shapes (marker, text, parentId, tokenCount, status, supersededBy) reflect a common observation pattern, not accidental duplication.",
+    "scoreMin": 0.9032258064516129,
+    "scoreMax": 0.9032258064516129,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 28,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/agents/entities/agent-observation.entity.ts:7-37|.bench/n8n/packages/cli/src/modules/instance-ai/entities/instance-ai-observation.entity.ts:7-32",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/agents/entities/agent-observation.entity.ts:7-37 ClassDeclaration AgentObservationEntity",
+      ".bench/n8n/packages/cli/src/modules/instance-ai/entities/instance-ai-observation.entity.ts:7-32 ClassDeclaration InstanceAiObservation"
+    ]
+  },
+  {
+    "id": "n8n-cli-33",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 33,
+    "label": "real",
+    "confidence": 0.85,
+    "fpClass": "none",
+    "reasoning": "getRedisContext and getRedisState are structurally identical private methods — both check redisClient, call get with a typed key, return null on miss, JSON.parse and cast the result, catch errors and log — differing only in key getter and return type, making them a strong candidate for a generic typed Redis fetch helper.",
+    "scoreMin": 0.8936170212765957,
+    "scoreMax": 0.8936170212765957,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 42,
+    "split": "holdout",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/chat-hub/chat-hub-execution-store.service.ts:158-169|.bench/n8n/packages/cli/src/modules/chat-hub/chat-stream-state.service.ts:291-302",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/chat-hub/chat-hub-execution-store.service.ts:158-169 MethodDeclaration getRedisContext",
+      ".bench/n8n/packages/cli/src/modules/chat-hub/chat-stream-state.service.ts:291-302 MethodDeclaration getRedisState"
+    ]
+  },
+  {
+    "id": "n8n-cli-34",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 34,
+    "label": "fp",
+    "confidence": 0.75,
+    "fpClass": "framework-boilerplate",
+    "reasoning": "Both classes implement the same IBreakingChangeInstanceRule interface using the same @BreakingChangeRule decorator pattern with identical method signatures (getMetadata + detect), but they cover distinct infrastructure breaking changes (file permissions vs Docker image removal) and are intentionally separate rule implementations.",
+    "scoreMin": 0.8709677419354839,
+    "scoreMax": 0.8709677419354839,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 54,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/breaking-changes/rules/v2/settings-file-permissions.rule.ts:11-81|.bench/n8n/packages/cli/src/modules/breaking-changes/rules/v2/task-runner-docker-image.rule.ts:11-71",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/breaking-changes/rules/v2/settings-file-permissions.rule.ts:11-81 ClassDeclaration SettingsFilePermissionsRule",
+      ".bench/n8n/packages/cli/src/modules/breaking-changes/rules/v2/task-runner-docker-image.rule.ts:11-71 ClassDeclaration TaskRunnerDockerImageRule"
+    ]
+  },
+  {
+    "id": "n8n-cli-35",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 35,
+    "label": "real",
+    "confidence": 0.8,
+    "fpClass": "none",
+    "reasoning": "store() and copyByFilePath() in the same class share nearly identical logic: generate a fileId, read buffer, check file size against limit, call toSource(), insert into repository with the same field set, and return {fileId, fileSize} — the only difference is the buffer source (stream vs file path), making copyByFilePath an accidental near-reimplementation of store's core body.",
+    "scoreMin": 0.8676470588235294,
+    "scoreMax": 0.8676470588235294,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 59,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/binary-data/database.manager.ts:129-161|.bench/n8n/packages/cli/src/binary-data/database.manager.ts:27-59",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/binary-data/database.manager.ts:27-59 MethodDeclaration store",
+      ".bench/n8n/packages/cli/src/binary-data/database.manager.ts:129-161 MethodDeclaration copyByFilePath"
+    ]
+  },
+  {
+    "id": "n8n-cli-36",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 36,
+    "label": "real",
+    "confidence": 0.85,
+    "fpClass": "none",
+    "reasoning": "setLdapLoginEnabled, setOidcLoginEnabled, and setSamlLoginEnabled share identical logic structure: get current auth method, throw if incompatible SSO method active, compute target method, update globalConfig.sso.[x].loginEnabled, call setCurrentAuthenticationMethod — differing only in the SSO protocol name, making these clear candidates for a shared utility.",
+    "scoreMin": 0.85,
+    "scoreMax": 0.8620689655172413,
+    "locationCount": 3,
+    "sameName": [],
+    "maxShared": 51,
+    "split": "holdout",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/ldap.ee/ldap.service.ee.ts:160-174|.bench/n8n/packages/cli/src/modules/sso-oidc/oidc.service.ee.ts:642-658|.bench/n8n/packages/cli/src/modules/sso-saml/saml-helpers.ts:23-36",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/ldap.ee/ldap.service.ee.ts:160-174 MethodDeclaration setLdapLoginEnabled",
+      ".bench/n8n/packages/cli/src/modules/sso-oidc/oidc.service.ee.ts:642-658 MethodDeclaration setOidcLoginEnabled",
+      ".bench/n8n/packages/cli/src/modules/sso-saml/saml-helpers.ts:23-36 FunctionDeclaration setSamlLoginEnabled"
+    ]
+  },
+  {
+    "id": "n8n-cli-37",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 37,
+    "label": "fp",
+    "confidence": 0.65,
+    "fpClass": "coincidental",
+    "reasoning": "createSkill and createAndAttachSkill are intentionally distinct operations (one creates only, the other also wires the skill into the agent's schema ref), so while they share structural scaffolding, the second is a deliberate extension of the first rather than an accidental reinvention.",
+    "scoreMin": 0.8604651162790697,
+    "scoreMax": 0.8604651162790697,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 37,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/agents/agent-skills.service.ts:42-60|.bench/n8n/packages/cli/src/modules/agents/agent-skills.service.ts:62-82",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/agents/agent-skills.service.ts:42-60 MethodDeclaration createSkill",
+      ".bench/n8n/packages/cli/src/modules/agents/agent-skills.service.ts:62-82 MethodDeclaration createAndAttachSkill"
+    ]
+  },
+  {
+    "id": "n8n-cli-38",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 38,
+    "label": "fp",
+    "confidence": 0.85,
+    "fpClass": "data-shape",
+    "reasoning": "CredentialsFilter and UserFilter are different domain filter DTOs with different fields (name/type/projectId vs email/firstName/lastName/isOwner/projectId); the shared @IsString/@IsOptional/@Expose decorator pattern and fromString static method are framework-imposed boilerplate for all filter DTOs.",
+    "scoreMin": 0.8571428571428571,
+    "scoreMax": 0.8571428571428571,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 24,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/middlewares/list-query/dtos/credentials.filter.dto.ts:6-25|.bench/n8n/packages/cli/src/middlewares/list-query/dtos/user.filter.dto.ts:6-35",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/middlewares/list-query/dtos/credentials.filter.dto.ts:6-25 ClassDeclaration CredentialsFilter",
+      ".bench/n8n/packages/cli/src/middlewares/list-query/dtos/user.filter.dto.ts:6-35 ClassDeclaration UserFilter"
+    ]
+  },
+  {
+    "id": "n8n-cli-39",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 39,
+    "label": "fp",
+    "confidence": 0.9,
+    "fpClass": "declarative-config",
+    "reasoning": "OtelConfig and TokenExchangeConfig are entirely separate configuration namespaces using the @Config/@Env declarative pattern; their structural similarity is inherent to the config framework, not accidental reimplementation.",
+    "scoreMin": 0.8571428571428571,
+    "scoreMax": 0.8571428571428571,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 12,
+    "split": "holdout",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/otel/otel.config.ts:3-35|.bench/n8n/packages/cli/src/modules/token-exchange/token-exchange.config.ts:3-46",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/otel/otel.config.ts:3-35 ClassDeclaration OtelConfig",
+      ".bench/n8n/packages/cli/src/modules/token-exchange/token-exchange.config.ts:3-46 ClassDeclaration TokenExchangeConfig"
+    ]
+  },
+  {
+    "id": "n8n-cli-40",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 40,
+    "label": "fp",
+    "confidence": 0.85,
+    "fpClass": "data-shape",
+    "reasoning": "AgentTaskRunLock and AgentTaskSnapshot are distinct TypeORM entities for different purposes (distributed lock vs immutable task snapshot) with different columns; the shared WithTimestamps base, @PrimaryColumn/ManyToOne pattern, and JoinColumn structure are TypeORM entity conventions, not duplicated business logic.",
+    "scoreMin": 0.8387096774193549,
+    "scoreMax": 0.8387096774193549,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 26,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/agents/entities/agent-task-run-lock.entity.ts:7-35|.bench/n8n/packages/cli/src/modules/agents/entities/agent-task-snapshot.entity.ts:8-49",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/agents/entities/agent-task-run-lock.entity.ts:7-35 ClassDeclaration AgentTaskRunLock",
+      ".bench/n8n/packages/cli/src/modules/agents/entities/agent-task-snapshot.entity.ts:8-49 ClassDeclaration AgentTaskSnapshot"
+    ]
+  },
+  {
+    "id": "n8n-cli-41",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 41,
+    "label": "real",
+    "confidence": 0.72,
+    "fpClass": "none",
+    "reasoning": "Both methods follow the identical pattern of checking an admin credential ID, falling back to env vars when absent, calling findCredentialForUser, decrypting, and returning typed config fields — only the credential domain and field names differ, making this an accidental reimplementation of a 'resolve admin credential with env-var fallback' helper.",
+    "scoreMin": 0.8333333333333334,
+    "scoreMax": 0.8333333333333334,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 55,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/instance-ai/instance-ai-settings.service.ts:309-332|.bench/n8n/packages/cli/src/modules/instance-ai/instance-ai-settings.service.ts:366-392",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/instance-ai/instance-ai-settings.service.ts:309-332 MethodDeclaration resolveDaytonaConfig",
+      ".bench/n8n/packages/cli/src/modules/instance-ai/instance-ai-settings.service.ts:366-392 MethodDeclaration resolveSearchConfig"
+    ]
+  },
+  {
+    "id": "n8n-cli-42",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 42,
+    "label": "fp",
+    "confidence": 0.75,
+    "fpClass": "coincidental",
+    "reasoning": "editMessageManual is a distinct execution mode (draft/canvas) that intentionally adds a pushRef parameter, enforces n8n-only provider, validates attachments against draft policy, and passes a manual=true flag to prepareReplyWorkflow — the differences are load-bearing behavioral distinctions, not renamed identifiers.",
+    "scoreMin": 0.8235294117647058,
+    "scoreMax": 0.8235294117647058,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 168,
+    "split": "holdout",
+    "locationKey": ".bench/n8n/packages/cli/src/modules/chat-hub/chat-hub.service.ts:744-871|.bench/n8n/packages/cli/src/modules/chat-hub/chat-hub.service.ts:877-1026",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/modules/chat-hub/chat-hub.service.ts:744-871 MethodDeclaration editMessage",
+      ".bench/n8n/packages/cli/src/modules/chat-hub/chat-hub.service.ts:877-1026 MethodDeclaration editMessageManual"
+    ]
+  },
+  {
+    "id": "n8n-cli-43",
+    "corpus": "n8n-cli",
+    "corpusTag": "n8n@2.25.7",
+    "pool": "strict",
+    "rank": 43,
+    "label": "fp",
+    "confidence": 0.7,
+    "fpClass": "coincidental",
+    "reasoning": "Both methods follow the service's uniform dispatch pattern (getNodeType → getMethod → getWorkflow → getThisArg → withExpressionIsolate → method.call) but serve different dynamic parameter subsystems (listSearch vs actionHandler) with different signatures and return types, making the similarity incidental to the consistent dispatch design.",
+    "scoreMin": 0.8235294117647058,
+    "scoreMax": 0.8235294117647058,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 28,
+    "split": "train",
+    "locationKey": ".bench/n8n/packages/cli/src/services/dynamic-node-parameters.service.ts:230-247|.bench/n8n/packages/cli/src/services/dynamic-node-parameters.service.ts:281-297",
+    "locationSignatures": [
+      ".bench/n8n/packages/cli/src/services/dynamic-node-parameters.service.ts:230-247 MethodDeclaration getResourceLocatorResults",
+      ".bench/n8n/packages/cli/src/services/dynamic-node-parameters.service.ts:281-297 MethodDeclaration getActionResult"
+    ]
+  }
+]

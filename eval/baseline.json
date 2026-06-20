@@ -1,0 +1,37 @@
+{
+  "mode": "baseline",
+  "ranking": "fixture rank",
+  "corpora": {
+    "n8n-cli": {
+      "labeled": 43,
+      "real": 19,
+      "fp": 24,
+      "fpClasses": {
+        "framework-boilerplate": 15,
+        "declarative-config": 2,
+        "data-shape": 4,
+        "coincidental": 3
+      },
+      "precisionAtK": {
+        "@5": {
+          "precision": 0.2,
+          "coverage": 1,
+          "real": 1,
+          "k": 5
+        },
+        "@10": {
+          "precision": 0.5,
+          "coverage": 1,
+          "real": 5,
+          "k": 10
+        },
+        "@20": {
+          "precision": 0.5,
+          "coverage": 1,
+          "real": 10,
+          "k": 20
+        }
+      }
+    }
+  }
+}
