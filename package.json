@@ -59,7 +59,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.0",
-    "@tanstack/intent": "^0.0.42",
+    "@tanstack/intent": "^0.3.3",
     "@types/node": "^22.0.0"
   },
   "engines": {
