@@ -1,6 +1,6 @@
 {
   "name": "dry-ts",
-  "version": "0.14.0",
+  "version": "0.14.1",
   "description": "Find candidate duplicate TypeScript code by comparing normalized AST structure.",
   "type": "module",
   "repository": {
@@ -55,7 +55,7 @@
   "sideEffects": false,
   "dependencies": {
     "ignore": "^7.0.5",
-    "typescript": "^5.9.3"
+    "typescript": ">=5.0.0-0 <7.0.0-0"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.0",
