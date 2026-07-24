@@ -5,7 +5,10 @@ All notable changes to dry-ts are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.14.1] - 2026-07-24
+## [0.14.2] - 2026-07-24
+
+Supersedes 0.14.1, which was tagged but never published to npm (release-pipeline
+OIDC failure); the fix below ships as 0.14.2.
 
 ### Fixed
 
