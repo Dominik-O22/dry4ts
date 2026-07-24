@@ -5,11 +5,11 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Dominik-O22/dry4ts.git"
+    "url": "git+https://github.com/Dominik-O22/dry-ts.git"
   },
-  "homepage": "https://github.com/Dominik-O22/dry4ts#readme",
+  "homepage": "https://github.com/Dominik-O22/dry-ts#readme",
   "bugs": {
-    "url": "https://github.com/Dominik-O22/dry4ts/issues"
+    "url": "https://github.com/Dominik-O22/dry-ts/issues"
   },
   "author": "Dominik-O22",
   "packageManager": "bun@1.3.6",

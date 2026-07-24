@@ -20,7 +20,7 @@ jobs:
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
-      - run: npm install -g npm@11 # keep OIDC compatibility while avoiding latest-version drift
+      - run: npm install -g npm@11.17.0 # pin exact: the version that last published this package via OIDC (avoid 11.x float)
       - run: bun install --frozen-lockfile
       - run: bun run ci
       - name: Verify tag matches package.json version
