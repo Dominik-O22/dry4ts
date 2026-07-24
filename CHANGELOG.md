@@ -5,6 +5,22 @@ All notable changes to dry-ts are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.1] - 2026-07-24
+
+### Fixed
+
+- **`typescript` dependency range no longer forces a duplicate install** (#75):
+  the dependency was pinned to `^5.9.3` (`>=5.9.3 <6.0.0`), so a consumer already
+  on TypeScript 6 could not dedupe — npm/bun installed a second nested `5.9.3`
+  beside the host's 6.x. Widened to `>=5.0.0-0 <7.0.0-0`: the `5.0.0` floor covers
+  every compiler API dry-ts uses (all present since 4.8), the prerelease-tagged
+  bounds (`-0`) let `6.0.0-beta` satisfy the range so it dedupes, and the
+  `<7.0.0-0` cap excludes TypeScript 7. TS 7 is the native (Go) `typescript-go`
+  rewrite: its package exports changed so `import ts from "typescript"` resolves
+  to a stub and `ts.SyntaxKind` is `undefined` at runtime — dry-ts does not run on
+  7 yet. Verified: build + 198 tests pass on 6.0.0-beta, both fail on 7.0.2.
+  Standalone installs still resolve to stable 5.9.3.
+
 ## [0.14.0] - 2026-06-17
 
 ### Added
