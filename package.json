@@ -58,7 +58,7 @@
     "typescript": ">=5.0.0-0 <7.0.0-0"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.0",
+    "@biomejs/biome": "2.5.5",
     "@tanstack/intent": "^0.0.42",
     "@types/node": "^22.0.0"
   },
