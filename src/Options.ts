@@ -16,6 +16,7 @@ interface ProfileFlags {
   readonly failOnDuplicates?: boolean;
   readonly format?: OutputFormat;
   readonly counterparts?: boolean;
+  readonly demoteBoilerplate?: boolean;
 }
 
 // PR gate, highest signal. Deliberately requires an explicit --changed-from /
@@ -41,11 +42,13 @@ const PROFILES: Record<string, ProfileFlags> = {
   // anonymous arrow bodies (the dominant test-scan noise) and raise the floor.
   // Point it at your test directories.
   tests: { excludeKinds: ["ArrowFunction"], minNodes: 40 },
-  // After-edit agent loop: the PR gate plus per-location counterpart routing and
-  // JSON output, so an agent reads each new finding's nearest existing match and
-  // either reuses it or justifies the duplication. Inherits pr's onlyNew, so it
-  // too fails loud without a --changed-from/--changed scope.
-  agent: { ...PR_PROFILE, counterparts: true, format: "json" },
+  // After-edit agent loop: the PR gate plus per-location counterpart routing,
+  // JSON output, and boilerplate demotion (work-free clusters — the classic DI
+  // constructor — sink below real candidates so the agent reads the likely-real
+  // duplicates first). An agent reads each new finding's nearest existing match
+  // and either reuses it or justifies the duplication. Inherits pr's onlyNew, so
+  // it too fails loud without a --changed-from/--changed scope.
+  agent: { ...PR_PROFILE, counterparts: true, format: "json", demoteBoilerplate: true },
 };
 
 // The profile names a user can pass, for validation and help/docs.
@@ -79,6 +82,7 @@ export interface OptionsInput {
   readonly excludeTaggedTemplates?: boolean;
   readonly excludeTests?: boolean;
   readonly counterparts?: boolean;
+  readonly demoteBoilerplate?: boolean;
 }
 
 // A fully-resolved option set: every field present, defaults and any profile
@@ -107,6 +111,7 @@ export interface ResolvedOptions {
   readonly excludeTaggedTemplates: boolean;
   readonly excludeTests: boolean;
   readonly counterparts: boolean;
+  readonly demoteBoilerplate: boolean;
 }
 
 export class Options {
@@ -129,6 +134,7 @@ export class Options {
   readonly excludeTaggedTemplates: boolean;
   readonly excludeTests: boolean;
   readonly counterparts: boolean;
+  readonly demoteBoilerplate: boolean;
 
   constructor(resolved: ResolvedOptions) {
     if (!(resolved.threshold > 0 && resolved.threshold <= 1)) {
@@ -175,6 +181,7 @@ export class Options {
     this.excludeTaggedTemplates = resolved.excludeTaggedTemplates;
     this.excludeTests = resolved.excludeTests;
     this.counterparts = resolved.counterparts;
+    this.demoteBoilerplate = resolved.demoteBoilerplate;
   }
 
   static defaults(): Options {
@@ -198,6 +205,7 @@ export class Options {
       excludeTaggedTemplates: false,
       excludeTests: false,
       counterparts: false,
+      demoteBoilerplate: false,
     });
   }
 
@@ -223,6 +231,7 @@ export class Options {
       excludeTaggedTemplates: input.excludeTaggedTemplates ?? defaults.excludeTaggedTemplates,
       excludeTests: input.excludeTests ?? defaults.excludeTests,
       counterparts: input.counterparts ?? defaults.counterparts,
+      demoteBoilerplate: input.demoteBoilerplate ?? defaults.demoteBoilerplate,
     });
   }
 
@@ -258,6 +267,7 @@ export class Options {
     let excludeTaggedTemplates: boolean | undefined;
     let excludeTests: boolean | undefined;
     let counterparts: boolean | undefined;
+    let demoteBoilerplate: boolean | undefined;
 
     for (let i = 0; i < args.length; i += 1) {
       const arg = args[i];
@@ -310,6 +320,9 @@ export class Options {
           break;
         case "--counterparts":
           counterparts = true;
+          break;
+        case "--demote-boilerplate":
+          demoteBoilerplate = true;
           break;
         case "--exclude-kinds":
           for (const name of valueFor(args, ++i, arg).split(",")) {
@@ -380,6 +393,9 @@ export class Options {
       excludeTaggedTemplates: pick(excludeTaggedTemplates, undefined, config.excludeTaggedTemplates, false),
       excludeTests: pick(excludeTests, profile.excludeTests, config.excludeTests, false),
       counterparts: pick(counterparts, profile.counterparts, config.counterparts, false),
+      // Set by --profile agent; an explicit --demote-boilerplate still wins. No
+      // config-file layer yet (not persistable until the signal graduates).
+      demoteBoilerplate: pick(demoteBoilerplate, profile.demoteBoilerplate, undefined, false),
     });
   }
 }

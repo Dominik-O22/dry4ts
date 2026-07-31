@@ -15,7 +15,15 @@ export interface Entry {
   // anonymous), surfaced on each reported location; see ClusterLocation.
   readonly kind: string;
   readonly name: string | null;
+  // Whether the candidate does no real work (no control flow / non-super call /
+  // real operator) — see doesRealWork. Populated only under --demote-boilerplate;
+  // absent off the flag so the default Entry shape is unchanged.
+  readonly boilerplate?: boolean;
 }
+
+// Writable view used only while constructing an Entry in the scan hot loop, so
+// `boilerplate` can be assigned under the flag without a per-candidate spread.
+type MutableEntry = { -readonly [K in keyof Entry]: Entry[K] };
 
 // Parses and fingerprints files in a single AST walk, without materializing the
 // normalized tree. Fingerprints are content hashes, so output is deterministic
@@ -32,9 +40,18 @@ export class FileScanner {
     excludeKinds: ReadonlySet<ts.SyntaxKind> = EMPTY_KIND_SET,
     minDistinctKinds = 0,
     excludeTaggedTemplates = false,
+    demoteBoilerplate = false,
   ): Entry[] {
     return files.flatMap((file) =>
-      this.scanFile(file, minLines, minNodes, excludeKinds, minDistinctKinds, excludeTaggedTemplates),
+      this.scanFile(
+        file,
+        minLines,
+        minNodes,
+        excludeKinds,
+        minDistinctKinds,
+        excludeTaggedTemplates,
+        demoteBoilerplate,
+      ),
     );
   }
 
@@ -45,6 +62,7 @@ export class FileScanner {
     excludeKinds: ReadonlySet<ts.SyntaxKind> = EMPTY_KIND_SET,
     minDistinctKinds = 0,
     excludeTaggedTemplates = false,
+    demoteBoilerplate = false,
   ): Entry[] {
     const text = fs.readFileSync(file, "utf8");
     const sourceFile = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, false, scriptKind(file));
@@ -101,18 +119,22 @@ export class FileScanner {
       ) {
         const { startLine, endLine } = lineRangeFor(sourceFile, node);
         if (endLine - startLine + 1 >= minLines) {
-          entries.push({
-            order,
-            entry: {
-              file,
-              startLine,
-              endLine,
-              nodes: hashes.length - rangeStart,
-              fingerprints: sortedUnique(hashes, rangeStart),
-              kind: candidateKindNameByKind.get(node.kind)!,
-              name: declarationName(node, sourceFile),
-            },
-          });
+          // Build the entry once; assign `boilerplate` only under the flag. The
+          // off path allocates exactly the object it always did — no per-candidate
+          // empty-object spread (which measurably cost ~3% on a large scan).
+          const entry: MutableEntry = {
+            file,
+            startLine,
+            endLine,
+            nodes: hashes.length - rangeStart,
+            fingerprints: sortedUnique(hashes, rangeStart),
+            kind: candidateKindNameByKind.get(node.kind)!,
+            name: declarationName(node, sourceFile),
+          };
+          if (demoteBoilerplate) {
+            entry.boilerplate = !doesRealWork(node);
+          }
+          entries.push({ order, entry });
         }
       }
       return hash;
@@ -320,6 +342,70 @@ function isTaggedTemplateValued(node: ts.Node): boolean {
     return node.initializer !== undefined && ts.isTaggedTemplateExpression(node.initializer);
   }
   return false;
+}
+
+// Boilerplate demote (--demote-boilerplate). A candidate "does real work" if its
+// subtree contains any control flow, a call other than super(), a construction, a
+// tagged template (the tag function runs), a real operator (anything but plain
+// `=` / `,`), or await/yield. The classic negative is a DI constructor that only
+// wires fields (or a TS param-property constructor with no body): identical across
+// many classes, but logic-free, so a near-certain false positive. Decorators and
+// type nodes are skipped — they are annotations, not logic, so a `@Inject(TOKEN)`
+// param does not count as work. (Styling FPs — styled-components etc. — are a
+// separate concern handled by --exclude-tagged-templates, not demoted here.)
+const CONTROL_FLOW_KINDS: ReadonlySet<ts.SyntaxKind> = new Set([
+  ts.SyntaxKind.IfStatement,
+  ts.SyntaxKind.ForStatement,
+  ts.SyntaxKind.ForInStatement,
+  ts.SyntaxKind.ForOfStatement,
+  ts.SyntaxKind.WhileStatement,
+  ts.SyntaxKind.DoStatement,
+  ts.SyntaxKind.SwitchStatement,
+  ts.SyntaxKind.ConditionalExpression,
+  ts.SyntaxKind.TryStatement,
+]);
+
+function isWorkNode(node: ts.Node): boolean {
+  if (CONTROL_FLOW_KINDS.has(node.kind)) {
+    return true;
+  }
+  if (ts.isCallExpression(node)) {
+    return node.expression.kind !== ts.SyntaxKind.SuperKeyword;
+  }
+  if (ts.isNewExpression(node) || ts.isTaggedTemplateExpression(node)) {
+    return true;
+  }
+  if (ts.isBinaryExpression(node)) {
+    const op = node.operatorToken.kind;
+    return op !== ts.SyntaxKind.EqualsToken && op !== ts.SyntaxKind.CommaToken;
+  }
+  return (
+    ts.isPrefixUnaryExpression(node) ||
+    ts.isPostfixUnaryExpression(node) ||
+    ts.isAwaitExpression(node) ||
+    ts.isYieldExpression(node)
+  );
+}
+
+function isTypeNode(node: ts.Node): boolean {
+  return node.kind >= ts.SyntaxKind.FirstTypeNode && node.kind <= ts.SyntaxKind.LastTypeNode;
+}
+
+function doesRealWork(root: ts.Node): boolean {
+  let found = false;
+  const walk = (node: ts.Node): void => {
+    if (found || ts.isDecorator(node) || isTypeNode(node)) {
+      return;
+    }
+    if (isWorkNode(node)) {
+      found = true;
+      return;
+    }
+    node.forEachChild(walk);
+  };
+  // The root declaration itself is never "work"; inspect its subtree.
+  root.forEachChild(walk);
+  return found;
 }
 
 function lineRangeFor(sourceFile: ts.SourceFile, node: ts.Node): { startLine: number; endLine: number } {

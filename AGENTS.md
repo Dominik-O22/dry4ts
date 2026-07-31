@@ -82,10 +82,12 @@ Findings are worded "intersects your change", never "you created this": the
 counterpart of a `new` cluster may be old code you copied from.
 
 `--profile agent` bundles this whole loop into one flag: it expands to the `pr`
-gate plus `--counterparts --format json`, so it gates on `status: "new"` and
-hands you each finding's nearest existing match to route the fix. It inherits
-`pr`'s `--only-new`, so it still needs a `--changed-from`/`--changed` scope and
-fails loud (exit `2`) without one:
+gate plus `--counterparts --format json --demote-boilerplate`, so it gates on
+`status: "new"`, hands you each finding's nearest existing match to route the
+fix, and sinks work-free clusters (the classic DI constructor that only wires
+fields) below real candidates so you read the likely-real duplicates first. It
+inherits `pr`'s `--only-new`, so it still needs a `--changed-from`/`--changed`
+scope and fails loud (exit `2`) without one:
 
 ```bash
 bun ./dist/bin/dry-ts.js --profile agent --changed-from HEAD src   # uncommitted edits

@@ -1,0 +1,2299 @@
+[
+  {
+    "id": "sentry-1",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 1,
+    "label": "real",
+    "confidence": 0.97,
+    "fpClass": "none",
+    "reasoning": "Identical function bodies copied verbatim into two separate chartcuterie files (metricAlert.tsx and metricDetector.tsx) — same name, same logic, same comment, only the surrounding export function differs; a shared utility would eliminate the copy.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [
+      "transformAreaSeries"
+    ],
+    "maxShared": 45,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/chartcuterie/metricAlert.tsx:18-43|.bench/sentry/static/app/chartcuterie/metricDetector.tsx:18-43",
+    "locationSignatures": [
+      ".bench/sentry/static/app/chartcuterie/metricAlert.tsx:18-43 FunctionDeclaration transformAreaSeries",
+      ".bench/sentry/static/app/chartcuterie/metricDetector.tsx:18-43 FunctionDeclaration transformAreaSeries"
+    ]
+  },
+  {
+    "id": "sentry-2",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 2,
+    "label": "real",
+    "confidence": 0.97,
+    "fpClass": "none",
+    "reasoning": "The function body is character-for-character identical in continuousFlamegraph.tsx and flamegraph.tsx — both files duplicate the same span-collection helper and should share a single import.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [
+      "collectAllSpanEntriesFromTransaction"
+    ],
+    "maxShared": 40,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/components/profiling/flamegraph/continuousFlamegraph.tsx:85-103|.bench/sentry/static/app/components/profiling/flamegraph/flamegraph.tsx:102-120",
+    "locationSignatures": [
+      ".bench/sentry/static/app/components/profiling/flamegraph/continuousFlamegraph.tsx:85-103 FunctionDeclaration collectAllSpanEntriesFromTransaction",
+      ".bench/sentry/static/app/components/profiling/flamegraph/flamegraph.tsx:102-120 FunctionDeclaration collectAllSpanEntriesFromTransaction"
+    ]
+  },
+  {
+    "id": "sentry-3",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 3,
+    "label": "real",
+    "confidence": 0.97,
+    "fpClass": "none",
+    "reasoning": "findLongestMatchingFrame is copied verbatim (same algorithm, same comments, same logic) into both continuousFlamegraph.tsx and flamegraph.tsx — clear accidental duplication that belongs in a shared utility.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [
+      "findLongestMatchingFrame"
+    ],
+    "maxShared": 68,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/components/profiling/flamegraph/continuousFlamegraph.tsx:196-225|.bench/sentry/static/app/components/profiling/flamegraph/flamegraph.tsx:150-179",
+    "locationSignatures": [
+      ".bench/sentry/static/app/components/profiling/flamegraph/continuousFlamegraph.tsx:196-225 FunctionDeclaration findLongestMatchingFrame",
+      ".bench/sentry/static/app/components/profiling/flamegraph/flamegraph.tsx:150-179 FunctionDeclaration findLongestMatchingFrame"
+    ]
+  },
+  {
+    "id": "sentry-4",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 4,
+    "label": "real",
+    "confidence": 0.95,
+    "fpClass": "none",
+    "reasoning": "All three copies of useUpdateOverlayPositionOnContentChange are byte-for-byte identical (same comment, same ResizeObserver pattern, same two useLayoutEffect blocks) across three separate combobox components — the hook should be extracted once.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 3,
+    "sameName": [
+      "useUpdateOverlayPositionOnContentChange"
+    ],
+    "maxShared": 82,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/components/searchQueryBuilder/askSeerCombobox/askSeerComboBox.tsx:40-83|.bench/sentry/static/app/components/searchQueryBuilder/tokens/combobox.tsx:228-271|.bench/sentry/static/app/components/tokenizedInput/token/comboBox.tsx:355-398",
+    "locationSignatures": [
+      ".bench/sentry/static/app/components/searchQueryBuilder/askSeerCombobox/askSeerComboBox.tsx:40-83 FunctionDeclaration useUpdateOverlayPositionOnContentChange",
+      ".bench/sentry/static/app/components/searchQueryBuilder/tokens/combobox.tsx:228-271 FunctionDeclaration useUpdateOverlayPositionOnContentChange",
+      ".bench/sentry/static/app/components/tokenizedInput/token/comboBox.tsx:355-398 FunctionDeclaration useUpdateOverlayPositionOnContentChange"
+    ]
+  },
+  {
+    "id": "sentry-5",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 5,
+    "label": "fp",
+    "confidence": 0.85,
+    "fpClass": "framework-boilerplate",
+    "reasoning": "All five build() methods are in subclasses of Profile (ContinuousProfile, JSSelfProfile, SampledProfile, SentrySampledProfile, Profile itself) and share the identical finalisation pattern mandated by the builder pattern; the same logic lives in each subclass because they each return their own concrete type, making consolidation into a base-class method the natural fix — but the similarity arises from the class hierarchy's required override shape, not accidental reimplementation.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 5,
+    "sameName": [
+      "build"
+    ],
+    "maxShared": 31,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/utils/profiling/profile/continuousProfile.tsx:163-179|.bench/sentry/static/app/utils/profiling/profile/jsSelfProfile.tsx:173-189|.bench/sentry/static/app/utils/profiling/profile/profile.tsx:152-168|.bench/sentry/static/app/utils/profiling/profile/sampledProfile.tsx:324-340|.bench/sentry/static/app/utils/profiling/profile/sentrySampledProfile.tsx:154-170",
+    "locationSignatures": [
+      ".bench/sentry/static/app/utils/profiling/profile/continuousProfile.tsx:163-179 MethodDeclaration build",
+      ".bench/sentry/static/app/utils/profiling/profile/jsSelfProfile.tsx:173-189 MethodDeclaration build",
+      ".bench/sentry/static/app/utils/profiling/profile/profile.tsx:152-168 MethodDeclaration build",
+      ".bench/sentry/static/app/utils/profiling/profile/sampledProfile.tsx:324-340 MethodDeclaration build",
+      ".bench/sentry/static/app/utils/profiling/profile/sentrySampledProfile.tsx:154-170 MethodDeclaration build"
+    ]
+  },
+  {
+    "id": "sentry-6",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 6,
+    "label": "real",
+    "confidence": 0.82,
+    "fpClass": "none",
+    "reasoning": "initCanvasContext in FlamegraphRendererWebGL and UIFramesRendererWebGL contains the same WebGL setup sequence (safeGetContext, BLEND enable, blendFuncSeparate, resizeCanvasToDisplaySize); the only difference is a minor formatting detail in the guard block — these renderers reinvent the same canvas initialisation and could share a base-class method.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [
+      "initCanvasContext"
+    ],
+    "maxShared": 25,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/utils/profiling/renderers/flamegraphRendererWebGL.tsx:157-177|.bench/sentry/static/app/utils/profiling/renderers/uiFramesRendererWebGL.tsx:138-157",
+    "locationSignatures": [
+      ".bench/sentry/static/app/utils/profiling/renderers/flamegraphRendererWebGL.tsx:157-177 MethodDeclaration initCanvasContext",
+      ".bench/sentry/static/app/utils/profiling/renderers/uiFramesRendererWebGL.tsx:138-157 MethodDeclaration initCanvasContext"
+    ]
+  },
+  {
+    "id": "sentry-7",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 7,
+    "label": "fp",
+    "confidence": 0.75,
+    "fpClass": "coincidental",
+    "reasoning": "Both fetchData implementations follow the same API-request loop skeleton but fetch different stat keys ('client-api.all-versions.*' vs 'events.total/dropped') and post-process the data differently; the structural similarity is driven by a shared API client pattern, not reimplemented business logic.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [
+      "fetchData"
+    ],
+    "maxShared": 50,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/admin/adminOverview/apiChart.tsx:47-78|.bench/sentry/static/app/views/admin/adminOverview/eventChart.tsx:50-79",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/admin/adminOverview/apiChart.tsx:47-78 PropertyDeclaration fetchData",
+      ".bench/sentry/static/app/views/admin/adminOverview/eventChart.tsx:50-79 PropertyDeclaration fetchData"
+    ]
+  },
+  {
+    "id": "sentry-8",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 8,
+    "label": "real",
+    "confidence": 0.85,
+    "fpClass": "none",
+    "reasoning": "Both render() methods in ApiChart and EventChart are pixel-identical in structure (loading guard, error guard, getChartSeries()+colors extraction, MiniBarChart with identical props) — they are accidental reimplementations of the same chart rendering pattern that differ only in class name and data source.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [
+      "render"
+    ],
+    "maxShared": 42,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/admin/adminOverview/apiChart.tsx:118-140|.bench/sentry/static/app/views/admin/adminOverview/eventChart.tsx:143-164",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/admin/adminOverview/apiChart.tsx:118-140 MethodDeclaration render",
+      ".bench/sentry/static/app/views/admin/adminOverview/eventChart.tsx:143-164 MethodDeclaration render"
+    ]
+  },
+  {
+    "id": "sentry-9",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 9,
+    "label": "real",
+    "confidence": 0.95,
+    "fpClass": "none",
+    "reasoning": "Both getWaitingForDataRange functions are byte-for-byte identical in logic — same parameter name, same early return, same loop body, same final return — copied from metric alert chart options into the detector chart options file without abstraction.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [
+      "getWaitingForDataRange"
+    ],
+    "maxShared": 42,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/views/alerts/rules/metric/details/metricChartOption.tsx:416-429|.bench/sentry/static/app/views/detectors/components/details/metric/charts/metricDetectorChartOptions.tsx:422-435",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/alerts/rules/metric/details/metricChartOption.tsx:416-429 FunctionDeclaration getWaitingForDataRange",
+      ".bench/sentry/static/app/views/detectors/components/details/metric/charts/metricDetectorChartOptions.tsx:422-435 FunctionDeclaration getWaitingForDataRange"
+    ]
+  },
+  {
+    "id": "sentry-10",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 10,
+    "label": "real",
+    "confidence": 0.97,
+    "fpClass": "none",
+    "reasoning": "Both disambiguateHeaderName functions are byte-for-byte identical (same JSDoc, same logic, same output format) in two parallel uptime header field files (alerts vs detectors), a clear copy-paste without shared abstraction.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [
+      "disambiguateHeaderName"
+    ],
+    "maxShared": 52,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/alerts/rules/uptime/uptimeHeadersField.tsx:76-86|.bench/sentry/static/app/views/detectors/components/forms/uptime/detect/uptimeHeadersField.tsx:76-86",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/alerts/rules/uptime/uptimeHeadersField.tsx:76-86 FunctionDeclaration disambiguateHeaderName",
+      ".bench/sentry/static/app/views/detectors/components/forms/uptime/detect/uptimeHeadersField.tsx:76-86 FunctionDeclaration disambiguateHeaderName"
+    ]
+  },
+  {
+    "id": "sentry-11",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 11,
+    "label": "fp",
+    "confidence": 0.65,
+    "fpClass": "framework-boilerplate",
+    "reasoning": "The three ValueField components share the same AutomationBuilderNumberInput structure but intentionally differ in min (0 vs 1), aria-label ('Value' vs 'Count'), and domain context (age comparison vs comparison branches vs issue occurrences) — they are condition-specific form fields, not accidental duplicates, though the structural overlap is high enough to warrant some uncertainty.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 3,
+    "sameName": [
+      "ValueField"
+    ],
+    "maxShared": 47,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/automations/components/actionFilters/ageComparison.tsx:65-82|.bench/sentry/static/app/views/automations/components/actionFilters/comparisonBranches.tsx:27-44|.bench/sentry/static/app/views/automations/components/actionFilters/issueOccurrences.tsx:20-37",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/automations/components/actionFilters/ageComparison.tsx:65-82 FunctionDeclaration ValueField",
+      ".bench/sentry/static/app/views/automations/components/actionFilters/comparisonBranches.tsx:27-44 FunctionDeclaration ValueField",
+      ".bench/sentry/static/app/views/automations/components/actionFilters/issueOccurrences.tsx:20-37 FunctionDeclaration ValueField"
+    ]
+  },
+  {
+    "id": "sentry-12",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 12,
+    "label": "real",
+    "confidence": 0.82,
+    "fpClass": "none",
+    "reasoning": "The three ComparisonTypeField components share identical structure — same context hooks, same CountBranch/PercentBranch pattern, same AutomationBuilderSelect with 'more than...' / 'relatively higher than...' labels — differing only in DataConditionType enum variants; the shared logic (select UI, onChange shape) should be abstracted into a shared component.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 3,
+    "sameName": [
+      "ComparisonTypeField"
+    ],
+    "maxShared": 62,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/views/automations/components/actionFilters/eventFrequency.tsx:89-127|.bench/sentry/static/app/views/automations/components/actionFilters/eventUniqueUserFrequency.tsx:101-139|.bench/sentry/static/app/views/automations/components/actionFilters/percentSessions.tsx:92-130",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/automations/components/actionFilters/eventFrequency.tsx:89-127 FunctionDeclaration ComparisonTypeField",
+      ".bench/sentry/static/app/views/automations/components/actionFilters/eventUniqueUserFrequency.tsx:101-139 FunctionDeclaration ComparisonTypeField",
+      ".bench/sentry/static/app/views/automations/components/actionFilters/percentSessions.tsx:92-130 FunctionDeclaration ComparisonTypeField"
+    ]
+  },
+  {
+    "id": "sentry-13",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 13,
+    "label": "real",
+    "confidence": 0.8,
+    "fpClass": "none",
+    "reasoning": "Both getPrimaryFieldOptions functions are nearly identical — same signature, same generateFieldOptions call with EAP_AGGREGATIONS, same reduce pattern for building tag objects with identical structure — differing only in a local variable name (logTags vs spanTags), making this a clear accidental reimplementation.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [
+      "getPrimaryFieldOptions"
+    ],
+    "maxShared": 58,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/dashboards/datasetConfig/logs.tsx:245-276|.bench/sentry/static/app/views/dashboards/datasetConfig/spans.tsx:238-269",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/dashboards/datasetConfig/logs.tsx:245-276 FunctionDeclaration getPrimaryFieldOptions",
+      ".bench/sentry/static/app/views/dashboards/datasetConfig/spans.tsx:238-269 FunctionDeclaration getPrimaryFieldOptions"
+    ]
+  },
+  {
+    "id": "sentry-14",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 14,
+    "label": "real",
+    "confidence": 0.92,
+    "fpClass": "none",
+    "reasoning": "All three ConfigurationRenderer components across logs, performance, and profiling onboarding are byte-for-byte identical — same JSX tree, same conditional rendering logic, same recursive call — copied into three separate onboarding files without any shared abstraction.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 3,
+    "sameName": [
+      "ConfigurationRenderer"
+    ],
+    "maxShared": 56,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/explore/logs/logsOnboarding.tsx:58-82|.bench/sentry/static/app/views/performance/onboarding.tsx:347-371|.bench/sentry/static/app/views/profiling/onboarding.tsx:93-117",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/explore/logs/logsOnboarding.tsx:58-82 FunctionDeclaration ConfigurationRenderer",
+      ".bench/sentry/static/app/views/performance/onboarding.tsx:347-371 FunctionDeclaration ConfigurationRenderer",
+      ".bench/sentry/static/app/views/profiling/onboarding.tsx:93-117 FunctionDeclaration ConfigurationRenderer"
+    ]
+  },
+  {
+    "id": "sentry-15",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 15,
+    "label": "real",
+    "confidence": 0.95,
+    "fpClass": "none",
+    "reasoning": "Both `useAiSpanWaiter` functions in agents/onboarding.tsx and mcp/onboarding.tsx are identical in logic — same hook calls, same search query, same refetch interval — copy-pasted between two feature areas with no meaningful difference.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [
+      "useAiSpanWaiter"
+    ],
+    "maxShared": 61,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/views/insights/agents/views/onboarding.tsx:63-99|.bench/sentry/static/app/views/insights/mcp/views/onboarding.tsx:66-102",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/insights/agents/views/onboarding.tsx:63-99 FunctionDeclaration useAiSpanWaiter",
+      ".bench/sentry/static/app/views/insights/mcp/views/onboarding.tsx:66-102 FunctionDeclaration useAiSpanWaiter"
+    ]
+  },
+  {
+    "id": "sentry-16",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 16,
+    "label": "real",
+    "confidence": 0.85,
+    "fpClass": "none",
+    "reasoning": "Both `WaitingIndicator` components share the same structure and logic; the only difference is the button label text ('View Agent Monitoring' vs 'View MCP Monitoring'), making this an accidental duplication that could share a parameterized component.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [
+      "WaitingIndicator"
+    ],
+    "maxShared": 42,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/insights/agents/views/onboarding.tsx:101-113|.bench/sentry/static/app/views/insights/mcp/views/onboarding.tsx:104-116",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/insights/agents/views/onboarding.tsx:101-113 FunctionDeclaration WaitingIndicator",
+      ".bench/sentry/static/app/views/insights/mcp/views/onboarding.tsx:104-116 FunctionDeclaration WaitingIndicator"
+    ]
+  },
+  {
+    "id": "sentry-17",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 17,
+    "label": "real",
+    "confidence": 0.97,
+    "fpClass": "none",
+    "reasoning": "Both `ConfigurationRenderer` functions in agents/onboarding.tsx and mcp/onboarding.tsx are byte-for-byte identical — same props, same rendering logic, same recursive call — a clear copy-paste duplication.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [
+      "ConfigurationRenderer"
+    ],
+    "maxShared": 64,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/insights/agents/views/onboarding.tsx:115-138|.bench/sentry/static/app/views/insights/mcp/views/onboarding.tsx:118-141",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/insights/agents/views/onboarding.tsx:115-138 FunctionDeclaration ConfigurationRenderer",
+      ".bench/sentry/static/app/views/insights/mcp/views/onboarding.tsx:118-141 FunctionDeclaration ConfigurationRenderer"
+    ]
+  },
+  {
+    "id": "sentry-18",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 18,
+    "label": "real",
+    "confidence": 0.97,
+    "fpClass": "none",
+    "reasoning": "Both `StepRenderer` functions in agents/onboarding.tsx and mcp/onboarding.tsx are byte-for-byte identical — same props interface, same JSX structure, same conditional rendering — a clear copy-paste duplication.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [
+      "StepRenderer"
+    ],
+    "maxShared": 60,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/views/insights/agents/views/onboarding.tsx:140-168|.bench/sentry/static/app/views/insights/mcp/views/onboarding.tsx:143-171",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/insights/agents/views/onboarding.tsx:140-168 FunctionDeclaration StepRenderer",
+      ".bench/sentry/static/app/views/insights/mcp/views/onboarding.tsx:143-171 FunctionDeclaration StepRenderer"
+    ]
+  },
+  {
+    "id": "sentry-19",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 19,
+    "label": "fp",
+    "confidence": 0.75,
+    "fpClass": "declarative-config",
+    "reasoning": "All four `OnboardingPanel` components share the same structural template (Panel/PanelBody/AuthTokenGeneratorProvider/HeaderWrapper/Arcade) but each contains product-specific copy, bullet points, Arcade demo URLs, and titles that are intentionally different per feature area (AI Agents, MCP Servers, Performance, Profiling) — these are feature-specific onboarding panels, not accidental duplicates.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 4,
+    "sameName": [
+      "OnboardingPanel"
+    ],
+    "maxShared": 45,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/insights/agents/views/onboarding.tsx:170-225|.bench/sentry/static/app/views/insights/mcp/views/onboarding.tsx:173-231|.bench/sentry/static/app/views/performance/onboarding.tsx:386-443|.bench/sentry/static/app/views/profiling/onboarding.tsx:161-218",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/insights/agents/views/onboarding.tsx:170-225 FunctionDeclaration OnboardingPanel",
+      ".bench/sentry/static/app/views/insights/mcp/views/onboarding.tsx:173-231 FunctionDeclaration OnboardingPanel",
+      ".bench/sentry/static/app/views/performance/onboarding.tsx:386-443 FunctionDeclaration OnboardingPanel",
+      ".bench/sentry/static/app/views/profiling/onboarding.tsx:161-218 FunctionDeclaration OnboardingPanel"
+    ]
+  },
+  {
+    "id": "sentry-20",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 20,
+    "label": "real",
+    "confidence": 0.9,
+    "fpClass": "none",
+    "reasoning": "Both `SpanSamplesTable` functions in cache and http are nearly identical — same props shape, same GridEditable usage, same renderBodyCell delegation — differing only in minor prop ordering, a clear copy-paste between two insights modules.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [
+      "SpanSamplesTable"
+    ],
+    "maxShared": 45,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/insights/cache/components/tables/spanSamplesTable.tsx:84-118|.bench/sentry/static/app/views/insights/http/components/tables/spanSamplesTable.tsx:69-104",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/insights/cache/components/tables/spanSamplesTable.tsx:84-118 FunctionDeclaration SpanSamplesTable",
+      ".bench/sentry/static/app/views/insights/http/components/tables/spanSamplesTable.tsx:69-104 FunctionDeclaration SpanSamplesTable"
+    ]
+  },
+  {
+    "id": "sentry-21",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 21,
+    "label": "real",
+    "confidence": 0.97,
+    "fpClass": "none",
+    "reasoning": "Both `renderBodyCell` functions in backendTable.tsx and mobileOverviewTable.tsx are byte-for-byte identical — same signature, same transaction key branch with the same comment and logic, same getFieldRenderer call — a clear copy-paste duplication.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [
+      "renderBodyCell"
+    ],
+    "maxShared": 51,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/views/insights/pages/backend/backendTable.tsx:216-250|.bench/sentry/static/app/views/insights/pages/mobile/mobileOverviewTable.tsx:198-232",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/insights/pages/backend/backendTable.tsx:216-250 FunctionDeclaration renderBodyCell",
+      ".bench/sentry/static/app/views/insights/pages/mobile/mobileOverviewTable.tsx:198-232 FunctionDeclaration renderBodyCell"
+    ]
+  },
+  {
+    "id": "sentry-22",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 22,
+    "label": "real",
+    "confidence": 0.85,
+    "fpClass": "none",
+    "reasoning": "Both renderTrend functions are structurally identical — same loading placeholder, same null check, same SubText/PaddedIconArrow pattern — with the only difference being a '%' suffix on the trend value in teamStability, making this an accidental near-duplicate that should share code.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [
+      "renderTrend"
+    ],
+    "maxShared": 52,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/organizationStats/teamInsights/teamReleases.tsx:140-161|.bench/sentry/static/app/views/organizationStats/teamInsights/teamStability.tsx:174-195",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/organizationStats/teamInsights/teamReleases.tsx:140-161 FunctionDeclaration renderTrend",
+      ".bench/sentry/static/app/views/organizationStats/teamInsights/teamStability.tsx:174-195 FunctionDeclaration renderTrend"
+    ]
+  },
+  {
+    "id": "sentry-23",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 23,
+    "label": "real",
+    "confidence": 0.92,
+    "fpClass": "none",
+    "reasoning": "Both renderBodyCell functions in overviewSpansTable and serviceEntrySpansTable are essentially identical line-for-line (same span_id, profile.id, replayId branches, same fallback renderer), living in sibling OTLP table files — a clear copy-paste that should be extracted into a shared utility.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [
+      "renderBodyCell"
+    ],
+    "maxShared": 103,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/performance/otlp/overviewSpansTable.tsx:140-215|.bench/sentry/static/app/views/performance/otlp/serviceEntrySpansTable.tsx:182-257",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/performance/otlp/overviewSpansTable.tsx:140-215 FunctionDeclaration renderBodyCell",
+      ".bench/sentry/static/app/views/performance/otlp/serviceEntrySpansTable.tsx:182-257 FunctionDeclaration renderBodyCell"
+    ]
+  },
+  {
+    "id": "sentry-24",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 24,
+    "label": "real",
+    "confidence": 0.78,
+    "fpClass": "none",
+    "reasoning": "Both handleValidate methods implement the same curried field-validation pattern with the same three conditional branches and same error message, with the only meaningful difference being .trim() vs .replace(/\\s/g,'') for whitespace detection — same logic reimplemented in two separate modal managers.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [
+      "handleValidate"
+    ],
+    "maxShared": 52,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/views/settings/components/dataScrubbing/modals/modalManager.tsx:291-315|.bench/sentry/static/app/views/settings/organizationRelay/modals/modalManager.tsx:150-174",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/settings/components/dataScrubbing/modals/modalManager.tsx:291-315 PropertyDeclaration handleValidate",
+      ".bench/sentry/static/app/views/settings/organizationRelay/modals/modalManager.tsx:150-174 PropertyDeclaration handleValidate"
+    ]
+  },
+  {
+    "id": "sentry-25",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 25,
+    "label": "real",
+    "confidence": 0.95,
+    "fpClass": "none",
+    "reasoning": "The two UptimHeadersControl components are virtually identical copies (same hook logic, same JSX structure, same helper functions) with only one minor difference — the useState initializer is lazy (arrow function) in the detectors version — a clear duplication of a component that should be shared.",
+    "scoreMin": 0.934010152284264,
+    "scoreMax": 0.934010152284264,
+    "locationCount": 2,
+    "sameName": [
+      "UptimHeadersControl"
+    ],
+    "maxShared": 184,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/alerts/rules/uptime/uptimeHeadersField.tsx:24-138|.bench/sentry/static/app/views/detectors/components/forms/uptime/detect/uptimeHeadersField.tsx:24-138",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/alerts/rules/uptime/uptimeHeadersField.tsx:24-138 FunctionDeclaration UptimHeadersControl",
+      ".bench/sentry/static/app/views/detectors/components/forms/uptime/detect/uptimeHeadersField.tsx:24-138 FunctionDeclaration UptimHeadersControl"
+    ]
+  },
+  {
+    "id": "sentry-26",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 26,
+    "label": "real",
+    "confidence": 0.88,
+    "fpClass": "none",
+    "reasoning": "The HeaderCell components in automationListTable and detectorListTable are near-identical (same sort logic, same navigate pattern, same SimpleTable.HeaderCell rendering) with only a minor prop difference (className optional in one), making this a textbook copy that should be extracted to a shared component.",
+    "scoreMin": 0.9166666666666666,
+    "scoreMax": 0.9166666666666666,
+    "locationCount": 2,
+    "sameName": [
+      "HeaderCell"
+    ],
+    "maxShared": 88,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/automations/components/automationListTable/index.tsx:39-75|.bench/sentry/static/app/views/detectors/components/detectorListTable/index.tsx:37-72",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/automations/components/automationListTable/index.tsx:39-75 FunctionDeclaration HeaderCell",
+      ".bench/sentry/static/app/views/detectors/components/detectorListTable/index.tsx:37-72 FunctionDeclaration HeaderCell"
+    ]
+  },
+  {
+    "id": "sentry-27",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 27,
+    "label": "real",
+    "confidence": 0.72,
+    "fpClass": "none",
+    "reasoning": "The three appendSample/appendSampleWithWeight methods share the same core call-tree-building algorithm (find-or-create node, totalWeight, recursive-frame detection, lock children, count, dedup weights) with intentional differences only in iteration direction and zero-weight guard — the shared algorithm is a strong candidate for a base class or shared utility.",
+    "scoreMin": 0.8373983739837398,
+    "scoreMax": 0.88,
+    "locationCount": 3,
+    "sameName": [
+      "appendSample"
+    ],
+    "maxShared": 110,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/utils/profiling/profile/continuousProfile.tsx:89-152|.bench/sentry/static/app/utils/profiling/profile/jsSelfProfile.tsx:110-171|.bench/sentry/static/app/utils/profiling/profile/sentrySampledProfile.tsx:87-152",
+    "locationSignatures": [
+      ".bench/sentry/static/app/utils/profiling/profile/continuousProfile.tsx:89-152 MethodDeclaration appendSample",
+      ".bench/sentry/static/app/utils/profiling/profile/jsSelfProfile.tsx:110-171 MethodDeclaration appendSample",
+      ".bench/sentry/static/app/utils/profiling/profile/sentrySampledProfile.tsx:87-152 MethodDeclaration appendSampleWithWeight"
+    ]
+  },
+  {
+    "id": "sentry-28",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 28,
+    "label": "real",
+    "confidence": 0.9,
+    "fpClass": "none",
+    "reasoning": "The two AggregateFlamegraphToolbar components are identical except for the profile_type string in the analytics call ('transaction aggregate flamegraph' vs 'landing aggregate flamegraph') and minor prop order differences in CompactSelect — a clear duplicate that should be a single parameterized component.",
+    "scoreMin": 0.8793103448275862,
+    "scoreMax": 0.8793103448275862,
+    "locationCount": 2,
+    "sameName": [
+      "AggregateFlamegraphToolbar"
+    ],
+    "maxShared": 102,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/performance/transactionSummary/transactionProfiles/content.tsx:221-290|.bench/sentry/static/app/views/profiling/landingAggregateFlamegraph.tsx:76-145",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/performance/transactionSummary/transactionProfiles/content.tsx:221-290 FunctionDeclaration AggregateFlamegraphToolbar",
+      ".bench/sentry/static/app/views/profiling/landingAggregateFlamegraph.tsx:76-145 FunctionDeclaration AggregateFlamegraphToolbar"
+    ]
+  },
+  {
+    "id": "sentry-29",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 29,
+    "label": "real",
+    "confidence": 0.8,
+    "fpClass": "none",
+    "reasoning": "Both ConfidenceMessage functions implement nearly identical confidence/sampling message logic (same props, same branching structure, same tct() calls) differing only in the domain label ('logs' vs 'metrics') and the behavior when dataScanned==='full' — the logs version renders a count while metrics returns null; a reviewer would consolidate these with a prop or config parameter.",
+    "scoreMin": 0.8695652173913043,
+    "scoreMax": 0.8695652173913043,
+    "locationCount": 2,
+    "sameName": [
+      "ConfidenceMessage"
+    ],
+    "maxShared": 60,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/explore/logs/confidenceFooter.tsx:47-109|.bench/sentry/static/app/views/explore/metrics/confidenceFooter.tsx:48-104",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/explore/logs/confidenceFooter.tsx:47-109 FunctionDeclaration ConfidenceMessage",
+      ".bench/sentry/static/app/views/explore/metrics/confidenceFooter.tsx:48-104 FunctionDeclaration ConfidenceMessage"
+    ]
+  },
+  {
+    "id": "sentry-30",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 30,
+    "label": "real",
+    "confidence": 0.97,
+    "fpClass": "none",
+    "reasoning": "The two computeCollapsedBarSpace functions are character-for-character identical in logic (same algorithm, same comment, same output type), differing only in the type of the input parameter (TraceTreeNode array vs BaseNode array); one is a clear copy of the other that should be deduplicated into a shared utility.",
+    "scoreMin": 0.8648648648648649,
+    "scoreMax": 0.8648648648648649,
+    "locationCount": 2,
+    "sameName": [
+      "computeCollapsedBarSpace"
+    ],
+    "maxShared": 64,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/views/performance/newTraceDetails/traceModels/parentAutogroupNode.tsx:49-81|.bench/sentry/static/app/views/performance/newTraceDetails/traceModels/traceTreeNode/utils.tsx:10-40",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/performance/newTraceDetails/traceModels/parentAutogroupNode.tsx:49-81 FunctionDeclaration computeCollapsedBarSpace",
+      ".bench/sentry/static/app/views/performance/newTraceDetails/traceModels/traceTreeNode/utils.tsx:10-40 FunctionDeclaration computeCollapsedBarSpace"
+    ]
+  },
+  {
+    "id": "sentry-31",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 31,
+    "label": "fp",
+    "confidence": 0.75,
+    "fpClass": "framework-boilerplate",
+    "reasoning": "The transactionNode's expand override is an intentional specialization of the base class method — it adds extra behavior in the collapse branch (re-inserting visible children after collapsing, to keep child transactions visible), so the similarity is a deliberate override pattern, not accidental duplication.",
+    "scoreMin": 0.8461538461538461,
+    "scoreMax": 0.8461538461538461,
+    "locationCount": 2,
+    "sameName": [
+      "expand"
+    ],
+    "maxShared": 44,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/performance/newTraceDetails/traceModels/traceTreeNode/baseNode.tsx:411-436|.bench/sentry/static/app/views/performance/newTraceDetails/traceModels/traceTreeNode/transactionNode.tsx:125-154",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/performance/newTraceDetails/traceModels/traceTreeNode/baseNode.tsx:411-436 MethodDeclaration expand",
+      ".bench/sentry/static/app/views/performance/newTraceDetails/traceModels/traceTreeNode/transactionNode.tsx:125-154 MethodDeclaration expand"
+    ]
+  },
+  {
+    "id": "sentry-32",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 32,
+    "label": "real",
+    "confidence": 0.72,
+    "fpClass": "none",
+    "reasoning": "Both renderBodyCell functions share the same overall structure and most branches (SPAN_ID cell with SpanIdCell, SPAN_DESCRIPTION cell, meta guard, getFieldRenderer fallback) and differ mainly in module-specific constants (ModuleName.CACHE vs HTTP, TraceViewSources, and an extra CACHE_HIT branch); a reviewer would likely extract a shared base renderer parameterized by module.",
+    "scoreMin": 0.8392857142857143,
+    "scoreMax": 0.8392857142857143,
+    "locationCount": 2,
+    "sameName": [
+      "renderBodyCell"
+    ],
+    "maxShared": 47,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/insights/cache/components/tables/spanSamplesTable.tsx:120-162|.bench/sentry/static/app/views/insights/http/components/tables/spanSamplesTable.tsx:106-144",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/insights/cache/components/tables/spanSamplesTable.tsx:120-162 FunctionDeclaration renderBodyCell",
+      ".bench/sentry/static/app/views/insights/http/components/tables/spanSamplesTable.tsx:106-144 FunctionDeclaration renderBodyCell"
+    ]
+  },
+  {
+    "id": "sentry-33",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 33,
+    "label": "real",
+    "confidence": 0.7,
+    "fpClass": "none",
+    "reasoning": "DifferentialFlamegraphDrawer and FlamegraphDrawer share ~90% of their render logic and state management (identical hooks, callbacks, tab/treeType/recursion state, and JSX structure) differing only in minor UI details (checkbox size, ExportProfileButton conditional rendering, a ProfileDetails block); a reviewer would merge these into one parameterized component.",
+    "scoreMin": 0.8238095238095238,
+    "scoreMax": 0.8238095238095238,
+    "locationCount": 2,
+    "sameName": [
+      "FlamegraphDrawer"
+    ],
+    "maxShared": 173,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/components/profiling/flamegraph/flamegraphDrawer/differentialFlamegraphDrawer.tsx:43-283|.bench/sentry/static/app/components/profiling/flamegraph/flamegraphDrawer/flamegraphDrawer.tsx:49-299",
+    "locationSignatures": [
+      ".bench/sentry/static/app/components/profiling/flamegraph/flamegraphDrawer/differentialFlamegraphDrawer.tsx:43-283 FunctionExpression FlamegraphDrawer",
+      ".bench/sentry/static/app/components/profiling/flamegraph/flamegraphDrawer/flamegraphDrawer.tsx:49-299 FunctionExpression FlamegraphDrawer"
+    ]
+  },
+  {
+    "id": "sentry-34",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 34,
+    "label": "fp",
+    "confidence": 0.8,
+    "fpClass": "declarative-config",
+    "reasoning": "archiveRelease and restoreRelease are intentionally opposite operations (setting status to ARCHIVED vs ACTIVE) with symmetric but semantically distinct behavior; they are siblings by design, not accidental reimplementations — extracting them would obscure the intent of each action.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 47,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/actionCreators/release.tsx:16-39|.bench/sentry/static/app/actionCreators/release.tsx:41-64",
+    "locationSignatures": [
+      ".bench/sentry/static/app/actionCreators/release.tsx:16-39 FunctionDeclaration archiveRelease",
+      ".bench/sentry/static/app/actionCreators/release.tsx:41-64 FunctionDeclaration restoreRelease"
+    ]
+  },
+  {
+    "id": "sentry-35",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 35,
+    "label": "real",
+    "confidence": 0.85,
+    "fpClass": "none",
+    "reasoning": "makeMetricAlertCharts and makeMetricDetectorCharts are structurally identical (same xAxis/yAxis setup pattern, same two .push() calls with parallel getOption logic, same spread of slackChartSize) differing only in renamed identifiers (alert vs detector, rule vs detector, different ChartType keys and chart option functions); these are clear accidental reimplementations that should share a factory.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 86,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/chartcuterie/metricAlert.tsx:45-126|.bench/sentry/static/app/chartcuterie/metricDetector.tsx:45-129",
+    "locationSignatures": [
+      ".bench/sentry/static/app/chartcuterie/metricAlert.tsx:45-126 FunctionDeclaration makeMetricAlertCharts",
+      ".bench/sentry/static/app/chartcuterie/metricDetector.tsx:45-129 FunctionDeclaration makeMetricDetectorCharts"
+    ]
+  },
+  {
+    "id": "sentry-36",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 36,
+    "label": "real",
+    "confidence": 0.82,
+    "fpClass": "none",
+    "reasoning": "LeadingItems and TrailingItems are symmetric counterparts in the same file with identical structure — same props, same ref, same useLayoutEffect pattern — differing only in which context setter they call (setLeadingWidth vs setTrailingWidth) and which styled wrapper they render, making them a genuine accidental duplication that could share logic.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 54,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/components/core/input/inputGroup.tsx:138-163|.bench/sentry/static/app/components/core/input/inputGroup.tsx:173-198",
+    "locationSignatures": [
+      ".bench/sentry/static/app/components/core/input/inputGroup.tsx:138-163 FunctionDeclaration LeadingItems",
+      ".bench/sentry/static/app/components/core/input/inputGroup.tsx:173-198 FunctionDeclaration TrailingItems"
+    ]
+  },
+  {
+    "id": "sentry-37",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 37,
+    "label": "fp",
+    "confidence": 0.8,
+    "fpClass": "test-boilerplate",
+    "reasoning": "RadioCase and SwitchCase are story helper components in separate .stories.tsx files for distinct UI components (Radio vs Switch), sharing a controlled-checkbox toggle pattern that is idiomatic Storybook boilerplate; they should not be merged.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 49,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/components/core/radio/radio.stories.tsx:46-57|.bench/sentry/static/app/components/core/switch/switch.stories.tsx:46-57",
+    "locationSignatures": [
+      ".bench/sentry/static/app/components/core/radio/radio.stories.tsx:46-57 FunctionDeclaration RadioCase",
+      ".bench/sentry/static/app/components/core/switch/switch.stories.tsx:46-57 FunctionDeclaration SwitchCase"
+    ]
+  },
+  {
+    "id": "sentry-38",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 38,
+    "label": "real",
+    "confidence": 0.75,
+    "fpClass": "none",
+    "reasoning": "useFeedbackOnboardingDrawer and useReplaysOnboardingDrawer are nearly identical hooks that open a drawer when a specific onboarding panel is active, differing only in the OnboardingDrawerKey enum value and aria-label string; a shared abstraction parameterized on those values would be appropriate.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 50,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/components/feedback/feedbackOnboarding/sidebar.tsx:46-64|.bench/sentry/static/app/components/replaysOnboarding/sidebar.tsx:42-60",
+    "locationSignatures": [
+      ".bench/sentry/static/app/components/feedback/feedbackOnboarding/sidebar.tsx:46-64 FunctionDeclaration useFeedbackOnboardingDrawer",
+      ".bench/sentry/static/app/components/replaysOnboarding/sidebar.tsx:42-60 FunctionDeclaration useReplaysOnboardingDrawer"
+    ]
+  },
+  {
+    "id": "sentry-39",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 39,
+    "label": "fp",
+    "confidence": 0.72,
+    "fpClass": "declarative-config",
+    "reasoning": "getCrashReportSDKInstallFirstBlocks and getCrashReportSDKInstallFirstBlocksRails produce the same CDN script block structure but differ in the template language label ('HTML' vs 'ERB') and indentation style, making them platform-specific documentation variants rather than accidental reimplementations.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 57,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/components/onboarding/gettingStartedDoc/utils/feedbackOnboarding.tsx:178-212|.bench/sentry/static/app/components/onboarding/gettingStartedDoc/utils/feedbackOnboarding.tsx:278-314",
+    "locationSignatures": [
+      ".bench/sentry/static/app/components/onboarding/gettingStartedDoc/utils/feedbackOnboarding.tsx:178-212 FunctionDeclaration getCrashReportSDKInstallFirstBlocks",
+      ".bench/sentry/static/app/components/onboarding/gettingStartedDoc/utils/feedbackOnboarding.tsx:278-314 FunctionDeclaration getCrashReportSDKInstallFirstBlocksRails"
+    ]
+  },
+  {
+    "id": "sentry-40",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 40,
+    "label": "real",
+    "confidence": 0.85,
+    "fpClass": "none",
+    "reasoning": "OnboardingPanel and ReplayPanel are structurally identical components (same props, same Panel/Container/IlloBox/StyledBox layout) living in different files, with only a minor flexbox alignment difference (align-items: center vs flex-start) that likely crept in accidentally — one clearly copies the other.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 36,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/components/onboardingPanel.tsx:12-21|.bench/sentry/static/app/views/replays/list/replayPanel.tsx:12-21",
+    "locationSignatures": [
+      ".bench/sentry/static/app/components/onboardingPanel.tsx:12-21 FunctionDeclaration OnboardingPanel",
+      ".bench/sentry/static/app/views/replays/list/replayPanel.tsx:12-21 FunctionDeclaration ReplayPanel"
+    ]
+  },
+  {
+    "id": "sentry-41",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 41,
+    "label": "real",
+    "confidence": 0.8,
+    "fpClass": "none",
+    "reasoning": "createSentryAppResults and createDocIntegrationResults share an identical async mapping pattern (await promise, makeResolvedTs, map to ResultItem with title/description/model/sourceType/resultType/to/resolvedTs), differing only in domain-specific field names and URL paths — a shared factory function parameterized on type would eliminate this duplication.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 53,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/components/search/sources/apiSource.tsx:180-202|.bench/sentry/static/app/components/search/sources/apiSource.tsx:204-226",
+    "locationSignatures": [
+      ".bench/sentry/static/app/components/search/sources/apiSource.tsx:180-202 FunctionDeclaration createSentryAppResults",
+      ".bench/sentry/static/app/components/search/sources/apiSource.tsx:204-226 FunctionDeclaration createDocIntegrationResults"
+    ]
+  },
+  {
+    "id": "sentry-42",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 42,
+    "label": "real",
+    "confidence": 0.85,
+    "fpClass": "none",
+    "reasoning": "focusNextGridCell and focusPreviousGridCell are mirror-image navigation functions with identical structure, differing only in direction (nextSibling/getKeyAfter/firstChild vs previousSibling/getKeyBefore/lastChild), a classic bidirectional pair that should share a single parameterized implementation.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 50,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/components/searchQueryBuilder/hooks/useQueryBuilderGridItem.tsx:19-48|.bench/sentry/static/app/components/searchQueryBuilder/hooks/useQueryBuilderGridItem.tsx:50-80",
+    "locationSignatures": [
+      ".bench/sentry/static/app/components/searchQueryBuilder/hooks/useQueryBuilderGridItem.tsx:19-48 FunctionDeclaration focusNextGridCell",
+      ".bench/sentry/static/app/components/searchQueryBuilder/hooks/useQueryBuilderGridItem.tsx:50-80 FunctionDeclaration focusPreviousGridCell"
+    ]
+  },
+  {
+    "id": "sentry-43",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 43,
+    "label": "real",
+    "confidence": 0.95,
+    "fpClass": "none",
+    "reasoning": "getDurationSuggestions and getSizeSuggestions are structurally identical — same control flow, same branching logic, same mapping patterns — differing only in renamed unit arrays, parser functions, and default constants; a reviewer would extract a single generic suggestion-builder.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 69,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/components/searchQueryBuilder/tokens/filter/valueSuggestions/duration.tsx:14-51|.bench/sentry/static/app/components/searchQueryBuilder/tokens/filter/valueSuggestions/size.tsx:14-51",
+    "locationSignatures": [
+      ".bench/sentry/static/app/components/searchQueryBuilder/tokens/filter/valueSuggestions/duration.tsx:14-51 FunctionDeclaration getDurationSuggestions",
+      ".bench/sentry/static/app/components/searchQueryBuilder/tokens/filter/valueSuggestions/size.tsx:14-51 FunctionDeclaration getSizeSuggestions"
+    ]
+  },
+  {
+    "id": "sentry-44",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 44,
+    "label": "fp",
+    "confidence": 0.95,
+    "fpClass": "framework-boilerplate",
+    "reasoning": "All six components (IconCase, IconGraphArea, IconGraphLine, IconMarkdown, IconSubscribed, IconTap) are separate SVG icons with entirely different path data; the shared structure is the mandatory useTheme/SvgIcon/chonk-branch wrapper mandated by the icon framework, not accidental reimplementation.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 6,
+    "sameName": [],
+    "maxShared": 36,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/icons/iconCase.tsx:7-21|.bench/sentry/static/app/icons/iconGraphArea.tsx:7-21|.bench/sentry/static/app/icons/iconGraphLine.tsx:7-21|.bench/sentry/static/app/icons/iconMarkdown.tsx:7-21|.bench/sentry/static/app/icons/iconSubscribed.tsx:7-21|.bench/sentry/static/app/icons/iconTap.tsx:7-21",
+    "locationSignatures": [
+      ".bench/sentry/static/app/icons/iconCase.tsx:7-21 FunctionDeclaration IconCase",
+      ".bench/sentry/static/app/icons/iconGraphArea.tsx:7-21 FunctionDeclaration IconGraphArea",
+      ".bench/sentry/static/app/icons/iconGraphLine.tsx:7-21 FunctionDeclaration IconGraphLine",
+      ".bench/sentry/static/app/icons/iconMarkdown.tsx:7-21 FunctionDeclaration IconMarkdown",
+      ".bench/sentry/static/app/icons/iconSubscribed.tsx:7-21 FunctionDeclaration IconSubscribed",
+      ".bench/sentry/static/app/icons/iconTap.tsx:7-21 FunctionDeclaration IconTap"
+    ]
+  },
+  {
+    "id": "sentry-45",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 45,
+    "label": "fp",
+    "confidence": 0.95,
+    "fpClass": "framework-boilerplate",
+    "reasoning": "IconContract, IconExpand, and IconSync render visually distinct SVG shapes; the three-Fragment chonk/non-chonk pattern is identical only because all icons in this codebase must follow the same wrapper convention.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 3,
+    "sameName": [],
+    "maxShared": 35,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/icons/iconContract.tsx:7-28|.bench/sentry/static/app/icons/iconExpand.tsx:7-28|.bench/sentry/static/app/icons/iconSync.tsx:7-28",
+    "locationSignatures": [
+      ".bench/sentry/static/app/icons/iconContract.tsx:7-28 FunctionDeclaration IconContract",
+      ".bench/sentry/static/app/icons/iconExpand.tsx:7-28 FunctionDeclaration IconExpand",
+      ".bench/sentry/static/app/icons/iconSync.tsx:7-28 FunctionDeclaration IconSync"
+    ]
+  },
+  {
+    "id": "sentry-46",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 46,
+    "label": "fp",
+    "confidence": 0.95,
+    "fpClass": "framework-boilerplate",
+    "reasoning": "IconFile, IconGraphCircle, and IconJson have completely different SVG path content; the two-Fragment chonk/non-chonk structure is required icon boilerplate, not duplicated logic.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 3,
+    "sameName": [],
+    "maxShared": 35,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/icons/iconFile.tsx:7-24|.bench/sentry/static/app/icons/iconGraphCircle.tsx:7-24|.bench/sentry/static/app/icons/iconJson.tsx:7-24",
+    "locationSignatures": [
+      ".bench/sentry/static/app/icons/iconFile.tsx:7-24 FunctionDeclaration IconFile",
+      ".bench/sentry/static/app/icons/iconGraphCircle.tsx:7-24 FunctionDeclaration IconGraphCircle",
+      ".bench/sentry/static/app/icons/iconJson.tsx:7-24 FunctionDeclaration IconJson"
+    ]
+  },
+  {
+    "id": "sentry-47",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 47,
+    "label": "fp",
+    "confidence": 0.92,
+    "fpClass": "framework-boilerplate",
+    "reasoning": "IconFilter (tapered lines) and IconMenu (equal-length lines) are visually distinct icons that happen to share a three-line SVG structure; the component wrapper is identical only due to the icon framework convention, not accidental duplication.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 39,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/icons/iconFilter.tsx:7-26|.bench/sentry/static/app/icons/iconMenu.tsx:7-26",
+    "locationSignatures": [
+      ".bench/sentry/static/app/icons/iconFilter.tsx:7-26 FunctionDeclaration IconFilter",
+      ".bench/sentry/static/app/icons/iconMenu.tsx:7-26 FunctionDeclaration IconMenu"
+    ]
+  },
+  {
+    "id": "sentry-48",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 48,
+    "label": "fp",
+    "confidence": 0.97,
+    "fpClass": "framework-boilerplate",
+    "reasoning": "IconLink (chain-link shape) and IconUpload (arrow-with-tray shape) are completely different icons; the only shared structure is the mandatory useTheme/SvgIcon chonk-branch icon wrapper.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 39,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/icons/iconLink.tsx:7-26|.bench/sentry/static/app/icons/iconUpload.tsx:7-26",
+    "locationSignatures": [
+      ".bench/sentry/static/app/icons/iconLink.tsx:7-26 FunctionDeclaration IconLink",
+      ".bench/sentry/static/app/icons/iconUpload.tsx:7-26 FunctionDeclaration IconUpload"
+    ]
+  },
+  {
+    "id": "sentry-49",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 49,
+    "label": "fp",
+    "confidence": 0.97,
+    "fpClass": "framework-boilerplate",
+    "reasoning": "IconLocation (map pin with circle) and IconTag (label tag with dot) are visually and semantically distinct icons; similarity is entirely the required icon component boilerplate, not duplicated logic.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 39,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/icons/iconLocation.tsx:7-24|.bench/sentry/static/app/icons/iconTag.tsx:7-24",
+    "locationSignatures": [
+      ".bench/sentry/static/app/icons/iconLocation.tsx:7-24 FunctionDeclaration IconLocation",
+      ".bench/sentry/static/app/icons/iconTag.tsx:7-24 FunctionDeclaration IconTag"
+    ]
+  },
+  {
+    "id": "sentry-50",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 50,
+    "label": "fp",
+    "confidence": 0.95,
+    "fpClass": "styling",
+    "reasoning": "IconNext and IconPrevious are distinct SVG icons (forward/backward navigation) sharing the same React wrapper pattern but rendering mirrored/different path data — they are intentionally separate visual assets, not accidental reimplementations.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 39,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/icons/iconNext.tsx:7-24|.bench/sentry/static/app/icons/iconPrevious.tsx:7-24",
+    "locationSignatures": [
+      ".bench/sentry/static/app/icons/iconNext.tsx:7-24 FunctionDeclaration IconNext",
+      ".bench/sentry/static/app/icons/iconPrevious.tsx:7-24 FunctionDeclaration IconPrevious"
+    ]
+  },
+  {
+    "id": "sentry-51",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 51,
+    "label": "fp",
+    "confidence": 0.95,
+    "fpClass": "styling",
+    "reasoning": "IconScrollHorizontally, IconScrollVertically, IconSound, IconStack, and IconTimer each render completely different SVG path data representing distinct icons; the shared structure (SvgIcon wrapper, theme.isChonk branch, Fragment) is icon-library boilerplate, not duplicated logic.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 5,
+    "sameName": [],
+    "maxShared": 35,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/icons/iconScrollHorizontally.tsx:7-26|.bench/sentry/static/app/icons/iconScrollVertically.tsx:7-26|.bench/sentry/static/app/icons/iconSound.tsx:7-26|.bench/sentry/static/app/icons/iconStack.tsx:7-26|.bench/sentry/static/app/icons/iconTimer.tsx:7-26",
+    "locationSignatures": [
+      ".bench/sentry/static/app/icons/iconScrollHorizontally.tsx:7-26 FunctionDeclaration IconScrollHorizontally",
+      ".bench/sentry/static/app/icons/iconScrollVertically.tsx:7-26 FunctionDeclaration IconScrollVertically",
+      ".bench/sentry/static/app/icons/iconSound.tsx:7-26 FunctionDeclaration IconSound",
+      ".bench/sentry/static/app/icons/iconStack.tsx:7-26 FunctionDeclaration IconStack",
+      ".bench/sentry/static/app/icons/iconTimer.tsx:7-26 FunctionDeclaration IconTimer"
+    ]
+  },
+  {
+    "id": "sentry-52",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 52,
+    "label": "fp",
+    "confidence": 0.9,
+    "fpClass": "declarative-config",
+    "reasoning": "FigmaResource and JsResource are intentionally distinct table-row renderers linking to different resource types (Figma design vs GitHub implementation) with different icons, labels, badge types, and link text — collapsing them would force an awkward abstraction over semantically different content.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 29,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/stories/view/storyResources.tsx:62-76|.bench/sentry/static/app/stories/view/storyResources.tsx:78-92",
+    "locationSignatures": [
+      ".bench/sentry/static/app/stories/view/storyResources.tsx:62-76 FunctionDeclaration FigmaResource",
+      ".bench/sentry/static/app/stories/view/storyResources.tsx:78-92 FunctionDeclaration JsResource"
+    ]
+  },
+  {
+    "id": "sentry-53",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 53,
+    "label": "real",
+    "confidence": 0.85,
+    "fpClass": "none",
+    "reasoning": "addOrganizationFeaturesHandler and addProjectFeaturesHandler are nearly identical — same Proxy-intercept logic, same handler signature, only differing in the entity type (organization vs project) and the local variable name (orgFeatures vs projFeatures); a single generic function parameterized by the feature-bearing object would eliminate the duplication.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 49,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/utils/featureFlags.ts:38-55|.bench/sentry/static/app/utils/featureFlags.ts:61-78",
+    "locationSignatures": [
+      ".bench/sentry/static/app/utils/featureFlags.ts:38-55 FunctionDeclaration addOrganizationFeaturesHandler",
+      ".bench/sentry/static/app/utils/featureFlags.ts:61-78 FunctionDeclaration addProjectFeaturesHandler"
+    ]
+  },
+  {
+    "id": "sentry-54",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 54,
+    "label": "real",
+    "confidence": 0.8,
+    "fpClass": "none",
+    "reasoning": "getConfigViewTranslationBetweenVectors and getConfigSpaceTranslationBetweenVectors are identical except for one method call (view.fromConfigView vs view.fromConfigSpace), making this a clear accidental reimplementation that should be unified with a parameter.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 57,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/utils/profiling/gl/utils.ts:716-752|.bench/sentry/static/app/utils/profiling/gl/utils.ts:754-789",
+    "locationSignatures": [
+      ".bench/sentry/static/app/utils/profiling/gl/utils.ts:716-752 FunctionDeclaration getConfigViewTranslationBetweenVectors",
+      ".bench/sentry/static/app/utils/profiling/gl/utils.ts:754-789 FunctionDeclaration getConfigSpaceTranslationBetweenVectors"
+    ]
+  },
+  {
+    "id": "sentry-55",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 55,
+    "label": "real",
+    "confidence": 0.75,
+    "fpClass": "none",
+    "reasoning": "createContinuousProfileFrameIndex and createSentrySampleProfileFrameIndex are nearly byte-for-byte identical (same frameKey construction, same Frame constructor fields, same loop structure); createAndroidContinuousProfileFrameIndex uses different field names from a different profile format but the algorithm is identical — the first two are clear duplicates, and all three share enough structure to warrant a shared helper.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 3,
+    "sameName": [],
+    "maxShared": 86,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/utils/profiling/profile/utils.tsx:10-53|.bench/sentry/static/app/utils/profiling/profile/utils.tsx:100-143|.bench/sentry/static/app/utils/profiling/profile/utils.tsx:55-98",
+    "locationSignatures": [
+      ".bench/sentry/static/app/utils/profiling/profile/utils.tsx:10-53 FunctionDeclaration createContinuousProfileFrameIndex",
+      ".bench/sentry/static/app/utils/profiling/profile/utils.tsx:55-98 FunctionDeclaration createAndroidContinuousProfileFrameIndex",
+      ".bench/sentry/static/app/utils/profiling/profile/utils.tsx:100-143 FunctionDeclaration createSentrySampleProfileFrameIndex"
+    ]
+  },
+  {
+    "id": "sentry-56",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 56,
+    "label": "fp",
+    "confidence": 0.8,
+    "fpClass": "declarative-config",
+    "reasoning": "AdminProjects and AdminUsers are separate admin views for different entities with different columns, endpoints, paths, and filter/sort options; the ResultGrid wrapper pattern is framework boilerplate for admin list pages, not accidental duplication of business logic.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 46,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/admin/adminProjects.tsx:34-70|.bench/sentry/static/app/views/admin/adminUsers.tsx:34-70",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/admin/adminProjects.tsx:34-70 FunctionDeclaration AdminProjects",
+      ".bench/sentry/static/app/views/admin/adminUsers.tsx:34-70 FunctionDeclaration AdminUsers"
+    ]
+  },
+  {
+    "id": "sentry-57",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 57,
+    "label": "fp",
+    "confidence": 0.75,
+    "fpClass": "declarative-config",
+    "reasoning": "ComparisonField/TimeField and MatchField/LevelField are distinct form sub-fields for different automation filter conditions (age comparison vs level), sharing a structural pattern mandated by the AutomationBuilderSelect/hook convention, not accidental reimplementation.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 4,
+    "sameName": [],
+    "maxShared": 48,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/views/automations/components/actionFilters/ageComparison.tsx:47-63|.bench/sentry/static/app/views/automations/components/actionFilters/ageComparison.tsx:84-100|.bench/sentry/static/app/views/automations/components/actionFilters/level.tsx:33-49|.bench/sentry/static/app/views/automations/components/actionFilters/level.tsx:51-67",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/automations/components/actionFilters/ageComparison.tsx:47-63 FunctionDeclaration ComparisonField",
+      ".bench/sentry/static/app/views/automations/components/actionFilters/ageComparison.tsx:84-100 FunctionDeclaration TimeField",
+      ".bench/sentry/static/app/views/automations/components/actionFilters/level.tsx:33-49 FunctionDeclaration MatchField",
+      ".bench/sentry/static/app/views/automations/components/actionFilters/level.tsx:51-67 FunctionDeclaration LevelField"
+    ]
+  },
+  {
+    "id": "sentry-58",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 58,
+    "label": "fp",
+    "confidence": 0.72,
+    "fpClass": "declarative-config",
+    "reasoning": "IntervalField and ComparisonIntervalField live in the same file and each controls a distinct comparison field (interval vs comparisonInterval) with different option sets; their structural sameness is boilerplate from the builder-select pattern, not redundant logic.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 48,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/automations/components/actionFilters/comparisonBranches.tsx:46-62|.bench/sentry/static/app/views/automations/components/actionFilters/comparisonBranches.tsx:64-82",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/automations/components/actionFilters/comparisonBranches.tsx:46-62 FunctionDeclaration IntervalField",
+      ".bench/sentry/static/app/views/automations/components/actionFilters/comparisonBranches.tsx:64-82 FunctionDeclaration ComparisonIntervalField"
+    ]
+  },
+  {
+    "id": "sentry-59",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 59,
+    "label": "real",
+    "confidence": 0.82,
+    "fpClass": "none",
+    "reasoning": "EventFrequencyCountDetails, EventUniqueUserFrequencyCountDetails, and PercentSessionsCountDetails are structurally identical components differing only in the tct() description string and the metric noun (events/users/sessions), making them clear candidates for a shared parameterized component.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 3,
+    "sameName": [],
+    "maxShared": 59,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/automations/components/actionFilters/eventFrequency.tsx:28-44|.bench/sentry/static/app/views/automations/components/actionFilters/eventUniqueUserFrequency.tsx:28-52|.bench/sentry/static/app/views/automations/components/actionFilters/percentSessions.tsx:28-48",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/automations/components/actionFilters/eventFrequency.tsx:28-44 FunctionDeclaration EventFrequencyCountDetails",
+      ".bench/sentry/static/app/views/automations/components/actionFilters/eventUniqueUserFrequency.tsx:28-52 FunctionDeclaration EventUniqueUserFrequencyCountDetails",
+      ".bench/sentry/static/app/views/automations/components/actionFilters/percentSessions.tsx:28-48 FunctionDeclaration PercentSessionsCountDetails"
+    ]
+  },
+  {
+    "id": "sentry-60",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 60,
+    "label": "real",
+    "confidence": 0.82,
+    "fpClass": "none",
+    "reasoning": "EventFrequencyPercentDetails, EventUniqueUserFrequencyPercentDetails, and PercentSessionsPercentDetails share the exact same render structure and logic, differing only in the human-readable metric label in the tct() template string.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 3,
+    "sameName": [],
+    "maxShared": 59,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/views/automations/components/actionFilters/eventFrequency.tsx:46-70|.bench/sentry/static/app/views/automations/components/actionFilters/eventUniqueUserFrequency.tsx:54-82|.bench/sentry/static/app/views/automations/components/actionFilters/percentSessions.tsx:50-74",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/automations/components/actionFilters/eventFrequency.tsx:46-70 FunctionDeclaration EventFrequencyPercentDetails",
+      ".bench/sentry/static/app/views/automations/components/actionFilters/eventUniqueUserFrequency.tsx:54-82 FunctionDeclaration EventUniqueUserFrequencyPercentDetails",
+      ".bench/sentry/static/app/views/automations/components/actionFilters/percentSessions.tsx:50-74 FunctionDeclaration PercentSessionsPercentDetails"
+    ]
+  },
+  {
+    "id": "sentry-61",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 61,
+    "label": "real",
+    "confidence": 0.8,
+    "fpClass": "none",
+    "reasoning": "EventFrequencyNode, EventUniqueUserFrequencyNode, and PercentSessionsNode are structurally identical (same RowLine/tct/SubfiltersList pattern) and differ only in the descriptive phrase used in the tct() string, a clear accidental parallel reimplementation.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 3,
+    "sameName": [],
+    "maxShared": 41,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/automations/components/actionFilters/eventFrequency.tsx:72-87|.bench/sentry/static/app/views/automations/components/actionFilters/eventUniqueUserFrequency.tsx:84-99|.bench/sentry/static/app/views/automations/components/actionFilters/percentSessions.tsx:76-90",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/automations/components/actionFilters/eventFrequency.tsx:72-87 FunctionDeclaration EventFrequencyNode",
+      ".bench/sentry/static/app/views/automations/components/actionFilters/eventUniqueUserFrequency.tsx:84-99 FunctionDeclaration EventUniqueUserFrequencyNode",
+      ".bench/sentry/static/app/views/automations/components/actionFilters/percentSessions.tsx:76-90 FunctionDeclaration PercentSessionsNode"
+    ]
+  },
+  {
+    "id": "sentry-62",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 62,
+    "label": "real",
+    "confidence": 0.8,
+    "fpClass": "none",
+    "reasoning": "validateEventFrequencyCondition, validateEventUniqueUserFrequencyCondition, and validatePercentSessionsCondition share identical validation logic and differ only in the DataConditionType enum constants checked, indicating these should share a generic validator.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 3,
+    "sameName": [],
+    "maxShared": 36,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/automations/components/actionFilters/eventFrequency.tsx:129-147|.bench/sentry/static/app/views/automations/components/actionFilters/eventUniqueUserFrequency.tsx:141-159|.bench/sentry/static/app/views/automations/components/actionFilters/percentSessions.tsx:132-150",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/automations/components/actionFilters/eventFrequency.tsx:129-147 FunctionDeclaration validateEventFrequencyCondition",
+      ".bench/sentry/static/app/views/automations/components/actionFilters/eventUniqueUserFrequency.tsx:141-159 FunctionDeclaration validateEventUniqueUserFrequencyCondition",
+      ".bench/sentry/static/app/views/automations/components/actionFilters/percentSessions.tsx:132-150 FunctionDeclaration validatePercentSessionsCondition"
+    ]
+  },
+  {
+    "id": "sentry-63",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 63,
+    "label": "real",
+    "confidence": 0.85,
+    "fpClass": "none",
+    "reasoning": "PriorityField (opsgenie) and SeverityField (pagerduty) are near-identical select field components differing only in the options list variable and aria-label string, and could trivially share a generic action select field component.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 47,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/views/automations/components/actions/opsgenie.tsx:48-66|.bench/sentry/static/app/views/automations/components/actions/pagerduty.tsx:48-66",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/automations/components/actions/opsgenie.tsx:48-66 FunctionDeclaration PriorityField",
+      ".bench/sentry/static/app/views/automations/components/actions/pagerduty.tsx:48-66 FunctionDeclaration SeverityField"
+    ]
+  },
+  {
+    "id": "sentry-64",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 64,
+    "label": "real",
+    "confidence": 0.72,
+    "fpClass": "none",
+    "reasoning": "AutomationListConnectedDetectors and DetectorListConnectedAutomations are mirror-image components with identical structure (guard on empty array, ClassNames+Hovercard with CSS body, tn() plural label) that differ only in domain nouns (detectorIds vs automationIds, monitors vs automations) — a clear accidental reimplementation of a connected-items cell pattern that belongs in one shared component.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 43,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/automations/components/automationListTable/connectedDetectors.tsx:63-88|.bench/sentry/static/app/views/detectors/components/detectorListConnectedAutomations.tsx:74-98",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/automations/components/automationListTable/connectedDetectors.tsx:63-88 FunctionDeclaration AutomationListConnectedDetectors",
+      ".bench/sentry/static/app/views/detectors/components/detectorListConnectedAutomations.tsx:74-98 FunctionDeclaration DetectorListConnectedAutomations"
+    ]
+  },
+  {
+    "id": "sentry-65",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 65,
+    "label": "real",
+    "confidence": 0.85,
+    "fpClass": "none",
+    "reasoning": "AutomationsList and DetectorsList are nearly line-for-line identical list-page components — same hooks pattern, same pagination/header/filter structure, same response-header parsing — differing only in domain nouns (automations vs detectors/monitors), making this a textbook accidental duplication that should be extracted into a shared generic list page.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 145,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/automations/list.tsx:27-109|.bench/sentry/static/app/views/detectors/list.tsx:28-110",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/automations/list.tsx:27-109 FunctionDeclaration AutomationsList",
+      ".bench/sentry/static/app/views/detectors/list.tsx:28-110 FunctionDeclaration DetectorsList"
+    ]
+  },
+  {
+    "id": "sentry-66",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 66,
+    "label": "real",
+    "confidence": 0.8,
+    "fpClass": "none",
+    "reasoning": "useReorderStarredDashboards and useReorderStarredSavedQueries share an identical pattern — useCallback wrapping an api.requestPromise PUT + invalidate call — differing only in the URL path and payload key name, indicating a clear reuse opportunity via a generic reorder hook.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 40,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/views/dashboards/hooks/useReorderStarredDashboards.tsx:8-29|.bench/sentry/static/app/views/explore/hooks/useReorderStarredSavedQueries.tsx:10-31",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/dashboards/hooks/useReorderStarredDashboards.tsx:8-29 FunctionDeclaration useReorderStarredDashboards",
+      ".bench/sentry/static/app/views/explore/hooks/useReorderStarredSavedQueries.tsx:10-31 FunctionDeclaration useReorderStarredSavedQueries"
+    ]
+  },
+  {
+    "id": "sentry-67",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 67,
+    "label": "fp",
+    "confidence": 0.75,
+    "fpClass": "coincidental",
+    "reasoning": "useTraceItemNumberAttributes and useTraceItemStringAttributes are intentionally parallel functions in the same file that wrap the same underlying hook with different type='number'/'string' arguments and different default-attribute helpers (getDefaultNumberAttributes/getDefaultStringAttributes with FieldKind.MEASUREMENT vs FieldKind.TAG) — they must remain distinct because they represent fundamentally different attribute types.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 48,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/detectors/datasetConfig/useTraceItemAttributes.tsx:106-137|.bench/sentry/static/app/views/detectors/datasetConfig/useTraceItemAttributes.tsx:73-104",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/detectors/datasetConfig/useTraceItemAttributes.tsx:73-104 FunctionDeclaration useTraceItemNumberAttributes",
+      ".bench/sentry/static/app/views/detectors/datasetConfig/useTraceItemAttributes.tsx:106-137 FunctionDeclaration useTraceItemStringAttributes"
+    ]
+  },
+  {
+    "id": "sentry-68",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 68,
+    "label": "fp",
+    "confidence": 0.78,
+    "fpClass": "coincidental",
+    "reasoning": "getDatasetFromLocationOrSavedQueryDataset and getSavedQueryDatasetFromLocationOrDataset are intentional inverses of each other (one converts SavedQueryDatasets→DiscoverDatasets, the other the reverse), so their structural similarity is inherent to the bidirectional mapping design and merging them would be incorrect.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 33,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/discover/savedQuery/utils.tsx:310-329|.bench/sentry/static/app/views/discover/savedQuery/utils.tsx:331-350",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/discover/savedQuery/utils.tsx:310-329 FunctionDeclaration getDatasetFromLocationOrSavedQueryDataset",
+      ".bench/sentry/static/app/views/discover/savedQuery/utils.tsx:331-350 FunctionDeclaration getSavedQueryDatasetFromLocationOrDataset"
+    ]
+  },
+  {
+    "id": "sentry-69",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 69,
+    "label": "real",
+    "confidence": 0.72,
+    "fpClass": "none",
+    "reasoning": "updateLocationWithAggregateSortBys and updateLocationWithSortBys have an identical control-flow structure (defined check, map sort direction, delete cursor, null branch delete) and differ only in which location.query key they write to (aggregateSort vs sort), making this a candidate for a shared helper parameterized by query key.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 40,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/views/explore/contexts/pageParamsContext/aggregateSortBys.tsx:59-73|.bench/sentry/static/app/views/explore/contexts/pageParamsContext/sortBys.tsx:42-56",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/explore/contexts/pageParamsContext/aggregateSortBys.tsx:59-73 FunctionDeclaration updateLocationWithAggregateSortBys",
+      ".bench/sentry/static/app/views/explore/contexts/pageParamsContext/sortBys.tsx:42-56 FunctionDeclaration updateLocationWithSortBys"
+    ]
+  },
+  {
+    "id": "sentry-70",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 70,
+    "label": "real",
+    "confidence": 0.82,
+    "fpClass": "none",
+    "reasoning": "useExploreAggregatesTable and useExploreSpansTable are structurally identical — same useQueryParamsExtrapolate, same canTriggerHighAccuracy callback logic, same useProgressiveQuery call shape — differing only in which inner implementation hook they delegate to, a clear reimplementation that should be unified into one parameterized hook.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 61,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/explore/hooks/useExploreAggregatesTable.tsx:32-56|.bench/sentry/static/app/views/explore/hooks/useExploreSpansTable.tsx:31-56",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/explore/hooks/useExploreAggregatesTable.tsx:32-56 FunctionDeclaration useExploreAggregatesTable",
+      ".bench/sentry/static/app/views/explore/hooks/useExploreSpansTable.tsx:31-56 FunctionDeclaration useExploreSpansTable"
+    ]
+  },
+  {
+    "id": "sentry-71",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 71,
+    "label": "real",
+    "confidence": 0.85,
+    "fpClass": "none",
+    "reasoning": "getLogsAggregateFieldsFromLocation and getSpansAggregateFieldsFromLocation have identical logic (same loop, same hasGroupBy/hasVisualize checks, same fallback pattern) differing only in their domain-specific key constants (LOGS_AGGREGATE_FIELD_KEY vs SPANS_AGGREGATE_FIELD_KEY, LOGS_GROUP_BY_KEY vs SPANS_GROUP_BY_KEY), making them clear candidates for a shared generic helper parameterized by those keys.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 44,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/explore/logs/logsQueryParams.tsx:195-232|.bench/sentry/static/app/views/explore/spans/spansQueryParams.tsx:184-220",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/explore/logs/logsQueryParams.tsx:195-232 FunctionDeclaration getLogsAggregateFieldsFromLocation",
+      ".bench/sentry/static/app/views/explore/spans/spansQueryParams.tsx:184-220 FunctionDeclaration getSpansAggregateFieldsFromLocation"
+    ]
+  },
+  {
+    "id": "sentry-72",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 72,
+    "label": "fp",
+    "confidence": 0.8,
+    "fpClass": "declarative-config",
+    "reasoning": "TracesView and ModelsView are intentionally distinct dashboard views rendering different widget sets (LLMGenerations/TokenUsage/ToolUsage vs TokenCost/TokenUsage/TokenTypes) in the same WidgetGrid shell; the structural similarity is the shared page layout pattern, not accidental reimplementation.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 19,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/views/insights/agents/views/overview.tsx:247-264|.bench/sentry/static/app/views/insights/agents/views/overview.tsx:266-283",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/insights/agents/views/overview.tsx:247-264 FunctionDeclaration TracesView",
+      ".bench/sentry/static/app/views/insights/agents/views/overview.tsx:266-283 FunctionDeclaration ModelsView"
+    ]
+  },
+  {
+    "id": "sentry-73",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 73,
+    "label": "real",
+    "confidence": 0.75,
+    "fpClass": "none",
+    "reasoning": "ReleaseSessionCountChartwidget and ReleaseSessionPercentageChartWidget are structurally nearly identical wrappers (same hook call pattern, same alias derivation pattern, same props forwarding) that differ only in the specific hook, chart type (Line vs Area), alias field name suffix, and description string — a generic ReleaseChartWidget parameterized by hook and chart type could unify them.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 61,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/insights/common/components/widgets/releaseSessionCountChartWidget.tsx:10-37|.bench/sentry/static/app/views/insights/common/components/widgets/releaseSessionPercentageChartWidget.tsx:10-39",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/insights/common/components/widgets/releaseSessionCountChartWidget.tsx:10-37 FunctionDeclaration ReleaseSessionCountChartwidget",
+      ".bench/sentry/static/app/views/insights/common/components/widgets/releaseSessionPercentageChartWidget.tsx:10-39 FunctionDeclaration ReleaseSessionPercentageChartWidget"
+    ]
+  },
+  {
+    "id": "sentry-74",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 74,
+    "label": "real",
+    "confidence": 0.82,
+    "fpClass": "none",
+    "reasoning": "SessionHealthCountChartWidget and SessionHealthRateChartWidget share identical structure — both call useSessionHealthBreakdown with type 'count'/'rate', build a parallel aliases object (count_* vs rate_*), and render InsightsLineChartWidget vs InsightsAreaChartWidget with matching props — a unified component parameterized by type would cleanly replace both.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 56,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/insights/common/components/widgets/sessionHealthCountChartWidget.tsx:10-50|.bench/sentry/static/app/views/insights/common/components/widgets/sessionHealthRateChartWidget.tsx:10-50",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/insights/common/components/widgets/sessionHealthCountChartWidget.tsx:10-50 FunctionDeclaration SessionHealthCountChartWidget",
+      ".bench/sentry/static/app/views/insights/common/components/widgets/sessionHealthRateChartWidget.tsx:10-50 FunctionDeclaration SessionHealthRateChartWidget"
+    ]
+  },
+  {
+    "id": "sentry-75",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 75,
+    "label": "real",
+    "confidence": 0.82,
+    "fpClass": "none",
+    "reasoning": "UserHealthCountChartWidget and UserHealthRateChartWidget are exact structural parallels of SessionHealth variants (same pattern: useUserHealthBreakdown with type, parallel aliases, Line vs Area chart) and are equally strong candidates for a shared generic user-health chart widget.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 56,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/views/insights/common/components/widgets/userHealthCountChartWidget.tsx:10-53|.bench/sentry/static/app/views/insights/common/components/widgets/userHealthRateChartWidget.tsx:10-53",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/insights/common/components/widgets/userHealthCountChartWidget.tsx:10-53 FunctionDeclaration UserHealthCountChartWidget",
+      ".bench/sentry/static/app/views/insights/common/components/widgets/userHealthRateChartWidget.tsx:10-53 FunctionDeclaration UserHealthRateChartWidget"
+    ]
+  },
+  {
+    "id": "sentry-76",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 76,
+    "label": "fp",
+    "confidence": 0.78,
+    "fpClass": "declarative-config",
+    "reasoning": "PHPCronQuickStart, GoCronQuickStart, RubyCronQuickStart, and DotNetCronQuickStart each contain language-specific SDK code snippets and doc links that are inherently different content; the shared React skeleton (Fragment + tct install link + two CodeBlock elements) is platform-specific SDK documentation that must stay separate per language.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 4,
+    "sameName": [],
+    "maxShared": 46,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/insights/crons/components/quickStartEntries.tsx:149-189|.bench/sentry/static/app/views/insights/crons/components/quickStartEntries.tsx:264-313|.bench/sentry/static/app/views/insights/crons/components/quickStartEntries.tsx:826-855|.bench/sentry/static/app/views/insights/crons/components/quickStartEntries.tsx:936-965",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/insights/crons/components/quickStartEntries.tsx:149-189 FunctionDeclaration PHPCronQuickStart",
+      ".bench/sentry/static/app/views/insights/crons/components/quickStartEntries.tsx:264-313 FunctionDeclaration GoCronQuickStart",
+      ".bench/sentry/static/app/views/insights/crons/components/quickStartEntries.tsx:826-855 FunctionDeclaration RubyCronQuickStart",
+      ".bench/sentry/static/app/views/insights/crons/components/quickStartEntries.tsx:936-965 FunctionDeclaration DotNetCronQuickStart"
+    ]
+  },
+  {
+    "id": "sentry-77",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 77,
+    "label": "fp",
+    "confidence": 0.72,
+    "fpClass": "declarative-config",
+    "reasoning": "NodeJSCronQuickStart, RubyRailsCronQuickStart, and RubySidekiqCronQuickStart each embed language/framework-specific code and doc links; RubyRails and RubySidekiq share a mixin pattern but differ in the SDK guide URL and class base, making these intentionally separate documentation components rather than accidental duplication.",
+    "scoreMin": 0.9183673469387755,
+    "scoreMax": 1,
+    "locationCount": 3,
+    "sameName": [],
+    "maxShared": 47,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/insights/crons/components/quickStartEntries.tsx:220-262|.bench/sentry/static/app/views/insights/crons/components/quickStartEntries.tsx:857-894|.bench/sentry/static/app/views/insights/crons/components/quickStartEntries.tsx:896-934",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/insights/crons/components/quickStartEntries.tsx:220-262 FunctionDeclaration NodeJSCronQuickStart",
+      ".bench/sentry/static/app/views/insights/crons/components/quickStartEntries.tsx:857-894 FunctionDeclaration RubyRailsCronQuickStart",
+      ".bench/sentry/static/app/views/insights/crons/components/quickStartEntries.tsx:896-934 FunctionDeclaration RubySidekiqCronQuickStart"
+    ]
+  },
+  {
+    "id": "sentry-78",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 78,
+    "label": "real",
+    "confidence": 0.9,
+    "fpClass": "none",
+    "reasoning": "McpPromptsTable, McpResourcesTable, and McpToolsTable are structurally identical — same hooks, same render pattern, same column set — differing only in the MCP-specific field name (MCP_PROMPT_NAME / MCP_RESOURCE_URI / MCP_TOOL_NAME) and referrer constant, making them clear accidental reimplementations that should share a generic MCP table component.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 3,
+    "sameName": [],
+    "maxShared": 145,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/views/insights/mcp/components/mcpPromptsTable.tsx:44-139|.bench/sentry/static/app/views/insights/mcp/components/mcpResourcesTable.tsx:44-139|.bench/sentry/static/app/views/insights/mcp/components/mcpToolsTable.tsx:44-139",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/insights/mcp/components/mcpPromptsTable.tsx:44-139 FunctionDeclaration McpPromptsTable",
+      ".bench/sentry/static/app/views/insights/mcp/components/mcpResourcesTable.tsx:44-139 FunctionDeclaration McpResourcesTable",
+      ".bench/sentry/static/app/views/insights/mcp/components/mcpToolsTable.tsx:44-139 FunctionDeclaration McpToolsTable"
+    ]
+  },
+  {
+    "id": "sentry-79",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 79,
+    "label": "real",
+    "confidence": 0.82,
+    "fpClass": "none",
+    "reasoning": "McpPromptCell and McpResourceCell follow the same pattern of building an explore URL and returning a Link, differing only in the field name used and the set of columns in the 'field' array, which is a small domain-specific variation that could easily be parameterized.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 44,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/insights/mcp/components/mcpPromptsTable.tsx:141-166|.bench/sentry/static/app/views/insights/mcp/components/mcpResourcesTable.tsx:141-160",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/insights/mcp/components/mcpPromptsTable.tsx:141-166 FunctionDeclaration McpPromptCell",
+      ".bench/sentry/static/app/views/insights/mcp/components/mcpResourcesTable.tsx:141-160 FunctionDeclaration McpResourceCell"
+    ]
+  },
+  {
+    "id": "sentry-80",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 80,
+    "label": "fp",
+    "confidence": 0.85,
+    "fpClass": "declarative-config",
+    "reasoning": "getColdAppStartPerformance and getWarmAppStartPerformance have intentionally different threshold values (5000/3000 ms vs 2000/1000 ms) reflecting distinct platform performance standards for cold vs warm app starts, so merging them would require a threshold parameter that obscures the intentional domain difference.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 48,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/insights/mobile/screens/utils.ts:112-138|.bench/sentry/static/app/views/insights/mobile/screens/utils.ts:84-110",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/insights/mobile/screens/utils.ts:84-110 FunctionDeclaration getColdAppStartPerformance",
+      ".bench/sentry/static/app/views/insights/mobile/screens/utils.ts:112-138 FunctionDeclaration getWarmAppStartPerformance"
+    ]
+  },
+  {
+    "id": "sentry-81",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 81,
+    "label": "real",
+    "confidence": 0.85,
+    "fpClass": "none",
+    "reasoning": "BackendHeader and FrontendHeader are structurally identical wrappers around DomainViewHeader, differing only in the base URL path constant and title constant, making them prime candidates for a single parameterized DomainHeader component.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 30,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/views/insights/pages/backend/backendPageHeader.tsx:23-50|.bench/sentry/static/app/views/insights/pages/frontend/frontendPageHeader.tsx:24-51",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/insights/pages/backend/backendPageHeader.tsx:23-50 FunctionDeclaration BackendHeader",
+      ".bench/sentry/static/app/views/insights/pages/frontend/frontendPageHeader.tsx:24-51 FunctionDeclaration FrontendHeader"
+    ]
+  },
+  {
+    "id": "sentry-82",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 82,
+    "label": "real",
+    "confidence": 0.75,
+    "fpClass": "none",
+    "reasoning": "useQueuesByDestinationQuery and useQueuesByTransactionQuery share nearly identical structure and field sets, differing only in the cursor param name and that the transaction query adds 'transaction' and 'span.op' fields and omits the false flag on addFilterValue, suggesting they could share a base query hook with field overrides.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 40,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/insights/queues/queries/useQueuesByDestinationQuery.tsx:20-55|.bench/sentry/static/app/views/insights/queues/queries/useQueuesByTransactionQuery.tsx:20-57",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/insights/queues/queries/useQueuesByDestinationQuery.tsx:20-55 FunctionDeclaration useQueuesByDestinationQuery",
+      ".bench/sentry/static/app/views/insights/queues/queries/useQueuesByTransactionQuery.tsx:20-57 FunctionDeclaration useQueuesByTransactionQuery"
+    ]
+  },
+  {
+    "id": "sentry-83",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 83,
+    "label": "real",
+    "confidence": 0.85,
+    "fpClass": "none",
+    "reasoning": "useSessionHealthBreakdown and useUserHealthBreakdown are near-identical hooks differing only in the API field ('sum(session)' vs 'count_unique(user)'), the series name suffix ('session' vs 'user'), and which utility function is called (getSessionStatusSeries vs getCountStatusSeries), making them clear accidental reimplementations.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 156,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/insights/sessions/queries/useSessionHealthBreakdown.tsx:10-104|.bench/sentry/static/app/views/insights/sessions/queries/useUserHealthBreakdown.tsx:10-104",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/insights/sessions/queries/useSessionHealthBreakdown.tsx:10-104 FunctionDeclaration useSessionHealthBreakdown",
+      ".bench/sentry/static/app/views/insights/sessions/queries/useUserHealthBreakdown.tsx:10-104 FunctionDeclaration useUserHealthBreakdown"
+    ]
+  },
+  {
+    "id": "sentry-84",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 84,
+    "label": "real",
+    "confidence": 0.9,
+    "fpClass": "none",
+    "reasoning": "useMergedIssuesDrawer and useSimilarIssuesDrawer are structurally identical hooks differing only in the drawer component rendered (MergedIssuesDrawer vs SimilarIssuesDrawer) and the aria label string, which could trivially be parameterized into a single reusable hook.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 53,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/views/issueDetails/streamline/hooks/useMergedIssuesDrawer.tsx:12-45|.bench/sentry/static/app/views/issueDetails/streamline/hooks/useSimilarIssuesDrawer.tsx:12-45",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/issueDetails/streamline/hooks/useMergedIssuesDrawer.tsx:12-45 FunctionDeclaration useMergedIssuesDrawer",
+      ".bench/sentry/static/app/views/issueDetails/streamline/hooks/useSimilarIssuesDrawer.tsx:12-45 FunctionDeclaration useSimilarIssuesDrawer"
+    ]
+  },
+  {
+    "id": "sentry-85",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 85,
+    "label": "real",
+    "confidence": 0.85,
+    "fpClass": "none",
+    "reasoning": "MergedIssuesSidebarSection and SimilarIssuesSidebarSection are identical React components differing only in the Tab enum value and label string; they should share a single parameterized component.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 47,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/issueDetails/streamline/sidebar/mergedSidebarSection.tsx:9-29|.bench/sentry/static/app/views/issueDetails/streamline/sidebar/similarIssuesSidebarSection.tsx:9-29",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/issueDetails/streamline/sidebar/mergedSidebarSection.tsx:9-29 FunctionDeclaration MergedIssuesSidebarSection",
+      ".bench/sentry/static/app/views/issueDetails/streamline/sidebar/similarIssuesSidebarSection.tsx:9-29 FunctionDeclaration SimilarIssuesSidebarSection"
+    ]
+  },
+  {
+    "id": "sentry-86",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 86,
+    "label": "real",
+    "confidence": 0.92,
+    "fpClass": "none",
+    "reasoning": "RegressionsPage and WarningsPage are byte-for-byte identical page wrappers except for the IssueTaxonomy config key; a single configurable page component would eliminate the duplication.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 49,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/issueList/pages/breachedMetrics.tsx:12-32|.bench/sentry/static/app/views/issueList/pages/warnings.tsx:12-32",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/issueList/pages/breachedMetrics.tsx:12-32 FunctionDeclaration RegressionsPage",
+      ".bench/sentry/static/app/views/issueList/pages/warnings.tsx:12-32 FunctionDeclaration WarningsPage"
+    ]
+  },
+  {
+    "id": "sentry-87",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 87,
+    "label": "real",
+    "confidence": 0.75,
+    "fpClass": "none",
+    "reasoning": "generateBackendPerformanceEventView and generateFrontendOtherPerformanceEventView share identical boilerplate (savedQuery construction, widths, statsPeriod check, orderby, EAP branch) and differ only in the fields array; the shared skeleton is accidental reimplementation.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 76,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/views/performance/data.tsx:248-302|.bench/sentry/static/app/views/performance/data.tsx:422-474",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/performance/data.tsx:248-302 FunctionDeclaration generateBackendPerformanceEventView",
+      ".bench/sentry/static/app/views/performance/data.tsx:422-474 FunctionDeclaration generateFrontendOtherPerformanceEventView"
+    ]
+  },
+  {
+    "id": "sentry-88",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 88,
+    "label": "real",
+    "confidence": 0.88,
+    "fpClass": "none",
+    "reasoning": "UniqueErrorIssues and UniqueOccurrences implement the exact same deduplication algorithm using a Set<number> on issue_id, operating on node.errors vs node.occurrences with different return types; the logic should be extracted into a shared generic helper.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 38,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/performance/newTraceDetails/traceModels/traceTree.tsx:1415-1434|.bench/sentry/static/app/views/performance/newTraceDetails/traceModels/traceTree.tsx:1436-1455",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/performance/newTraceDetails/traceModels/traceTree.tsx:1415-1434 MethodDeclaration UniqueErrorIssues",
+      ".bench/sentry/static/app/views/performance/newTraceDetails/traceModels/traceTree.tsx:1436-1455 MethodDeclaration UniqueOccurrences"
+    ]
+  },
+  {
+    "id": "sentry-89",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 89,
+    "label": "real",
+    "confidence": 0.93,
+    "fpClass": "none",
+    "reasoning": "eventsRouteWithQuery, profilesRouteWithQuery, and replaysRouteWithQuery are structurally identical — same parameter shape, same query object, differing only in the URL path suffix — and should share a single factory function.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 3,
+    "sameName": [],
+    "maxShared": 35,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/performance/transactionSummary/transactionEvents/utils.tsx:92-118|.bench/sentry/static/app/views/performance/transactionSummary/transactionProfiles/utils.ts:7-34|.bench/sentry/static/app/views/performance/transactionSummary/transactionReplays/utils.ts:7-34",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/performance/transactionSummary/transactionEvents/utils.tsx:92-118 FunctionDeclaration eventsRouteWithQuery",
+      ".bench/sentry/static/app/views/performance/transactionSummary/transactionProfiles/utils.ts:7-34 FunctionDeclaration profilesRouteWithQuery",
+      ".bench/sentry/static/app/views/performance/transactionSummary/transactionReplays/utils.ts:7-34 FunctionDeclaration replaysRouteWithQuery"
+    ]
+  },
+  {
+    "id": "sentry-90",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 90,
+    "label": "real",
+    "confidence": 0.82,
+    "fpClass": "none",
+    "reasoning": "getShaUrl and getBranchUrl share the same validation, repoName resolution, baseUrl lookup, and provider switch structure, differing only in the URL path segment they append; the shared pattern is accidental reimplementation.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 52,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/views/preprod/utils/vcsLinkUtils.ts:21-48|.bench/sentry/static/app/views/preprod/utils/vcsLinkUtils.ts:68-95",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/preprod/utils/vcsLinkUtils.ts:21-48 FunctionDeclaration getShaUrl",
+      ".bench/sentry/static/app/views/preprod/utils/vcsLinkUtils.ts:68-95 FunctionDeclaration getBranchUrl"
+    ]
+  },
+  {
+    "id": "sentry-91",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 91,
+    "label": "real",
+    "confidence": 0.88,
+    "fpClass": "none",
+    "reasoning": "CommitDetailWrapper and PullDetailWrapper are identical layout shells — same SentryDocumentTitle, Header, Body, Main, Outlet structure — differing only in title strings; they should be one shared wrapper component accepting a title prop.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 37,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/prevent/coverage/commits/commitWrapper.tsx:9-31|.bench/sentry/static/app/views/prevent/coverage/pulls/pullWrapper.tsx:9-31",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/prevent/coverage/commits/commitWrapper.tsx:9-31 FunctionDeclaration CommitDetailWrapper",
+      ".bench/sentry/static/app/views/prevent/coverage/pulls/pullWrapper.tsx:9-31 FunctionDeclaration PullDetailWrapper"
+    ]
+  },
+  {
+    "id": "sentry-92",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 92,
+    "label": "real",
+    "confidence": 0.8,
+    "fpClass": "none",
+    "reasoning": "ContinuousProfileFlamegraph and ProfileFlamegraph have identical analytics/hook logic differing only in the component rendered (<ContinuousFlamegraph> vs <Flamegraph>) and a minor extra hook import, making the analytics+effect body a clear accidental duplication.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 45,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/profiling/continuousProfileFlamegraph.tsx:30-56|.bench/sentry/static/app/views/profiling/profileFlamechart.tsx:30-56",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/profiling/continuousProfileFlamegraph.tsx:30-56 FunctionDeclaration ContinuousProfileFlamegraph",
+      ".bench/sentry/static/app/views/profiling/profileFlamechart.tsx:30-56 FunctionDeclaration ProfileFlamegraph"
+    ]
+  },
+  {
+    "id": "sentry-93",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 93,
+    "label": "real",
+    "confidence": 0.85,
+    "fpClass": "none",
+    "reasoning": "Commits and FilesChanged share an identical data-fetching and error-handling skeleton with the same hooks and guards, differing only in the final list component rendered (<CommitsList> vs <FilesChangedList>), which is a textbook accidental duplication that should be extracted into a shared component.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 78,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/views/releases/detail/commitsAndFiles/commits.tsx:116-174|.bench/sentry/static/app/views/releases/detail/commitsAndFiles/filesChanged.tsx:130-188",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/releases/detail/commitsAndFiles/commits.tsx:116-174 FunctionDeclaration Commits",
+      ".bench/sentry/static/app/views/releases/detail/commitsAndFiles/filesChanged.tsx:130-188 FunctionDeclaration FilesChanged"
+    ]
+  },
+  {
+    "id": "sentry-94",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 94,
+    "label": "real",
+    "confidence": 0.82,
+    "fpClass": "none",
+    "reasoning": "get24hCountByRelease and getPeriodCountByRelease are structurally identical arrow methods that differ only in the state key accessed (totalCountByReleaseIn24h vs totalCountByReleaseInPeriod), making them clear candidates for a single parameterized helper.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 45,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/releases/list/releasesRequest.tsx:364-375|.bench/sentry/static/app/views/releases/list/releasesRequest.tsx:377-388",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/releases/list/releasesRequest.tsx:364-375 PropertyDeclaration get24hCountByRelease",
+      ".bench/sentry/static/app/views/releases/list/releasesRequest.tsx:377-388 PropertyDeclaration getPeriodCountByRelease"
+    ]
+  },
+  {
+    "id": "sentry-95",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 95,
+    "label": "fp",
+    "confidence": 0.7,
+    "fpClass": "declarative-config",
+    "reasoning": "RequestPayloadSection and ResponsePayloadSection intentionally model the request and response sides of an HTTP exchange; they use different data keys ('request' vs 'response'), different titles, and different container components (Indent vs InspectorMargin), so de-duplicating would force an awkward abstraction over semantically distinct payload directions.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 80,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/replays/detail/network/details/sections.tsx:198-235|.bench/sentry/static/app/views/replays/detail/network/details/sections.tsx:237-274",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/replays/detail/network/details/sections.tsx:198-235 FunctionDeclaration RequestPayloadSection",
+      ".bench/sentry/static/app/views/replays/detail/network/details/sections.tsx:237-274 FunctionDeclaration ResponsePayloadSection"
+    ]
+  },
+  {
+    "id": "sentry-96",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 96,
+    "label": "real",
+    "confidence": 0.75,
+    "fpClass": "none",
+    "reasoning": "_handleObjClose and _handleArrClose are structurally parallel state-machine handlers that differ only in the JSON token constants used (OBJ/OBJ_VAL/OBJ_VAL_COMPLETED vs ARR/ARR_VAL/ARR_VAL_COMPLETED), and share the identical trailing logic for updating the parent context, suggesting they could be unified into a single generic close-handler.",
+    "scoreMin": 1,
+    "scoreMax": 1,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 25,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/views/replays/detail/network/truncateJson/evaluateJson.ts:197-227|.bench/sentry/static/app/views/replays/detail/network/truncateJson/evaluateJson.ts:229-259",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/replays/detail/network/truncateJson/evaluateJson.ts:197-227 FunctionDeclaration _handleObjClose",
+      ".bench/sentry/static/app/views/replays/detail/network/truncateJson/evaluateJson.ts:229-259 FunctionDeclaration _handleArrClose"
+    ]
+  },
+  {
+    "id": "sentry-97",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 97,
+    "label": "real",
+    "confidence": 0.88,
+    "fpClass": "none",
+    "reasoning": "HttpDomainSummaryResponseCodesChartWidget and HttpResponseCodesChartWidget are nearly identical functions — same queries, same chart-building logic, same render output — differing only in the chart filter hook called and the component id/referrer string, a clear case of copy-paste duplication that should be unified into a shared widget with a filter parameter.",
+    "scoreMin": 0.963302752293578,
+    "scoreMax": 0.963302752293578,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 105,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/insights/common/components/widgets/httpDomainSummaryResponseCodesChartWidget.tsx:21-121|.bench/sentry/static/app/views/insights/common/components/widgets/httpResponseCodesChartWidget.tsx:21-119",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/insights/common/components/widgets/httpDomainSummaryResponseCodesChartWidget.tsx:21-121 FunctionDeclaration HttpDomainSummaryResponseCodesChartWidget",
+      ".bench/sentry/static/app/views/insights/common/components/widgets/httpResponseCodesChartWidget.tsx:21-119 FunctionDeclaration HttpResponseCodesChartWidget"
+    ]
+  },
+  {
+    "id": "sentry-98",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 98,
+    "label": "real",
+    "confidence": 0.82,
+    "fpClass": "none",
+    "reasoning": "makeColorBufferForNodes and makeColorBuffer have identical signatures and bodies except for the color-map lookup key (frame.node vs frame.key), making this an accidental duplication that should be collapsed into a single function accepting a key-extractor argument.",
+    "scoreMin": 0.9523809523809523,
+    "scoreMax": 0.9523809523809523,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 80,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/utils/profiling/colors/utils.tsx:55-84|.bench/sentry/static/app/utils/profiling/colors/utils.tsx:86-115",
+    "locationSignatures": [
+      ".bench/sentry/static/app/utils/profiling/colors/utils.tsx:55-84 FunctionDeclaration makeColorBufferForNodes",
+      ".bench/sentry/static/app/utils/profiling/colors/utils.tsx:86-115 FunctionDeclaration makeColorBuffer"
+    ]
+  },
+  {
+    "id": "sentry-99",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 99,
+    "label": "real",
+    "confidence": 0.75,
+    "fpClass": "none",
+    "reasoning": "QueryTransactionsTable and DomainTransactionsTable are nearly identical React components rendering the same GridEditable+Pagination structure with the same cursor handler and column resize logic, differing only in the domain-specific prop (groupId vs domain) passed to renderBodyCell and a missing useModuleURL call — a reviewer would consolidate these into a shared TransactionsTable.",
+    "scoreMin": 0.9436619718309859,
+    "scoreMax": 0.9436619718309859,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 67,
+    "split": "holdout",
+    "locationKey": ".bench/sentry/static/app/views/insights/database/components/tables/queryTransactionsTable.tsx:81-146|.bench/sentry/static/app/views/insights/http/components/tables/domainTransactionsTable.tsx:114-169",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/insights/database/components/tables/queryTransactionsTable.tsx:81-146 FunctionDeclaration QueryTransactionsTable",
+      ".bench/sentry/static/app/views/insights/http/components/tables/domainTransactionsTable.tsx:114-169 FunctionDeclaration DomainTransactionsTable"
+    ]
+  },
+  {
+    "id": "sentry-100",
+    "corpus": "sentry",
+    "corpusTag": "25.10.0",
+    "pool": "strict",
+    "rank": 100,
+    "label": "real",
+    "confidence": 0.8,
+    "fpClass": "none",
+    "reasoning": "transformEventsRequestToArea and transformEventsChartRequest are structurally identical transform functions — same signature, same normalizeDateTimeParams call, same childData shape — differing only in one line (results.timeseriesData vs results.results), which is a clear accidental reimplementation that should be parameterized or shared.",
+    "scoreMin": 0.9344262295081968,
+    "scoreMax": 0.9344262295081968,
+    "locationCount": 2,
+    "sameName": [],
+    "maxShared": 57,
+    "split": "train",
+    "locationKey": ".bench/sentry/static/app/views/performance/landing/widgets/transforms/transformEventsToArea.tsx:10-37|.bench/sentry/static/app/views/performance/landing/widgets/widgets/mobileReleaseComparisonListWidget.tsx:73-100",
+    "locationSignatures": [
+      ".bench/sentry/static/app/views/performance/landing/widgets/transforms/transformEventsToArea.tsx:10-37 FunctionDeclaration transformEventsRequestToArea",
+      ".bench/sentry/static/app/views/performance/landing/widgets/widgets/mobileReleaseComparisonListWidget.tsx:73-100 FunctionDeclaration transformEventsChartRequest"
+    ]
+  }
+]

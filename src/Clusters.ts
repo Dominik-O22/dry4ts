@@ -129,14 +129,30 @@ export function compareLocations(left: Location, right: Location): number {
 // the cross-file-name scan runs once per cluster, not once per comparison.
 function rankClusters(clusters: readonly Cluster[]): Cluster[] {
   return clusters
-    .map((cluster) => ({ cluster, crossFile: hasCrossFileSharedName(cluster) ? 1 : 0 }))
+    .map((cluster) => ({
+      cluster,
+      // Highest-priority (most significant) key: all-boilerplate clusters sink
+      // below everything, even cross-file-name ones (the n8n DI-constructor case).
+      // Off --demote-boilerplate no location carries the flag, so this is 0 for
+      // every cluster and the order is byte-identical to before.
+      boilerplate: isBoilerplate(cluster) ? 1 : 0,
+      crossFile: hasCrossFileSharedName(cluster) ? 1 : 0,
+    }))
     .sort(
       (left, right) =>
+        left.boilerplate - right.boilerplate ||
         right.crossFile - left.crossFile ||
         maxScore(right.cluster) - maxScore(left.cluster) ||
         compareLocations(left.cluster.locations[0], right.cluster.locations[0]),
     )
     .map(({ cluster }) => cluster);
+}
+
+// A cluster is boilerplate iff every location's candidate does no real work
+// (--demote-boilerplate only; the flag is uniform across a cluster's structural
+// twins). Off the flag, `boilerplate` is undefined everywhere, so this is false.
+function isBoilerplate(cluster: Cluster): boolean {
+  return cluster.locations.length > 0 && cluster.locations.every((location) => location.boilerplate === true);
 }
 
 // The set of declaration names that appear in two or more distinct files within a

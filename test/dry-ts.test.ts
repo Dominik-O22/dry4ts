@@ -240,9 +240,10 @@ test("--profile agent is the pr gate plus counterparts and json output", () => {
   assert.deepEqual(options.excludeKinds, ["ArrowFunction", "VariableStatement"]);
   assert.equal(options.onlyNew, true);
   assert.equal(options.failOnDuplicates, true);
-  // ...and adds the two agent-loop fields the profile mechanism now carries.
+  // ...and adds the agent-loop fields the profile mechanism now carries.
   assert.equal(options.counterparts, true);
   assert.equal(options.format, "json");
+  assert.equal(options.demoteBoilerplate, true);
 });
 
 test("--profile agent without a changed scope fails loud (inherits pr's only-new)", () => {
@@ -3648,5 +3649,86 @@ test("main: a committed config that shapes the gate prints a scope note under --
   assert.ok(
     !ungated.err.some((line) => line.includes("shapes this --fail-on-duplicates run")),
     `Expected no gate-scope note without the gate, got: ${JSON.stringify(ungated.err)}`,
+  );
+});
+
+test("--demote-boilerplate flag parses; default off", () => {
+  assert.equal(Options.parse(".").demoteBoilerplate, false);
+  assert.equal(Options.parse("--demote-boilerplate", ".").demoteBoilerplate, true);
+});
+
+test("--demote-boilerplate sinks work-free clusters below real-work ones, even cross-file-named", async () => {
+  // Each file holds a wiring-only function (assignments only — no control flow, no
+  // call, no real operator) and a real-work function (loop + arithmetic). Both recur
+  // cross-file with identical structure, so both clusters are cross-file-named and
+  // score 1.0; `wire` is declared first, so the default location tiebreak ranks it
+  // ahead. With the flag, the work-free `wire` cluster must sink below `total`.
+  const source = `
+export function wire(target: Target, a: Value, b: Value, c: Value): void {
+  target.first = a;
+  target.second = b;
+  target.third = c;
+}
+
+export function total(values: number[]): number {
+  let sum = 0;
+  for (const value of values) {
+    sum = sum + value;
+  }
+  return sum;
+}
+`;
+  const { dir } = await writeFixture({ "a.ts": source, "b.ts": source });
+  const scan: OptionsInput = { paths: [dir], threshold: 0.8, minLines: 1, minNodes: 5 };
+  const nameOf = (cluster: Cluster) => cluster.locations[0].name;
+
+  const baseline = new TypeScriptDuplicateFinder().findClusters(scan);
+  assert.deepEqual(
+    baseline.map(nameOf),
+    ["wire", "total"],
+    "off the flag, the first-declared `wire` wins the location tiebreak",
+  );
+  assert.ok(
+    baseline.every((cluster) => cluster.locations.every((location) => !("boilerplate" in location))),
+    "off the flag, no location carries a boilerplate own-property (byte-identical shape)",
+  );
+
+  const demoted = new TypeScriptDuplicateFinder().findClusters({ ...scan, demoteBoilerplate: true });
+  assert.deepEqual(
+    demoted.map(nameOf),
+    ["total", "wire"],
+    "on the flag, the work-free cluster sinks below the real one",
+  );
+  const wire = demoted.find((cluster) => nameOf(cluster) === "wire");
+  const work = demoted.find((cluster) => nameOf(cluster) === "total");
+  assert.ok(
+    wire?.locations.every((location) => location.boilerplate === true),
+    "`wire` candidates flagged boilerplate",
+  );
+  assert.ok(
+    work?.locations.every((location) => location.boilerplate === false),
+    "`total` does real work (loop + arithmetic)",
+  );
+});
+
+test("--demote-boilerplate treats a tagged template as real work, not boilerplate", async () => {
+  // A no-substitution tagged template has no inner call/operator nodes, but the tag
+  // function still runs — so it must NOT be classified as work-free boilerplate.
+  // (Styling false positives are handled by --exclude-tagged-templates, not here.)
+  const source = `
+export const query = sql\`SELECT id, name, email FROM users WHERE active = true\`;
+`;
+  const { dir } = await writeFixture({ "a.ts": source, "b.ts": source });
+  const [cluster] = new TypeScriptDuplicateFinder().findClusters({
+    paths: [dir],
+    threshold: 0.8,
+    minLines: 1,
+    minNodes: 1,
+    demoteBoilerplate: true,
+  });
+  assert.ok(cluster, "expected a cross-file cluster for the duplicated tagged-template const");
+  assert.ok(
+    cluster.locations.every((location) => location.boilerplate === false),
+    "a tagged template executes its tag function — real work",
   );
 });

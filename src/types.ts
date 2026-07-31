@@ -37,6 +37,12 @@ export interface ClusterLocation extends Location {
   // (--counterparts + an active scope only). Absent when the flag is off or no
   // scope is active, mirroring cluster status "unscoped".
   readonly changed?: boolean;
+  // Whether the candidate does no real work — no control flow, no call (other
+  // than super()), no real operator. The classic shape is a DI constructor that
+  // only wires fields. Populated only under --demote-boilerplate; absent off the
+  // flag, so the default object shape is byte-identical. Used to demote
+  // all-boilerplate clusters in rankClusters.
+  readonly boilerplate?: boolean;
 }
 
 export interface ScoreRange {
